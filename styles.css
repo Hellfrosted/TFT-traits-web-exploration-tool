@@ -267,12 +267,20 @@ button:hover {
 
 #cancelBtn {
   display: none;
-  background: #612f2f;
-  color: #f5d6d6;
+  border-color: #a84d4d;
+  background: linear-gradient(180deg, #8f3f3f 0%, #763636 100%);
+  color: #fff3f3;
+  box-shadow: 0 0 0 1px rgba(255, 160, 160, 0.08), 0 10px 22px rgba(95, 30, 30, 0.28);
 }
 
 #cancelBtn:hover {
-  background: #744040;
+  background: linear-gradient(180deg, #a84949 0%, #8b3c3c 100%);
+  border-color: #c16666;
+}
+
+#cancelBtn:focus-visible {
+  outline: 2px solid rgba(255, 210, 210, 0.75);
+  outline-offset: 2px;
 }
 
 .multi-select-container {
