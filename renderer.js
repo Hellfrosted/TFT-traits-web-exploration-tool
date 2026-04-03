@@ -32,6 +32,7 @@ const defaultDataSource = electronBridge?.defaultDataSource || 'pbe';
 let rendererBootScheduled = false;
 let uiShellInitialized = false;
 let staticUiListenersBound = false;
+let activeSearchEstimate = null;
 
 function hasRequiredShellElements() {
     const requiredIds = [
@@ -439,6 +440,48 @@ function renderEmptySummary(message) {
     `);
 }
 
+function formatBoardEstimate(count) {
+    const numericCount = Number(count);
+    if (!Number.isFinite(numericCount) || numericCount <= 0) {
+        return '-';
+    }
+
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: numericCount < 1000 ? 0 : 1
+    }).format(numericCount);
+}
+
+function renderEstimateSummary(estimate = null) {
+    const estimateCount = estimate?.count;
+    const remainingToPick = estimate?.remainingToPick;
+    const estimateLabel = Number.isFinite(Number(estimateCount))
+        ? `~${formatBoardEstimate(estimateCount)} boards`
+        : 'Estimating...';
+    const openSlotsLabel = Number.isFinite(Number(remainingToPick))
+        ? String(remainingToPick)
+        : '-';
+
+    setResultsSummary(`
+        <div class="summary-card">
+            <span class="summary-label">Search Space</span>
+            <span class="summary-value">${escapeHtml(estimateLabel)}</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Open Slots</span>
+            <span class="summary-value">${escapeHtml(openSlotsLabel)}</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Top Score</span>
+            <span class="summary-value">-</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-label">Lowest Cost</span>
+            <span class="summary-value">-</span>
+        </div>
+    `);
+}
+
 function renderEmptySpotlight(message = 'No selection') {
     const spotlight = document.getElementById('boardSpotlight');
     if (!spotlight) return;
@@ -456,11 +499,35 @@ function renderEmptySpotlight(message = 'No selection') {
     `;
 }
 
+function renderSearchingSpotlight() {
+    const estimateLabel = Number.isFinite(Number(activeSearchEstimate?.count))
+        ? `Current estimate: ~${formatBoardEstimate(activeSearchEstimate.count)} boards.`
+        : 'Estimating the search space for this query.';
+    renderEmptySpotlight(`${estimateLabel} Results will appear here when the search completes.`);
+}
+
+function getQueryMetaClass(meta) {
+    const text = String(meta ?? '').toLowerCase();
+    if (text.includes('error') || text.includes('failed')) return 'query-summary-meta query-summary-meta-error';
+    if (text.includes('cancel')) return 'query-summary-meta query-summary-meta-warning';
+    if (text.includes('searching') || text.includes('cached') || text.includes('loaded') || text.includes('boards in')) {
+        return 'query-summary-meta query-summary-meta-active';
+    }
+    return 'query-summary-meta';
+}
+
+function renderResultsMessageRow(message, className = 'results-message-row') {
+    return `<tr><td colspan="6" class="${className}">${escapeHtml(message)}</td></tr>`;
+}
+
 function renderQuerySummary(params = null, meta = 'Idle') {
+    const metaClass = getQueryMetaClass(meta);
     if (!params) {
         setQuerySummary(`
-            <span class="query-summary-label">Query</span>
-            <div class="query-summary-content">${escapeHtml(meta)}</div>
+            <div class="query-summary-heading">
+                <span class="query-summary-label">Query</span>
+                <span class="${metaClass}">${escapeHtml(meta)}</span>
+            </div>
         `);
         return;
     }
@@ -481,10 +548,22 @@ function renderQuerySummary(params = null, meta = 'Idle') {
     if (!params.tierRank) chips.push('Flat trait ranking');
 
     setQuerySummary(`
-        <span class="query-summary-label">Query</span>
-        <div class="query-summary-content">${escapeHtml(meta)}</div>
+        <div class="query-summary-heading">
+            <span class="query-summary-label">Query</span>
+            <span class="${metaClass}">${escapeHtml(meta)}</span>
+        </div>
         <div class="query-chip-list">${chips.map((chip) => `<span class="query-chip">${escapeHtml(chip)}</span>`).join('')}</div>
     `);
+}
+
+function buildSearchMeta(progressPct = null) {
+    const progressText = Number.isFinite(progressPct)
+        ? `Searching ${progressPct}%`
+        : 'Searching';
+    const estimateSuffix = Number.isFinite(Number(activeSearchEstimate?.count))
+        ? ` of ~${formatBoardEstimate(activeSearchEstimate.count)} boards`
+        : '';
+    return `${progressText}${estimateSuffix}`;
 }
 
 function getCurrentSearchParams() {
@@ -795,14 +874,10 @@ scheduleRendererBootstrap();
 // Listen for progress updates from the engine
 if (electronBridge?.onSearchProgress) {
     electronBridge.onSearchProgress((data) => {
-        const progressEl = document.getElementById('searchProgress');
-        const searchBtn = document.getElementById('searchBtn');
-        if (progressEl) {
-            progressEl.textContent = `Computing... ${data.pct}%`;
-            progressEl.style.display = 'block';
-        }
-        if (searchBtn) {
-            searchBtn.innerText = `Searching... ${data.pct}%`;
+        if (lastSearchParams) {
+            renderQuerySummary(lastSearchParams, buildSearchMeta(data.pct));
+        } else {
+            renderQuerySummary(null, buildSearchMeta(data.pct));
         }
     });
 }
@@ -836,14 +911,14 @@ function renderResults(results) {
 
     if (!results || results.length === 0) {
         renderEmptySummary('No results');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff5252; padding: 20px;">No results found for these constraints.</td></tr>';
+        tbody.innerHTML = renderResultsMessageRow('No results found for these constraints.', 'results-message-row results-message-row-error');
         renderEmptySpotlight('No boards matched the current filters. Relax constraints or widen the search.');
         return;
     }
 
     if (results[0].error) {
         renderEmptySummary('Search error');
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">${escapeHtml(results[0].error)}</td></tr>`;
+        tbody.innerHTML = renderResultsMessageRow(results[0].error, 'results-message-row results-message-row-error');
         renderEmptySpotlight('Search failed before a board could be inspected.');
         return;
     }
@@ -918,7 +993,6 @@ function setSearchState(searching) {
     isSearching = searching;
     const searchBtn = document.getElementById('searchBtn');
     const cancelBtn = document.getElementById('cancelBtn');
-    const progressEl = document.getElementById('searchProgress');
 
     if (searching) {
         searchBtn.disabled = true;
@@ -930,7 +1004,7 @@ function setSearchState(searching) {
         searchBtn.classList.remove('disabled');
         searchBtn.innerText = 'Compute';
         cancelBtn.style.display = 'none';
-        if (progressEl) progressEl.style.display = 'none';
+        activeSearchEstimate = null;
     }
 
     syncFetchButtonState();
@@ -943,16 +1017,17 @@ async function handleSearchClick() {
     clampNumericInput('maxResults', 1, 10000, 100);
 
     const tbody = document.getElementById('resBody');
-    renderEmptySummary('Searching');
-    renderEmptySpotlight('Searching...');
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Initializing DFS engine...</td></tr>';
+    activeSearchEstimate = null;
+    renderEstimateSummary();
+    renderSearchingSpotlight();
+    tbody.innerHTML = renderResultsMessageRow('Estimating search space...');
     
     setSearchState(true);
 
     if (!selectors.mustInclude) {
         renderEmptySummary('Data required');
         renderQuerySummary(null, 'Load data first');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Please fetch data first.</td></tr>';
+        tbody.innerHTML = renderResultsMessageRow('Please fetch data first.', 'results-message-row results-message-row-error');
         setSearchState(false);
         return;
     }
@@ -974,19 +1049,24 @@ async function handleSearchClick() {
             includeUnique: document.getElementById('includeUniqueToggle').checked
         };
         lastSearchParams = params;
-        renderQuerySummary(params, 'Searching');
+        renderQuerySummary(params, buildSearchMeta());
 
         if (!electronBridge?.getSearchEstimate) {
             throw new Error('Electron preload bridge is unavailable.');
         }
         const estimate = await electronBridge.getSearchEstimate(params);
+        activeSearchEstimate = estimate;
+        renderQuerySummary(params, buildSearchMeta());
+        renderEstimateSummary(estimate);
+        renderSearchingSpotlight();
+        tbody.innerHTML = renderResultsMessageRow(`Scanning ~${formatBoardEstimate(estimate.count)} estimated boards...`);
         const maxRemainingSlots = searchLimits.MAX_REMAINING_SLOTS ?? 7;
         const largeSearchThreshold = searchLimits.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
 
         if (estimate.remainingToPick > maxRemainingSlots) {
             renderEmptySummary('Board too large');
             renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining picks.`);
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ff5252; padding: 20px;">Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.</td></tr>`;
+            tbody.innerHTML = renderResultsMessageRow(`Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`, 'results-message-row results-message-row-error');
             return;
         }
 
@@ -995,7 +1075,7 @@ async function handleSearchClick() {
             if (!confirmed) {
                 renderEmptySummary('Search aborted');
                 renderQuerySummary(params, 'Search cancelled');
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #aaa;">Search aborted by user.</td></tr>';
+                tbody.innerHTML = renderResultsMessageRow('Search aborted by user.', 'results-message-row results-message-row-muted');
                 return;
             }
         }
@@ -1010,7 +1090,7 @@ async function handleSearchClick() {
             document.getElementById('status').innerText = 'Search cancelled.';
             renderEmptySummary('Search cancelled');
             renderQuerySummary(params, 'Search cancelled');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff5252;">Search cancelled.</td></tr>';
+            tbody.innerHTML = renderResultsMessageRow('Search cancelled.', 'results-message-row results-message-row-error');
             return;
         }
 
@@ -1021,7 +1101,7 @@ async function handleSearchClick() {
             showAlert(errorMessage, 'Search Failed');
             renderEmptySummary('Search error');
             renderQuerySummary(params, `Error: ${errorMessage}`);
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ff5252; padding: 20px;">${escapeHtml(errorMessage)}</td></tr>`;
+            tbody.innerHTML = renderResultsMessageRow(errorMessage, 'results-message-row results-message-row-error');
             return;
         }
 
@@ -1058,7 +1138,7 @@ async function handleSearchClick() {
         showAlert(error.message || String(error), 'Search Failed');
         renderEmptySummary('Search error');
         renderQuerySummary(lastSearchParams, `Unexpected failure: ${error.message || String(error)}`);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff5252; padding: 20px;">Search failed unexpectedly.</td></tr>';
+        tbody.innerHTML = renderResultsMessageRow('Search failed unexpectedly.', 'results-message-row results-message-row-error');
     } finally {
         setSearchState(false);
     }

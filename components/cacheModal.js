@@ -40,9 +40,9 @@ async function renderCacheList() {
     for (const entry of res.entries) {
         const summary = summarizeParams(entry.params);
         html += `<tr data-key="${entry.key}">
-            <td style="max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${modalEscapeHtml(summary)}">${modalEscapeHtml(summary)}</td>
+            <td class="cache-table-summary-cell" title="${modalEscapeHtml(summary)}">${modalEscapeHtml(summary)}</td>
             <td>${entry.resultCount}</td>
-            <td style="white-space: nowrap;">${modalEscapeHtml(formatTimestamp(entry.timestamp))}</td>
+            <td class="cache-table-timestamp-cell">${modalEscapeHtml(formatTimestamp(entry.timestamp))}</td>
             <td><button class="btn-sm btn-danger cache-delete-btn" data-key="${modalEscapeHtml(entry.key)}">Delete</button></td>
         </tr>`;
     }

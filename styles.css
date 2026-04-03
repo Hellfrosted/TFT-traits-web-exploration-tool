@@ -275,17 +275,6 @@ button:hover {
   background: #744040;
 }
 
-.search-progress {
-  display: none;
-  margin-top: 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: #14181a;
-  color: var(--accent);
-  text-align: center;
-}
-
 .multi-select-container {
   position: relative;
   min-height: 34px;
@@ -432,6 +421,31 @@ details[open] summary::after {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.query-summary-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.query-summary-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.query-summary-meta-active {
+  color: var(--accent);
+}
+
+.query-summary-meta-warning {
+  color: #d8c58a;
+}
+
+.query-summary-meta-error {
+  color: #ff8d8d;
 }
 
 .synergy-settings-panel {
@@ -667,6 +681,20 @@ tbody tr.result-row-selected {
   text-align: center;
 }
 
+.results-message-row {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.results-message-row-error {
+  color: #ff8d8d;
+}
+
+.results-message-row-muted {
+  color: #a7adb3;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -751,6 +779,17 @@ tbody tr.result-row-selected {
   padding: 8px;
   border-bottom: 1px solid #252a2f;
   overflow-wrap: anywhere;
+}
+
+.cache-table-summary-cell {
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cache-table-timestamp-cell {
+  white-space: nowrap;
 }
 
 .cache-empty {

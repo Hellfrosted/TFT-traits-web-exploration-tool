@@ -199,7 +199,11 @@ function createWindow() {
             message: error?.message || String(error)
         });
     });
-    mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    mainWindow.webContents.on('console-message', (event) => {
+        const level = event.level ?? 'log';
+        const message = event.message ?? '';
+        const line = event.lineNumber ?? '';
+        const sourceId = event.sourceId ?? 'unknown';
         console.log(`[Renderer:${level}] ${message} (${sourceId}:${line})`);
     });
     mainWindow.loadFile('index.html');
