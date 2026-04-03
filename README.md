@@ -11,19 +11,17 @@ Electron app for exploring Teamfight Tactics board combinations with live or PBE
 
 ## Run
 
-Use the repo-local wrapper in this project:
-
 ```powershell
-.\npmw.cmd install
-.\npmw.cmd start
+npm install
+npm start
 ```
 
 ## Development
 
 ```powershell
-.\npmw.cmd run test
-.\npmw.cmd run lint
-.\npmw.cmd run validate:data
+npm test
+npm run lint
+npm run validate:data
 ```
 
 ## Notes
