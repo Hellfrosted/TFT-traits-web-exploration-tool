@@ -1,0 +1,7 @@
+node_modules/
+tools/node/
+.appdata/
+AGENTS.md
+npmw.cmd
+.DS_Store
+*.log
