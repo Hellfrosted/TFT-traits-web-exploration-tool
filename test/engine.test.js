@@ -812,6 +812,46 @@ describe('Engine.search', () => {
         assert.deepEqual(results[0].units, ['Darius', 'Malph', 'Talon']);
     });
 
+    it('prefers higher-cost boards when synergy scores tie', () => {
+        const expensiveTieDataCache = {
+            units: [
+                { id: 'FrontlineCheap', cost: 1, role: 'Tank', traits: ['Alpha'], traitIds: ['Alpha'] },
+                { id: 'FrontlineExpensive', cost: 5, role: 'Tank', traits: ['Alpha'], traitIds: ['Alpha'] },
+                { id: 'BacklineCheap', cost: 1, role: 'Carry', traits: ['Beta'], traitIds: ['Beta'] },
+                { id: 'BacklineExpensive', cost: 5, role: 'Carry', traits: ['Beta'], traitIds: ['Beta'] }
+            ],
+            traits: ['Alpha', 'Beta'],
+            roles: ['Tank', 'Carry'],
+            traitBreakpoints: {
+                Alpha: [1],
+                Beta: [1]
+            },
+            hashMap: {
+                Alpha: 'Alpha',
+                Beta: 'Beta'
+            }
+        };
+
+        const params = {
+            ...baseParams,
+            boardSize: 2,
+            mustInclude: [],
+            mustExclude: [],
+            mustIncludeTraits: [],
+            mustExcludeTraits: [],
+            includeUnique: true,
+            onlyActive: true,
+            tierRank: false,
+            maxResults: 5
+        };
+
+        const results = Engine.search(expensiveTieDataCache, params);
+
+        assert.equal(results[0].synergyScore, 2);
+        assert.equal(results[0].totalCost, 10);
+        assert.deepEqual(results[0].units, ['BacklineExpensive', 'FrontlineExpensive']);
+    });
+
     it('returns empty array when must-include units are not all found', () => {
         const params = { ...baseParams, mustInclude: ['NonExistentUnit'] };
         const results = Engine.search(mockDataCache, params);

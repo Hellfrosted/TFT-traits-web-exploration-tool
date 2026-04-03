@@ -662,7 +662,9 @@ class Engine {
 
         /** Combine synergy score and cost into a single comparable value */
         const scoreBoard = (synergyScore, totalCost) => {
-            return synergyScore * 10000 - totalCost;
+            // This search is intended to surface capped endgame boards, not budget boards.
+            // Prefer higher-cost boards as the secondary tie-break once synergy is matched.
+            return synergyScore * 10000 + totalCost;
         };
 
         const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts, activeUnitIds) => {
@@ -952,7 +954,7 @@ class Engine {
         for (const b of topBoards) delete b._score;
         topBoards.sort((a,b) =>
             b.synergyScore - a.synergyScore ||
-            a.totalCost - b.totalCost ||
+            b.totalCost - a.totalCost ||
             a.units.join(',').localeCompare(b.units.join(','))
         );
         return topBoards;

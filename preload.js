@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     limits: LIMITS,
     dataSources: DATA_SOURCES,
     defaultDataSource: DEFAULT_DATA_SOURCE,
+    flags: {
+        smokeTest: process.argv.includes('--smoke-test')
+    },
 
     /** Fetch latest champion and trait data from CommunityDragon/Cache */
     fetchData: (source) => ipcRenderer.invoke(IPC_CHANNELS.FETCH_DATA, source),
@@ -60,11 +63,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /** Listen for search progress updates (percentage and count) */
     onSearchProgress: (callback) => {
-        ipcRenderer.on(IPC_CHANNELS.SEARCH_PROGRESS, (_event, data) => callback(data));
+        const listener = (_event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.SEARCH_PROGRESS, listener);
+        return () => {
+            ipcRenderer.removeListener(IPC_CHANNELS.SEARCH_PROGRESS, listener);
+        };
     },
 
     /** Listen for uncaught errors in the main process thread */
     onMainProcessError: (callback) => {
-        ipcRenderer.on(IPC_CHANNELS.MAIN_PROCESS_ERROR, (_event, data) => callback(data));
+        const listener = (_event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.MAIN_PROCESS_ERROR, listener);
+        return () => {
+            ipcRenderer.removeListener(IPC_CHANNELS.MAIN_PROCESS_ERROR, listener);
+        };
     }
 });

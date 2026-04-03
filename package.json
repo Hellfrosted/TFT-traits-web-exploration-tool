@@ -7,7 +7,9 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",
-    "lint": "eslint *.js components/*.js tools/*.js test/",
+    "test:smoke": "electron . --smoke-test",
+    "test:all": "npm test && npm run test:smoke",
+    "lint": "eslint *.js components/*.js renderer/*.js data-engine/*.js tools/*.js test/",
     "validate:data": "node tools/validate-data-sources.js"
   },
   "devDependencies": {

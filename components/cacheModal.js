@@ -1,6 +1,8 @@
 // --- Cache Management Modal ---
 
 const modalEscapeHtml = window.escapeHtml || ((value) => String(value ?? ''));
+const summarizeHistoryParams = window.summarizeParams || ((params) => JSON.stringify(params || {}));
+const formatHistoryTimestamp = window.formatTimestamp || ((value) => String(value ?? '-'));
 let cacheModal = null;
 let cacheModalBody = null;
 
@@ -38,11 +40,11 @@ async function renderCacheList() {
         <tbody>`;
     
     for (const entry of res.entries) {
-        const summary = summarizeParams(entry.params);
+        const summary = summarizeHistoryParams(entry.params);
         html += `<tr data-key="${entry.key}">
             <td class="cache-table-summary-cell" title="${modalEscapeHtml(summary)}">${modalEscapeHtml(summary)}</td>
             <td>${entry.resultCount}</td>
-            <td class="cache-table-timestamp-cell">${modalEscapeHtml(formatTimestamp(entry.timestamp))}</td>
+            <td class="cache-table-timestamp-cell">${modalEscapeHtml(formatHistoryTimestamp(entry.timestamp))}</td>
             <td><button class="btn-sm btn-danger cache-delete-btn" data-key="${modalEscapeHtml(entry.key)}">Delete</button></td>
         </tr>`;
     }

@@ -17,6 +17,8 @@ const { DEFAULT_DATA_SOURCE, IPC_CHANNELS, LIMITS } = require('./constants.js');
 let mainWindow;
 let activeSearch = null;
 const SEARCH_CACHE_VERSION = 3;
+const isSmokeTest = process.argv.includes('--smoke-test');
+let smokeTestFinished = false;
 
 app.commandLine.appendSwitch('disable-direct-composition');
 const STORAGE_PATHS = getStoragePaths({
@@ -31,6 +33,87 @@ function createSearchResponse({
     error = null
 } = {}) {
     return { success, cancelled, fromCache, results, error };
+}
+
+function finishSmokeTest(code, detail) {
+    if (!isSmokeTest || smokeTestFinished) return;
+    smokeTestFinished = true;
+    if (detail) {
+        if (code === 0) {
+            console.log(`[SmokeTest] ${detail}`);
+        } else {
+            console.error(`[SmokeTest] ${detail}`);
+        }
+    }
+    setTimeout(() => {
+        app.exit(code);
+    }, 50);
+}
+
+async function runSmokeTest() {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        finishSmokeTest(1, 'Main window was unavailable.');
+        return;
+    }
+
+    try {
+        const result = await mainWindow.webContents.executeJavaScript(`(() => {
+            const requiredMethods = [
+                'fetchData',
+                'searchBoards',
+                'cancelSearch',
+                'listCache',
+                'deleteCacheEntry',
+                'clearAllCache',
+                'getSearchEstimate'
+            ];
+            const requiredIds = [
+                'dataSourceSelect',
+                'fetchBtn',
+                'status',
+                'dataStats',
+                'resultsQuerySummary',
+                'boardSpotlight',
+                'sortMode',
+                'searchBtn',
+                'cancelBtn',
+                'resetFiltersBtn',
+                'resBody'
+            ];
+            const electronApi = window.electronAPI;
+            const missingMethods = requiredMethods.filter((methodName) => typeof electronApi?.[methodName] !== 'function');
+            const missingIds = requiredIds.filter((id) => !document.getElementById(id));
+            const preloadFailureText = document.body?.innerText?.includes('Electron preload bridge unavailable') || false;
+
+            return {
+                hasElectronAPI: !!electronApi,
+                missingMethods,
+                missingIds,
+                preloadFailureText
+            };
+        })()`, true);
+
+        if (!result?.hasElectronAPI) {
+            finishSmokeTest(1, 'window.electronAPI was not exposed.');
+            return;
+        }
+        if (result.missingMethods?.length) {
+            finishSmokeTest(1, `Missing bridge methods: ${result.missingMethods.join(', ')}`);
+            return;
+        }
+        if (result.missingIds?.length) {
+            finishSmokeTest(1, `Missing shell nodes: ${result.missingIds.join(', ')}`);
+            return;
+        }
+        if (result.preloadFailureText) {
+            finishSmokeTest(1, 'Preload failure UI was rendered.');
+            return;
+        }
+
+        finishSmokeTest(0, 'Renderer booted with bridge and shell intact.');
+    } catch (error) {
+        finishSmokeTest(1, error?.message || String(error));
+    }
 }
 
 // --- Process-level Error Handlers ---
@@ -177,6 +260,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
             preload: path.join(__dirname, 'preload.js')
         }
     });
@@ -184,6 +268,9 @@ function createWindow() {
     mainWindow.setMenuBarVisibility(false);
     mainWindow.webContents.on('did-finish-load', () => {
         console.log('[Main] Renderer finished loading index.html');
+        if (isSmokeTest) {
+            runSmokeTest();
+        }
     });
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
         console.error('[Main] Renderer failed to load', {
@@ -192,12 +279,14 @@ function createWindow() {
             validatedURL,
             isMainFrame
         });
+        finishSmokeTest(1, `Renderer failed to load: ${errorDescription} (${errorCode})`);
     });
     mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
         console.error('[Main] Preload script failed', {
             preloadPath,
             message: error?.message || String(error)
         });
+        finishSmokeTest(1, `Preload failed: ${error?.message || String(error)}`);
     });
     mainWindow.webContents.on('console-message', (event) => {
         const level = event.level ?? 'log';
@@ -216,6 +305,11 @@ app.whenReady().then(async () => {
         console.error('Failed to initialize local app storage:', err.message);
     }
     createWindow();
+    if (isSmokeTest) {
+        setTimeout(() => {
+            finishSmokeTest(1, 'Smoke test timed out before renderer verification completed.');
+        }, 15000);
+    }
 });
 
 app.on('window-all-closed', () => {

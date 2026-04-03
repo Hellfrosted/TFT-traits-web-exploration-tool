@@ -20,6 +20,8 @@ npm start
 
 ```powershell
 npm test
+npm run test:smoke
+npm run test:all
 npm run lint
 npm run validate:data
 ```
@@ -27,7 +29,6 @@ npm run validate:data
 ## Notes
 
 - The selected data source can be switched between live and PBE before fetching.
-- Raw source snapshots are cached locally per source. PBE refreshes after the next 11:00 AM Pacific rollover, and live refreshes after 13 days.
 - Local app data is stored under Electron's normal user-data directory, not inside the repo.
 
 ## License
