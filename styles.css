@@ -673,9 +673,11 @@ tbody tr.result-row-selected {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   background: rgba(0, 0, 0, 0.7);
   opacity: 0;
   pointer-events: none;
+  z-index: 1000;
 }
 
 .modal-overlay.active {
@@ -688,9 +690,11 @@ tbody tr.result-row-selected {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
 }
 
 .modal-header,
@@ -699,12 +703,17 @@ tbody tr.result-row-selected {
 }
 
 .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   border-bottom: 1px solid var(--border);
 }
 
 .modal-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: auto;
   padding: 12px 16px;
 }
 
@@ -717,11 +726,13 @@ tbody tr.result-row-selected {
 
 .modal-close {
   width: auto;
+  flex: 0 0 auto;
   padding: 0;
   background: transparent;
   color: var(--text-muted);
   border: none;
   font-size: 22px;
+  line-height: 1;
 }
 
 .modal-close:hover {
@@ -732,12 +743,14 @@ tbody tr.result-row-selected {
 .cache-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .cache-table th,
 .cache-table td {
   padding: 8px;
   border-bottom: 1px solid #252a2f;
+  overflow-wrap: anywhere;
 }
 
 .cache-empty {
