@@ -242,7 +242,9 @@ ipcMain.handle(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT
             assetValidation: dataCache.assetValidation,
             hashMap: dataCache.hashMap,
             setNumber: dataCache.setNumber,
-            dataFingerprint: dataCache.dataFingerprint
+            dataFingerprint: dataCache.dataFingerprint,
+            snapshotFetchedAt: dataCache.snapshotFetchedAt || null,
+            usedCachedSnapshot: !!dataCache.usedCachedSnapshot
         };
     } catch(e) {
         return { success: false, error: e.toString() };

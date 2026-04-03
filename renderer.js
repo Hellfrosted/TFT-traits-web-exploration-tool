@@ -176,6 +176,30 @@ function getDataSourceLabel(source) {
     return source === 'latest' ? 'Live' : 'PBE';
 }
 
+function formatSnapshotAge(timestamp) {
+    const parsedTimestamp = Number(timestamp);
+    if (!Number.isFinite(parsedTimestamp) || parsedTimestamp <= 0) {
+        return '';
+    }
+
+    const ageMs = Math.max(0, Date.now() - parsedTimestamp);
+    const ageMinutes = Math.round(ageMs / 60000);
+    if (ageMinutes < 1) {
+        return 'freshly cached';
+    }
+    if (ageMinutes < 60) {
+        return `${ageMinutes}m old`;
+    }
+
+    const ageHours = Math.round(ageMinutes / 60);
+    if (ageHours < 24) {
+        return `${ageHours}h old`;
+    }
+
+    const ageDays = Math.round(ageHours / 24);
+    return `${ageDays}d old`;
+}
+
 function getBoardMetric(board) {
     return board.synergyScore ?? board.traitsCount ?? 0;
 }
@@ -684,6 +708,10 @@ async function fetchData() {
             const activeSourceLabel = getDataSourceLabel(activeSource);
             const setLabel = res.setNumber ? `${activeSourceLabel} Set ${res.setNumber}` : `${activeSourceLabel} latest detected set`;
             const fingerprintShort = res.dataFingerprint ? res.dataFingerprint.slice(0, 8) : 'unknown';
+            const snapshotAgeLabel = formatSnapshotAge(res.snapshotFetchedAt);
+            const cacheSummary = res.usedCachedSnapshot
+                ? ` Using cached snapshot${snapshotAgeLabel ? ` (${snapshotAgeLabel})` : ''}.`
+                : '';
             setStatusMessage(`Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).`);
             activeData = {
                 unitMap: new Map(res.units.map((unit) => [unit.id, unit])),
@@ -694,12 +722,14 @@ async function fetchData() {
                 setNumber: res.setNumber,
                 dataSource: activeSource,
                 dataFingerprint: res.dataFingerprint,
-                hashMap: res.hashMap || {}
+                hashMap: res.hashMap || {},
+                snapshotFetchedAt: res.snapshotFetchedAt || null,
+                usedCachedSnapshot: !!res.usedCachedSnapshot
             };
             const assetSummary = summarizeAssetValidation(res.assetValidation);
             setStatusMessage(assetSummary
-                ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}`
-                : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).`);
+                ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}${cacheSummary}`
+                : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).${cacheSummary}`);
             setDataStats(
                 res.units.length,
                 res.traits.length,

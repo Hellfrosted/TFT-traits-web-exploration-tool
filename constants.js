@@ -40,7 +40,16 @@ const LIMITS = {
 /** Network fetch configuration */
 const NETWORK = {
     MAX_RETRIES: 3,
-    RETRY_BASE_DELAY_MS: 1000
+    RETRY_BASE_DELAY_MS: 1000,
+    DATA_CACHE_TTL_MS_BY_SOURCE: {
+        [DATA_SOURCES.LIVE]: 13 * 24 * 60 * 60 * 1000
+    },
+    PBE_CACHE_ROLLOVER: {
+        timeZone: 'America/Los_Angeles',
+        hour: 11,
+        minute: 0,
+        second: 0
+    }
 };
 
 module.exports = {

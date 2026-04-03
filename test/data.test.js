@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const DataEngine = require('../data.js');
+const { NETWORK } = require('../constants.js');
 
 function createCustomSetOverrides(unitOverrides = {}) {
     return {
@@ -70,6 +71,198 @@ describe('DataEngine._detectLatestSet', () => {
         };
 
         assert.equal(DataEngine._detectLatestSetFromRaw(rawJSON), '18');
+    });
+});
+
+describe('DataEngine.fetchAndParse', () => {
+    it('reuses a fresh cached raw snapshot without hitting Community Dragon', async () => {
+        const rawChar = {
+            '{TraitSentinel}': { mName: 'Sentinel' },
+            '{RoleTank}': { mName: 'Tank' },
+            'Characters/Set13Champion': {
+                mCharacterName: 'TFT13_Skarner',
+                unitTagsString: 'Champion',
+                tier: 3,
+                CharacterRole: '{RoleTank}',
+                mLinkedTraits: [{ TraitData: '{TraitSentinel}' }]
+            }
+        };
+        const rawTraits = {
+            sets: {
+                '13': {
+                    traits: [{ apiName: 'Sentinel', name: 'Sentinel', effects: [{ minUnits: 2 }] }]
+                }
+            }
+        };
+
+        const originalFetchJson = DataEngine._fetchJsonWithRetry;
+        const originalFetchText = DataEngine._fetchTextWithRetry;
+        let networkCalls = 0;
+        DataEngine._fetchJsonWithRetry = async () => {
+            networkCalls += 1;
+            throw new Error('network should not be used');
+        };
+        DataEngine._fetchTextWithRetry = async () => {
+            networkCalls += 1;
+            throw new Error('network should not be used');
+        };
+
+        try {
+            const parsed = await DataEngine.fetchAndParse({
+                source: 'latest',
+                readFallback: async () => ({
+                    source: 'latest',
+                    fetchedAt: Date.now(),
+                    rawChar,
+                    rawTraits
+                })
+            });
+
+            assert.equal(networkCalls, 0);
+            assert.equal(parsed.usedCachedSnapshot, true);
+            assert.equal(parsed.dataSource, 'latest');
+            assert.equal(parsed.snapshotFetchedAt > 0, true);
+            assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+        } finally {
+            DataEngine._fetchJsonWithRetry = originalFetchJson;
+            DataEngine._fetchTextWithRetry = originalFetchText;
+        }
+    });
+
+    it('refreshes Community Dragon data when the cached live snapshot is stale', async () => {
+        const staleFetchedAt = Date.now() - NETWORK.DATA_CACHE_TTL_MS_BY_SOURCE.latest - 1;
+        const freshRawChar = {
+            '{TraitSentinel}': { mName: 'Sentinel' },
+            '{RoleTank}': { mName: 'Tank' },
+            'Characters/Set13Champion': {
+                mCharacterName: 'TFT13_Skarner',
+                unitTagsString: 'Champion',
+                tier: 3,
+                CharacterRole: '{RoleTank}',
+                mLinkedTraits: [{ TraitData: '{TraitSentinel}' }]
+            }
+        };
+        const freshRawTraits = {
+            sets: {
+                '13': {
+                    traits: [{ apiName: 'Sentinel', name: 'Sentinel', effects: [{ minUnits: 2 }] }]
+                }
+            }
+        };
+
+        const originalFetchJson = DataEngine._fetchJsonWithRetry;
+        const originalFetchText = DataEngine._fetchTextWithRetry;
+        const jsonUrls = [];
+        const textUrls = [];
+        let cachedSnapshot = null;
+
+        DataEngine._fetchJsonWithRetry = async (url) => {
+            jsonUrls.push(url);
+            return jsonUrls.length === 1 ? freshRawChar : freshRawTraits;
+        };
+        DataEngine._fetchTextWithRetry = async (url) => {
+            textUrls.push(url);
+            return null;
+        };
+
+        try {
+            const parsed = await DataEngine.fetchAndParse({
+                source: 'latest',
+                readFallback: async () => ({
+                    source: 'latest',
+                    fetchedAt: staleFetchedAt,
+                    rawChar: { stale: true }
+                }),
+                writeFallback: async (data) => {
+                    cachedSnapshot = data;
+                }
+            });
+
+            assert.equal(parsed.usedCachedSnapshot, false);
+            assert.equal(jsonUrls.length, 2);
+            assert.equal(textUrls.length, 2);
+            assert.ok(cachedSnapshot);
+            assert.equal(cachedSnapshot.source, 'latest');
+            assert.equal(typeof cachedSnapshot.fetchedAt, 'number');
+            assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+        } finally {
+            DataEngine._fetchJsonWithRetry = originalFetchJson;
+            DataEngine._fetchTextWithRetry = originalFetchText;
+        }
+    });
+
+    it('keeps a PBE snapshot fresh until the next 11 AM Pacific rollover', () => {
+        const fetchedAt = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 3,
+            hour: 10,
+            minute: 30,
+            second: 0
+        }, 'America/Los_Angeles');
+
+        const snapshot = {
+            source: 'pbe',
+            fetchedAt,
+            rawChar: { ok: true }
+        };
+
+        const justBeforeRollover = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 3,
+            hour: 10,
+            minute: 59,
+            second: 59
+        }, 'America/Los_Angeles');
+        const justAfterRollover = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 3,
+            hour: 11,
+            minute: 0,
+            second: 1
+        }, 'America/Los_Angeles');
+
+        assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', justBeforeRollover), true);
+        assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', justAfterRollover), false);
+    });
+
+    it('extends PBE freshness to the following day when fetched after the daily rollover', () => {
+        const fetchedAt = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 3,
+            hour: 12,
+            minute: 0,
+            second: 0
+        }, 'America/Los_Angeles');
+
+        const snapshot = {
+            source: 'pbe',
+            fetchedAt,
+            rawChar: { ok: true }
+        };
+
+        const nextMorning = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 4,
+            hour: 10,
+            minute: 59,
+            second: 59
+        }, 'America/Los_Angeles');
+        const afterNextRollover = DataEngine._getZonedDateTimestamp({
+            year: 2026,
+            month: 4,
+            day: 4,
+            hour: 11,
+            minute: 0,
+            second: 1
+        }, 'America/Los_Angeles');
+
+        assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', nextMorning), true);
+        assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', afterNextRollover), false);
     });
 });
 
