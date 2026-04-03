@@ -267,19 +267,19 @@ button:hover {
 
 #cancelBtn {
   display: none;
-  border-color: #a84d4d;
-  background: linear-gradient(180deg, #8f3f3f 0%, #763636 100%);
-  color: #fff3f3;
-  box-shadow: 0 0 0 1px rgba(255, 160, 160, 0.08), 0 10px 22px rgba(95, 30, 30, 0.28);
+  border-color: #ff6a5f;
+  background: linear-gradient(180deg, #ff584d 0%, #e0443b 100%);
+  color: #fff6f8;
+  box-shadow: 0 0 0 1px rgba(255, 122, 102, 0.18), 0 10px 22px rgba(124, 36, 24, 0.32);
 }
 
 #cancelBtn:hover {
-  background: linear-gradient(180deg, #a84949 0%, #8b3c3c 100%);
-  border-color: #c16666;
+  background: linear-gradient(180deg, #ff685c 0%, #ea4c42 100%);
+  border-color: #ff8a7d;
 }
 
 #cancelBtn:focus-visible {
-  outline: 2px solid rgba(255, 210, 210, 0.75);
+  outline: 2px solid rgba(255, 196, 188, 0.9);
   outline-offset: 2px;
 }
 
