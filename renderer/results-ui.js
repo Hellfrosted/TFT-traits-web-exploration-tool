@@ -4,6 +4,7 @@
 
     ns.createResultsUi = function createResultsUi(app) {
         const { state } = app;
+        const boardTraitSummaryCache = new WeakMap();
 
         function renderUnitPill(name, board = null) {
             const unit = state.activeData?.unitMap?.get(name);
@@ -106,6 +107,12 @@
         function buildBoardTraitSummary(board) {
             if (!state.activeData?.unitMap) return [];
 
+            const cacheKey = `${state.lastSearchParams?.includeUnique ? 'u1' : 'u0'}:${state.lastSearchParams?.onlyActive ? 'a1' : 'a0'}`;
+            const cachedSummary = boardTraitSummaryCache.get(board);
+            if (cachedSummary?.cacheKey === cacheKey) {
+                return cachedSummary.value;
+            }
+
             const counts = new Map();
             const hasPrecomputedTraitCounts = board?.traitCounts && typeof board.traitCounts === 'object';
             if (hasPrecomputedTraitCounts) {
@@ -152,11 +159,16 @@
                 });
             });
 
-            return activeTraits.sort((a, b) =>
+            const summary = activeTraits.sort((a, b) =>
                 b.levelReached - a.levelReached ||
                 b.count - a.count ||
                 a.trait.localeCompare(b.trait)
             );
+            boardTraitSummaryCache.set(board, {
+                cacheKey,
+                value: summary
+            });
+            return summary;
         }
 
         const sortFunctions = {
@@ -269,9 +281,14 @@
                 </div>
             `);
 
+            let selectedRow = null;
+            const fragment = document.createDocumentFragment();
             results.forEach((board, index) => {
                 const tr = document.createElement('tr');
                 tr.className = index === state.selectedBoardIndex ? 'result-row-selected' : '';
+                if (index === state.selectedBoardIndex) {
+                    selectedRow = tr;
+                }
                 const traits = buildBoardTraitSummary(board);
                 const traitMarkup = traits.length > 0
                     ? traits.slice(0, 6).map((trait) =>
@@ -295,14 +312,17 @@
                     <td><div class="unit-pill-list">${unitsMarkup}</div></td>
                 `;
                 tr.addEventListener('click', () => {
+                    if (selectedRow) {
+                        selectedRow.classList.remove('result-row-selected');
+                    }
                     state.selectedBoardIndex = index;
+                    selectedRow = tr;
+                    selectedRow.classList.add('result-row-selected');
                     renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
-                    Array.from(tbody.children).forEach((row, rowIndex) => {
-                        row.classList.toggle('result-row-selected', rowIndex === state.selectedBoardIndex);
-                    });
                 });
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            tbody.appendChild(fragment);
 
             renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
         }

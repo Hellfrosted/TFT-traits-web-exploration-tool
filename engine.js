@@ -737,9 +737,10 @@ class Engine {
         let mustHaveInitialCarry = !requireCarry;
         let mustHaveTotalCost = 0;
         const initialTraitCounts = new Uint8Array(numTraits);
-        const mustHaveIds = [];
+        const activeUnitFlags = new Uint8Array(validUnits.length);
         const mustHaveUnitIndices = [];
         const mustHaveVariantUnitIndices = [];
+        let mustHaveComplexUnitCount = 0;
 
         // Add emblem traits to initial counts
         if (extraEmblems) {
@@ -752,9 +753,11 @@ class Engine {
         for (let i = 0; i < validUnits.length; i++) {
             if ((mustHaveMask & (1n << BigInt(i))) !== 0n) {
                 const info = unitInfo[i];
+                activeUnitFlags[i] = 1;
                 if (info.isTank) mustHaveInitialTank = true;
                 if (info.isCarry) mustHaveInitialCarry = true;
                 mustHaveTotalCost += info.cost;
+                mustHaveComplexUnitCount += info.hasComplexEvaluation;
                 info.fixedTraitContributionEntries.forEach(({ index, count }) => {
                     initialTraitCounts[index] += count;
                 });
@@ -762,7 +765,6 @@ class Engine {
                     mustHaveVariantUnitIndices.push(i);
                 }
                 mustHaveUnitIndices.push(i);
-                mustHaveIds.push(info.id);
             }
         }
 
@@ -773,11 +775,11 @@ class Engine {
         const hasVariantUnits = unitInfo.some((info) => info.variantProfiles.length > 0);
         const hasConditionalProfiles = unitInfo.some((info) =>
             info.conditionalProfileEntries.length > 0 ||
-            info.variantProfiles.some((variant) => variant.conditionalProfileEntries?.length > 0)
+            info.variantProfiles.some((variant) => variant.conditionalProfileEntries.length > 0)
         );
         const hasConditionalEffects = unitInfo.some((info) =>
             info.conditionalEffectEntries.length > 0 ||
-            info.variantProfiles.some((variant) => variant.conditionalEffectEntries?.length > 0)
+            info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
         );
 
         /** Calculate synergy score from trait counts based on breakpoint thresholds */
@@ -817,94 +819,74 @@ class Engine {
             return synergyScore * 10000 + totalCost;
         };
 
-        const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts, activeUnitIds) => {
-            const activeUnits = new Set(activeUnitIds || []);
+        const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts) => {
             const workingCounts = new Uint8Array(baseTraitCounts);
-            const currentAssignments = {};
+            const selectedVariantByUnitIndex = [];
             let bestEvaluation = null;
 
             const finalizeVariantSelection = () => {
-                const preEffectTraitCounts = this.traitCountsToRecord(workingCounts, allTraitNames);
-                const conditionContext = {
-                    traitCounts: preEffectTraitCounts,
-                    activeUnits,
-                    traitBreakpoints: traitBPs
-                };
-
-                if (Object.keys(currentAssignments).length > 0) {
-                    for (const unitIndex of selectedVariantIndices) {
-                        const info = unitInfo[unitIndex];
-                        const assignment = currentAssignments[info.id];
-                        const variant = info.variantProfiles.find((candidate) => candidate.id === assignment?.id);
-                        if (!this.isConditionSatisfied(variant?.conditions, conditionContext)) {
-                            return;
-                        }
+                for (const unitIndex of selectedVariantIndices) {
+                    const variant = selectedVariantByUnitIndex[unitIndex];
+                    if (!this.isCompiledConditionSatisfied(variant?.compiledConditions, workingCounts, activeUnitFlags)) {
+                        return;
                     }
                 }
 
                 const resolvedCounts = new Uint8Array(workingCounts);
-                selectedUnitIndices.forEach((unitIndex) => {
+                for (const unitIndex of selectedUnitIndices) {
                     const info = unitInfo[unitIndex];
-                    const assignment = currentAssignments[info.id];
-                    const selectedVariant = assignment
-                        ? info.variantProfiles.find((candidate) => candidate.id === assignment.id)
-                        : null;
-                    const activeConditionalProfile = (
-                        selectedVariant?.conditionalProfileEntries ||
-                        (!selectedVariant ? info.conditionalProfileEntries : [])
-                    ).find((profile) => this.isConditionSatisfied(profile.conditions, conditionContext));
+                    const selectedVariant = selectedVariantByUnitIndex[unitIndex] || null;
+                    const activeConditionalProfile = this.findFirstSatisfiedProfile(
+                        selectedVariant?.conditionalProfileEntries || info.conditionalProfileEntries,
+                        workingCounts,
+                        activeUnitFlags
+                    );
 
                     if (!activeConditionalProfile) {
-                        return;
+                        continue;
                     }
 
                     const currentContributionEntries = selectedVariant?.fullTraitContributionEntries || info.baseTraitContributionEntries;
-                    currentContributionEntries.forEach(({ index, count }) => {
+                    for (const { index, count } of currentContributionEntries) {
                         resolvedCounts[index] -= count;
-                    });
-                    activeConditionalProfile.traitContributionEntries.forEach(({ index, count }) => {
+                    }
+                    for (const { index, count } of activeConditionalProfile.traitContributionEntries) {
                         resolvedCounts[index] += count;
-                    });
-                });
+                    }
+                }
 
-                const effectConditionContext = {
-                    traitCounts: this.traitCountsToRecord(resolvedCounts, allTraitNames),
-                    activeUnits,
-                    traitBreakpoints: traitBPs
-                };
-                selectedUnitIndices.forEach((unitIndex) => {
+                const effectConditionCounts = new Uint8Array(resolvedCounts);
+                for (const unitIndex of selectedUnitIndices) {
                     const info = unitInfo[unitIndex];
-                    (info.conditionalEffectEntries || []).forEach((effect) => {
-                        if (!this.isConditionSatisfied(effect.conditions, effectConditionContext)) {
-                            return;
+                    for (const effect of info.conditionalEffectEntries || []) {
+                        if (!this.isCompiledConditionSatisfied(effect.compiledConditions, effectConditionCounts, activeUnitFlags)) {
+                            continue;
                         }
 
-                        effect.traitContributionEntries.forEach(({ index, count }) => {
+                        for (const { index, count } of effect.traitContributionEntries) {
                             resolvedCounts[index] += count;
-                        });
-                    });
-                });
-                selectedVariantIndices.forEach((unitIndex) => {
-                    const info = unitInfo[unitIndex];
-                    const assignment = currentAssignments[info.id];
-                    const variant = info.variantProfiles.find((candidate) => candidate.id === assignment?.id);
-                    (variant?.conditionalEffectEntries || []).forEach((effect) => {
-                        if (!this.isConditionSatisfied(effect.conditions, effectConditionContext)) {
-                            return;
+                        }
+                    }
+                }
+                for (const unitIndex of selectedVariantIndices) {
+                    const variant = selectedVariantByUnitIndex[unitIndex];
+                    for (const effect of variant?.conditionalEffectEntries || []) {
+                        if (!this.isCompiledConditionSatisfied(effect.compiledConditions, effectConditionCounts, activeUnitFlags)) {
+                            continue;
                         }
 
-                        effect.traitContributionEntries.forEach(({ index, count }) => {
+                        for (const { index, count } of effect.traitContributionEntries) {
                             resolvedCounts[index] += count;
-                        });
-                    });
-                });
+                        }
+                    }
+                }
 
-                const traitCounts = this.traitCountsToRecord(resolvedCounts, allTraitNames);
-                for (const tIdx of mustIncludeTraitIndices) {
-                    const count = resolvedCounts[tIdx];
-                    const name = allTraitNames[tIdx];
-                    const bps = traitBPs[name] || [1];
-                    if (count < bps[0]) return;
+                for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
+                    const traitIndexValue = mustIncludeTraitIndices[traitPos];
+                    const requiredThreshold = mustIncludeTraitTargets[traitPos];
+                    if ((resolvedCounts[traitIndexValue] || 0) < requiredThreshold) {
+                        return;
+                    }
                 }
 
                 const synergyScore = calculateSynergyScore(resolvedCounts);
@@ -912,10 +894,28 @@ class Engine {
                     return;
                 }
 
+                let variantAssignments = null;
+                if (selectedVariantIndices.length > 0) {
+                    variantAssignments = {};
+                    for (const unitIndex of selectedVariantIndices) {
+                        const variant = selectedVariantByUnitIndex[unitIndex];
+                        if (!variant) {
+                            continue;
+                        }
+                        const info = unitInfo[unitIndex];
+                        variantAssignments[info.id] = {
+                            id: variant.id,
+                            label: variant.label || variant.id
+                        };
+                    }
+                }
+
                 bestEvaluation = {
                     synergyScore,
-                    traitCounts,
-                    variantAssignments: { ...currentAssignments }
+                    traitCounts: this.traitCountsToRecord(resolvedCounts, allTraitNames),
+                    ...(variantAssignments && Object.keys(variantAssignments).length > 0
+                        ? { variantAssignments }
+                        : {})
                 };
             };
 
@@ -927,20 +927,17 @@ class Engine {
 
                 const info = unitInfo[selectedVariantIndices[variantPos]];
                 for (const variant of info.variantProfiles) {
-                    variant.traitContributionEntries.forEach(({ index, count }) => {
+                    for (const { index, count } of variant.traitContributionEntries) {
                         workingCounts[index] += count;
-                    });
-                    currentAssignments[info.id] = {
-                        id: variant.id,
-                        label: variant.label || variant.id
-                    };
+                    }
+                    selectedVariantByUnitIndex[selectedVariantIndices[variantPos]] = variant;
 
                     searchVariants(variantPos + 1);
 
-                    delete currentAssignments[info.id];
-                    variant.traitContributionEntries.forEach(({ index, count }) => {
+                    selectedVariantByUnitIndex[selectedVariantIndices[variantPos]] = null;
+                    for (const { index, count } of variant.traitContributionEntries) {
                         workingCounts[index] -= count;
-                    });
+                    }
                 }
             };
 
@@ -1015,7 +1012,7 @@ class Engine {
          * Depth-first search with backtracking.
          * Mutates currentTraitCounts in place for performance (avoids array copies).
          */
-        const dfs = (startIdx, currentCount, hasTank, hasCarry, currentCost, currentIdxList) => {
+        const dfs = (startIdx, currentCount, hasTank, hasCarry, currentCost, currentComplexUnitCount, currentIdxList) => {
             if (requireTank && !hasTank && !remainingTankFrom[startIdx]) return;
             if (requireCarry && !hasCarry && !remainingCarryFrom[startIdx]) return;
 
@@ -1041,18 +1038,41 @@ class Engine {
                 if (!hasTank || !hasCarry) return;
 
                 const totalCost = mustHaveTotalCost + currentCost;
-                const activeUnits = [...mustHaveIds];
-                for (const idx of currentIdxList) activeUnits.push(unitInfo[idx].id);
-                activeUnits.sort((a, b) => a.localeCompare(b));
-                const selectedVariantIndices = mustHaveVariantUnitIndices.concat(currentVariantUnitIndices);
                 const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
-                const evaluation = evaluateBoardSelection(selectedUnitIndices, selectedVariantIndices, currentTraitCounts, activeUnits);
+                const totalComplexUnitCount = mustHaveComplexUnitCount + currentComplexUnitCount;
+
+                if (totalComplexUnitCount === 0) {
+                    for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
+                        const traitIndexValue = mustIncludeTraitIndices[traitPos];
+                        const requiredThreshold = mustIncludeTraitTargets[traitPos];
+                        if ((currentTraitCounts[traitIndexValue] || 0) < requiredThreshold) {
+                            return;
+                        }
+                    }
+
+                    const synergyScore = calculateSynergyScore(currentTraitCounts);
+                    const totalScore = scoreBoard(synergyScore, totalCost);
+                    if (topBoards.length >= MAX_BOARDS && totalScore <= worstScore) return;
+
+                    addResult(
+                        this.buildSortedBoardUnits(selectedUnitIndices, unitInfo),
+                        {
+                            synergyScore,
+                            traitCounts: this.traitCountsToRecord(currentTraitCounts, allTraitNames)
+                        },
+                        totalCost
+                    );
+                    return;
+                }
+
+                const selectedVariantIndices = mustHaveVariantUnitIndices.concat(currentVariantUnitIndices);
+                const evaluation = evaluateBoardSelection(selectedUnitIndices, selectedVariantIndices, currentTraitCounts);
                 if (!evaluation) return;
                 const totalScore = scoreBoard(evaluation.synergyScore, totalCost);
 
                 if (topBoards.length >= MAX_BOARDS && totalScore <= worstScore) return;
                 
-                addResult(activeUnits, evaluation, totalCost);
+                addResult(this.buildSortedBoardUnits(selectedUnitIndices, unitInfo), evaluation, totalCost);
                 return;
             }
             
@@ -1066,6 +1086,7 @@ class Engine {
                     currentTraitCounts[index] += count;
                 }
                 
+                activeUnitFlags[idx] = 1;
                 currentIdxList.push(idx);
                 if (info.variantProfiles.length > 0) {
                     currentVariantUnitIndices.push(idx);
@@ -1076,12 +1097,14 @@ class Engine {
                     hasTank || info.isTank, 
                     hasCarry || info.isCarry,
                     currentCost + info.cost,
+                    currentComplexUnitCount + info.hasComplexEvaluation,
                     currentIdxList
                 );
                 if (info.variantProfiles.length > 0) {
                     currentVariantUnitIndices.pop();
                 }
                 currentIdxList.pop();
+                activeUnitFlags[idx] = 0;
                 
                 // Backtrack: undo trait count changes
                 for (const { index, count } of info.fixedTraitContributionEntries) {
@@ -1091,7 +1114,7 @@ class Engine {
         };
         
         if (remainingToPick <= LIMITS.MAX_REMAINING_SLOTS && totalCombinations <= LIMITS.COMBINATION_LIMIT) {
-            dfs(0, 0, mustHaveInitialTank, mustHaveInitialCarry, 0, []);
+            dfs(0, 0, mustHaveInitialTank, mustHaveInitialCarry, 0, 0, []);
             if (onProgress) onProgress(100, totalCombinations, totalCombinations);
         } else {
              const reason = totalCombinations > LIMITS.COMBINATION_LIMIT 
