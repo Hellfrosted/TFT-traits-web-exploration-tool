@@ -28,12 +28,13 @@ function createWindowService({
     preloadPath,
     ipcChannels,
     isSmokeTest,
-    smokeTimeoutMs = 15000
+    smokeTimeoutMs = 20000
 }) {
     let mainWindow;
     let smokeTestFinished = false;
     let smokeTimeoutHandle = null;
     let smokeExitHandle = null;
+    const rendererInspectionTimeoutMs = Math.max(1000, smokeTimeoutMs - 1000);
 
     function clearTimer(handle) {
         if (handle) {
@@ -83,17 +84,31 @@ function createWindowService({
             const result = await mainWindow.webContents.executeJavaScript(`(() => {
                 const requiredMethods = ${JSON.stringify(REQUIRED_BRIDGE_METHODS)};
                 const requiredIds = ${JSON.stringify(REQUIRED_SHELL_IDS)};
-                const electronApi = window.electronAPI;
-                const missingMethods = requiredMethods.filter((methodName) => typeof electronApi?.[methodName] !== 'function');
-                const missingIds = requiredIds.filter((id) => !document.getElementById(id));
-                const preloadFailureText = document.body?.innerText?.includes('Electron preload bridge unavailable') || false;
+                const deadline = Date.now() + ${rendererInspectionTimeoutMs};
 
-                return {
-                    hasElectronAPI: !!electronApi,
-                    missingMethods,
-                    missingIds,
-                    preloadFailureText
-                };
+                return new Promise((resolve) => {
+                    const inspect = () => {
+                        const electronApi = window.electronAPI;
+                        const missingMethods = requiredMethods.filter((methodName) => typeof electronApi?.[methodName] !== 'function');
+                        const missingIds = requiredIds.filter((id) => !document.getElementById(id));
+                        const preloadFailureText = document.body?.innerText?.includes('Electron preload bridge unavailable') || false;
+                        const ready = !!electronApi && missingMethods.length === 0 && missingIds.length === 0 && !preloadFailureText;
+
+                        if (ready || Date.now() >= deadline) {
+                            resolve({
+                                hasElectronAPI: !!electronApi,
+                                missingMethods,
+                                missingIds,
+                                preloadFailureText
+                            });
+                            return;
+                        }
+
+                        setTimeout(inspect, 50);
+                    };
+
+                    inspect();
+                });
             })()`, true);
 
             if (!result?.hasElectronAPI) {

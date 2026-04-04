@@ -74,6 +74,24 @@ describe('DataEngine._detectLatestSet', () => {
     });
 });
 
+describe('DataEngine asset URL trust boundaries', () => {
+    it('rejects absolute off-origin asset URLs', () => {
+        assert.equal(
+            DataEngine._assetPathToRawUrl('https://example.com/evil.png', 'pbe'),
+            null
+        );
+    });
+
+    it('ignores champion splash entries that resolve outside the expected asset directory', () => {
+        const championAssets = DataEngine._buildChampionAssetMap(`
+            <a href="https://example.com/tft17_kaisa_teamplanner_splash.png">external</a>
+            <a href="tft17_kaisa_teamplanner_splash.png">safe</a>
+        `, '17', 'pbe');
+
+        assert.equal(championAssets.get('kaisa').url, 'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png');
+    });
+});
+
 describe('DataEngine.fetchAndParse', () => {
     it('reuses a fresh cached raw snapshot without hitting Community Dragon', async () => {
         const rawChar = {

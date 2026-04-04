@@ -12,27 +12,16 @@
         }
 
         function resetFilters() {
-            if (state.isSearching) {
+            if (state.isSearching || state.isFetchingData) {
                 showAlert('Cancel the current search before resetting filters.');
                 return;
             }
 
-            document.getElementById('boardSize').value = 9;
-            document.getElementById('maxResults').value = state.searchLimits.DEFAULT_MAX_RESULTS || 500;
-            document.getElementById('onlyActiveToggle').checked = true;
-            document.getElementById('tierRankToggle').checked = true;
-            document.getElementById('includeUniqueToggle').checked = false;
-
-            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues([]);
-            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues([]);
-            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues([]);
-            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues([]);
-            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues([]);
-            app.queryUi.applyDefaultRoleFilters(true);
-            app.queryUi.applyVariantLocks({});
+            app.queryUi.applySearchParams(app.queryUi.getDefaultSearchParams());
 
             state.lastSearchParams = null;
             state.currentResults = [];
+            state.currentResultsFingerprint = null;
             app.results.renderEmptySummary('Awaiting execution');
             app.results.renderEmptySpotlight();
             app.queryUi.renderQuerySummary(null, 'Filters reset. Build a fresh query and compute when ready.');
@@ -88,6 +77,7 @@
             app.queryUi.setStatusMessage(state.hasElectronAPI ? 'Initializing UI...' : 'Electron preload bridge unavailable.');
             bindStaticUiListeners();
             app.queryUi.syncFetchButtonState();
+            app.queryUi.syncSearchButtonState();
             state.listeners.uiInitialized = true;
             return true;
         }

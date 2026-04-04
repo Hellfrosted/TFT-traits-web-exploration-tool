@@ -6,12 +6,17 @@ const { createSearchService } = require('../main-process/search-service.js');
 
 class FakeWorker extends EventEmitter {
     static instances = [];
+    static waiters = [];
 
     constructor(workerPath, options) {
         super();
         this.workerPath = workerPath;
         this.options = options;
         FakeWorker.instances.push(this);
+        while (FakeWorker.waiters.length > 0) {
+            const resolve = FakeWorker.waiters.shift();
+            resolve();
+        }
     }
 
     async terminate() {
@@ -22,6 +27,7 @@ class FakeWorker extends EventEmitter {
 
 function resetWorkers() {
     FakeWorker.instances.length = 0;
+    FakeWorker.waiters.length = 0;
 }
 
 function createDeferred() {
@@ -34,19 +40,26 @@ function createDeferred() {
     return { promise, resolve, reject };
 }
 
-function nextTurn() {
-    return new Promise((resolve) => {
-        setTimeout(resolve, 0);
-    });
-}
-
 async function waitForWorker(count = 1) {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        if (FakeWorker.instances.length >= count) {
-            return FakeWorker.instances[count - 1];
-        }
-        await nextTurn();
+    if (FakeWorker.instances.length >= count) {
+        return FakeWorker.instances[count - 1];
     }
+
+    await Promise.race([
+        new Promise((resolve) => {
+            FakeWorker.waiters.push(resolve);
+        }),
+        new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error(`Timed out waiting for ${count} worker instance(s).`));
+            }, 1000);
+        })
+    ]);
+
+    if (FakeWorker.instances.length >= count) {
+        return FakeWorker.instances[count - 1];
+    }
+
     assert.fail(`Expected ${count} worker instance(s), found ${FakeWorker.instances.length}.`);
 }
 
@@ -118,19 +131,15 @@ describe('main-process search service', () => {
 
     it('rejects a second search while one is already running', async () => {
         resetWorkers();
-        const pendingCacheRead = createDeferred();
-        const { searchService } = createSearchServiceUnderTest({
-            readCacheImpl: () => pendingCacheRead.promise
-        });
+        const { searchService } = createSearchServiceUnderTest();
 
         const firstPromise = searchService.searchBoards({ boardSize: 9 });
+        const worker = await waitForWorker();
         const secondResponse = await searchService.searchBoards({ boardSize: 9 });
 
         assert.equal(secondResponse.success, false);
         assert.match(secondResponse.error, /already in progress/i);
 
-        pendingCacheRead.resolve(null);
-        const worker = await waitForWorker();
         worker.emit('message', {
             type: 'done',
             success: true,

@@ -5,6 +5,7 @@
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
         const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
+        const getDefaultBoardSize = () => 9;
 
         function setResultsSummary(content) {
             const summary = document.getElementById('resultsSummary');
@@ -194,6 +195,21 @@
             fetchBtn.style.opacity = shouldDisable ? '0.5' : '1';
         }
 
+        function syncSearchButtonState() {
+            const searchBtn = document.getElementById('searchBtn');
+            if (!searchBtn) return;
+
+            const shouldDisable = state.isSearching || state.isFetchingData || !state.activeData;
+            searchBtn.disabled = shouldDisable;
+            searchBtn.classList.toggle('disabled', shouldDisable);
+
+            if (!state.isSearching) {
+                searchBtn.innerText = state.isFetchingData
+                    ? 'Loading data...'
+                    : 'Compute';
+            }
+        }
+
         function getQueryMetaClass(meta) {
             const text = String(meta ?? '').toLowerCase();
             if (text.includes('error') || text.includes('failed')) return 'query-summary-meta query-summary-meta-error';
@@ -242,7 +258,7 @@
 
         function getCurrentSearchParams() {
             return {
-                boardSize: parseInt(document.getElementById('boardSize').value, 10) || 9,
+                boardSize: parseInt(document.getElementById('boardSize').value, 10) || getDefaultBoardSize(),
                 maxResults: parseInt(document.getElementById('maxResults').value, 10) || getDefaultMaxResults(),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
                 mustExclude: state.selectors.mustExclude?.getValues() || [],
@@ -256,6 +272,62 @@
                 tierRank: document.getElementById('tierRankToggle').checked,
                 includeUnique: document.getElementById('includeUniqueToggle').checked
             };
+        }
+
+        function getDefaultSearchParams() {
+            return {
+                boardSize: getDefaultBoardSize(),
+                maxResults: getDefaultMaxResults(),
+                mustInclude: [],
+                mustExclude: [],
+                mustIncludeTraits: [],
+                mustExcludeTraits: [],
+                extraEmblems: [],
+                variantLocks: {},
+                tankRoles: null,
+                carryRoles: null,
+                onlyActive: true,
+                tierRank: true,
+                includeUnique: false
+            };
+        }
+
+        function applySearchParams(params = {}) {
+            const defaults = getDefaultSearchParams();
+            const nextParams = {
+                ...defaults,
+                ...params
+            };
+
+            document.getElementById('boardSize').value = nextParams.boardSize || getDefaultBoardSize();
+            document.getElementById('maxResults').value = nextParams.maxResults || getDefaultMaxResults();
+            document.getElementById('onlyActiveToggle').checked = !!nextParams.onlyActive;
+            document.getElementById('tierRankToggle').checked = !!nextParams.tierRank;
+            document.getElementById('includeUniqueToggle').checked = !!nextParams.includeUnique;
+
+            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(nextParams.mustInclude || []);
+            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(nextParams.mustExclude || []);
+            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues(nextParams.mustIncludeTraits || []);
+            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues(nextParams.mustExcludeTraits || []);
+            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues(nextParams.extraEmblems || []);
+
+            if (state.selectors.tankRoles) {
+                if (Array.isArray(nextParams.tankRoles)) {
+                    state.selectors.tankRoles.setValues(nextParams.tankRoles);
+                } else {
+                    applyDefaultRoleFilters(true);
+                }
+            }
+
+            if (state.selectors.carryRoles) {
+                if (Array.isArray(nextParams.carryRoles)) {
+                    state.selectors.carryRoles.setValues(nextParams.carryRoles);
+                } else {
+                    applyDefaultRoleFilters(true);
+                }
+            }
+
+            applyVariantLocks(nextParams.variantLocks || {});
         }
 
         function clampNumericInput(id, min, max, fallback) {
@@ -321,8 +393,11 @@
             getAssetCoverageLabel,
             summarizeAssetValidation,
             syncFetchButtonState,
+            syncSearchButtonState,
             renderQuerySummary,
             getCurrentSearchParams,
+            getDefaultSearchParams,
+            applySearchParams,
             clampNumericInput,
             refreshDraftQuerySummary,
             bindDraftQueryListeners
