@@ -18,7 +18,7 @@
             }
 
             document.getElementById('boardSize').value = 9;
-            document.getElementById('maxResults').value = 100;
+            document.getElementById('maxResults').value = state.searchLimits.DEFAULT_MAX_RESULTS || 500;
             document.getElementById('onlyActiveToggle').checked = true;
             document.getElementById('tierRankToggle').checked = true;
             document.getElementById('includeUniqueToggle').checked = false;

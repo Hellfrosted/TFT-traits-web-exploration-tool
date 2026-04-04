@@ -44,6 +44,16 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         return option?.label ?? option?.displayName ?? option?.name ?? getOptionValue(option);
     }
 
+    function getOptionPillLabel(option) {
+        if (typeof option === 'string') return option;
+        return option?.pillLabel ?? getOptionLabel(option);
+    }
+
+    function getOptionDropdownMeta(option) {
+        if (typeof option === 'string') return '';
+        return String(option?.dropdownMeta ?? '').trim();
+    }
+
     function getOptionIconUrl(option) {
         if (typeof option === 'string') return null;
         return option?.iconUrl || null;
@@ -55,6 +65,8 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         optionsByValue.set(value, {
             value,
             label: getOptionLabel(option),
+            pillLabel: getOptionPillLabel(option),
+            dropdownMeta: getOptionDropdownMeta(option),
             iconUrl: getOptionIconUrl(option)
         });
     });
@@ -91,7 +103,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         const label = document.createElement('span');
         label.className = 'pill-label';
         const optionMeta = optionsByValue.get(normalizedValue);
-        const displayValue = optionMeta?.label || normalizedValue;
+        const displayValue = optionMeta?.pillLabel || optionMeta?.label || normalizedValue;
         const iconUrl = optionMeta?.iconUrl;
 
         if (iconUrl) {
@@ -130,9 +142,10 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         filteredOptions = options.filter(opt => {
             const name = getOptionValue(opt);
             const label = getOptionLabel(opt);
+            const meta = getOptionDropdownMeta(opt);
             const query = filter.toLowerCase();
             return (
-                (name.toLowerCase().includes(query) || label.toLowerCase().includes(query)) &&
+                (`${name} ${label} ${meta}`.toLowerCase().includes(query)) &&
                 !selectedValues.includes(name)
             );
         }).slice(0, 50);
@@ -157,6 +170,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
             const name = getOptionValue(opt);
             const displayName = getOptionLabel(opt);
             const iconUrl = getOptionIconUrl(opt);
+            const dropdownMeta = getOptionDropdownMeta(opt);
 
             if (iconUrl) {
                 const img = document.createElement('img');
@@ -167,9 +181,22 @@ function setupMultiSelect(containerId, options, isUnit = true) {
                 item.appendChild(img);
             }
 
+            const content = document.createElement('div');
+            content.className = 'dropdown-item-content';
+
             const text = document.createElement('span');
+            text.className = 'dropdown-item-label';
             text.textContent = displayName;
-            item.appendChild(text);
+            content.appendChild(text);
+
+            if (dropdownMeta) {
+                const meta = document.createElement('span');
+                meta.className = 'dropdown-item-meta';
+                meta.textContent = dropdownMeta;
+                content.appendChild(meta);
+            }
+
+            item.appendChild(content);
 
             item.addEventListener('click', () => {
                 addPill(name);
@@ -274,7 +301,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
                         const resolvedMeta = optionsByValue.get(resolved);
                         const labelText = pill.querySelector('.pill-label-text');
                         if (labelText) {
-                            labelText.textContent = resolvedMeta?.label || resolved;
+                            labelText.textContent = resolvedMeta?.pillLabel || resolvedMeta?.label || resolved;
                         }
                     }
                 }

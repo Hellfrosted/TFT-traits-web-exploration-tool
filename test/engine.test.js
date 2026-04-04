@@ -37,6 +37,30 @@ const mockDataCache = {
     hashMap: mockHashMap
 };
 
+const roleThresholdDataCache = {
+    units: [
+        { id: 'MidTankA', cost: 3, role: 'Tank', traits: ['Bulwark'], traitIds: ['Bulwark'] },
+        { id: 'MidTankB', cost: 3, role: 'Tank', traits: ['Bulwark'], traitIds: ['Bulwark'] },
+        { id: 'EliteTank', cost: 4, role: 'Tank', traits: ['Bulwark'], traitIds: ['Bulwark'] },
+        { id: 'CheapTank', cost: 2, role: 'Tank', traits: ['Bulwark'], traitIds: ['Bulwark'] },
+        { id: 'EliteCarry', cost: 4, role: 'Carry', traits: ['Volley'], traitIds: ['Volley'] },
+        { id: 'CheapCarry', cost: 3, role: 'Carry', traits: ['Volley'], traitIds: ['Volley'] },
+        { id: 'Flex', cost: 2, role: 'Support', traits: ['Flex'], traitIds: ['Flex'] }
+    ],
+    traits: ['Bulwark', 'Flex', 'Volley'],
+    roles: ['Tank', 'Carry', 'Support'],
+    traitBreakpoints: {
+        Bulwark: [1],
+        Flex: [1],
+        Volley: [1]
+    },
+    hashMap: {
+        Bulwark: 'Bulwark',
+        Flex: 'Flex',
+        Volley: 'Volley'
+    }
+};
+
 const aliasedTraitDataCache = {
     units: [
         {
@@ -154,6 +178,123 @@ const variantTraitDataCache = {
         Conduit: 'Conduit',
         Guardian: 'Guardian',
         'Gun Goddess': 'Gun Goddess'
+    }
+};
+
+const mechaSlotDataCache = {
+    units: [
+        {
+            id: 'Galio',
+            cost: 4,
+            role: 'Tank',
+            traits: ['Mecha', 'Voyager'],
+            traitIds: ['Mecha', 'Voyager'],
+            variants: [
+                {
+                    id: 'standard',
+                    label: 'Standard',
+                    role: 'Tank',
+                    slotCost: 1,
+                    traits: ['Mecha', 'Voyager'],
+                    traitContributions: {
+                        Mecha: 1,
+                        Voyager: 1
+                    }
+                },
+                {
+                    id: 'two-slot',
+                    label: '2-Slot Mecha',
+                    role: 'Tank',
+                    slotCost: 2,
+                    traits: ['Mecha', 'Voyager'],
+                    traitContributions: {
+                        Mecha: 2,
+                        Voyager: 1
+                    }
+                }
+            ]
+        },
+        {
+            id: 'AurelionSol',
+            cost: 4,
+            role: 'Carry',
+            traits: ['Mecha', 'Conduit'],
+            traitIds: ['Mecha', 'Conduit'],
+            variants: [
+                {
+                    id: 'standard',
+                    label: 'Standard',
+                    role: 'Carry',
+                    slotCost: 1,
+                    traits: ['Mecha', 'Conduit'],
+                    traitContributions: {
+                        Mecha: 1,
+                        Conduit: 1
+                    }
+                },
+                {
+                    id: 'two-slot',
+                    label: '2-Slot Mecha',
+                    role: 'Carry',
+                    slotCost: 2,
+                    traits: ['Mecha', 'Conduit'],
+                    traitContributions: {
+                        Mecha: 2,
+                        Conduit: 1
+                    }
+                }
+            ]
+        },
+        {
+            id: 'Urgot',
+            cost: 3,
+            role: 'Carry',
+            traits: ['Mecha', 'Brawler'],
+            traitIds: ['Mecha', 'Brawler'],
+            variants: [
+                {
+                    id: 'standard',
+                    label: 'Standard',
+                    role: 'Carry',
+                    slotCost: 1,
+                    traits: ['Mecha', 'Brawler'],
+                    traitContributions: {
+                        Mecha: 1,
+                        Brawler: 1
+                    }
+                },
+                {
+                    id: 'two-slot',
+                    label: '2-Slot Mecha',
+                    role: 'Carry',
+                    slotCost: 2,
+                    traits: ['Mecha', 'Brawler'],
+                    traitContributions: {
+                        Mecha: 2,
+                        Brawler: 1
+                    }
+                }
+            ]
+        },
+        { id: 'VoyagerTwo', cost: 2, role: 'Tank', traits: ['Voyager'], traitIds: ['Voyager'] },
+        { id: 'VoyagerThree', cost: 2, role: 'Tank', traits: ['Voyager'], traitIds: ['Voyager'] },
+        { id: 'ConduitTwo', cost: 2, role: 'Carry', traits: ['Conduit'], traitIds: ['Conduit'] },
+        { id: 'ConduitThree', cost: 2, role: 'Carry', traits: ['Conduit'], traitIds: ['Conduit'] },
+        { id: 'BrawlerTwo', cost: 2, role: 'Tank', traits: ['Brawler'], traitIds: ['Brawler'] }
+    ],
+    traits: ['Brawler', 'Conduit', 'Mecha', 'Voyager'],
+    roles: ['Tank', 'Carry'],
+    traitBreakpoints: {
+        Brawler: [2],
+        Conduit: [2],
+        Mecha: [2, 4],
+        Voyager: [2]
+    },
+    hashMap: {
+        Brawler: 'Brawler',
+        Conduit: 'Conduit',
+        Mecha: 'Mecha',
+        Voyager: 'Voyager'
     }
 };
 
@@ -619,7 +760,7 @@ describe('Engine.getCombinationCount', () => {
             mustExcludeTraits: []
         });
         assert.equal(result.count, 56);
-        assert.equal(result.remainingToPick, 3);
+        assert.equal(result.remainingSlots, 3);
     });
 
     it('reduces search space with must-include', () => {
@@ -630,7 +771,7 @@ describe('Engine.getCombinationCount', () => {
             mustExcludeTraits: []
         });
         assert.equal(result.count, 6);
-        assert.equal(result.remainingToPick, 1);
+        assert.equal(result.remainingSlots, 1);
     });
 
     it('reduces pool with must-exclude', () => {
@@ -641,7 +782,7 @@ describe('Engine.getCombinationCount', () => {
             mustExcludeTraits: []
         });
         assert.equal(result.count, 20);
-        assert.equal(result.remainingToPick, 3);
+        assert.equal(result.remainingSlots, 3);
     });
 
     it('returns zero combinations when must-include unit is missing after filtering', () => {
@@ -662,7 +803,7 @@ describe('Engine.getCombinationCount', () => {
             mustExcludeTraits: []
         });
         assert.equal(result.count, 0);
-        assert.equal(result.remainingToPick, -1);
+        assert.equal(result.remainingSlots, -1);
     });
 
     it('filters units by excluded traits', () => {
@@ -673,7 +814,18 @@ describe('Engine.getCombinationCount', () => {
             mustExcludeTraits: ['Assassin']
         });
         assert.equal(result.count, 20);
-        assert.equal(result.remainingToPick, 3);
+        assert.equal(result.remainingSlots, 3);
+    });
+
+    it('returns an indeterminate count for slot-varying variant searches', () => {
+        const result = Engine.getCombinationCount(mechaSlotDataCache, {
+            boardSize: 9,
+            mustInclude: [],
+            mustExclude: [],
+            mustExcludeTraits: []
+        });
+        assert.equal(result.count, null);
+        assert.equal(result.remainingSlots, 9);
     });
 
     it('leaves units in the pool unless explicitly excluded', () => {
@@ -706,8 +858,8 @@ describe('Engine.search', () => {
         mustExclude: [],
         mustIncludeTraits: [],
         mustExcludeTraits: [],
-        tankRoles: ['Tank'],
-        carryRoles: ['Carry'],
+        tankRoles: [],
+        carryRoles: [],
         extraEmblems: [],
         onlyActive: false,
         tierRank: false,
@@ -764,11 +916,27 @@ describe('Engine.search', () => {
         }
     });
 
-    it('requires at least one tank and one carry', () => {
-        const results = Engine.search(mockDataCache, baseParams);
-        // All valid results must have at least one configured tank role
-        // and at least one configured carry role.
-        assert.ok(results.length >= 0); // May be empty if no valid boards, but shouldn't crash
+    it('requires either two 3-cost tanks or one 4-cost tank, plus one 4-cost carry', () => {
+        const results = Engine.search(roleThresholdDataCache, {
+            ...baseParams,
+            tankRoles: ['Tank'],
+            carryRoles: ['Carry']
+        });
+
+        assert.ok(results.length > 0);
+        results.forEach((result) => {
+            const units = result.units.map((unitId) =>
+                roleThresholdDataCache.units.find((unit) => unit.id === unitId)
+            );
+            const tanks = units.filter((unit) => unit.role === 'Tank');
+            const carries = units.filter((unit) => unit.role === 'Carry');
+            const tankThreePlusCount = tanks.filter((unit) => unit.cost >= 3).length;
+            const tankFourPlusCount = tanks.filter((unit) => unit.cost >= 4).length;
+            const carryFourPlusCount = carries.filter((unit) => unit.cost >= 4).length;
+
+            assert.ok(tankFourPlusCount >= 1 || tankThreePlusCount >= 2);
+            assert.ok(carryFourPlusCount >= 1);
+        });
     });
 
     it('treats an empty tank role list as no tank-role requirement', () => {
@@ -776,40 +944,56 @@ describe('Engine.search', () => {
             ...baseParams,
             tankRoles: [],
             carryRoles: ['Carry'],
-            mustInclude: ['Lux', 'Ahri']
+            boardSize: 2,
+            mustInclude: ['CheapCarry', 'EliteCarry']
         };
-        const results = Engine.search(mockDataCache, params);
+        const results = Engine.search(roleThresholdDataCache, params);
         assert.ok(results.length > 0);
         results.forEach((result) => {
-            assert.ok(result.units.includes('Lux'));
-            assert.ok(result.units.includes('Ahri'));
+            assert.ok(result.units.includes('CheapCarry'));
+            assert.ok(result.units.includes('EliteCarry'));
         });
     });
 
     it('treats an empty carry role list as no carry-role requirement', () => {
         const params = {
             ...baseParams,
+            boardSize: 2,
             tankRoles: ['Tank'],
             carryRoles: [],
-            mustInclude: ['Darius', 'Malph']
+            mustInclude: ['MidTankA', 'MidTankB']
         };
-        const results = Engine.search(mockDataCache, params);
+        const results = Engine.search(roleThresholdDataCache, params);
         assert.ok(results.length > 0);
         results.forEach((result) => {
-            assert.ok(result.units.includes('Darius'));
-            assert.ok(result.units.includes('Malph'));
+            assert.ok(result.units.includes('MidTankA'));
+            assert.ok(result.units.includes('MidTankB'));
         });
     });
 
-    it('uses explicit roles rather than hidden cost thresholds', () => {
+    it('rejects boards that have role matches but miss the new cost thresholds', () => {
         const params = {
             ...baseParams,
             boardSize: 3,
-            mustInclude: ['Darius', 'Malph', 'Talon']
+            tankRoles: ['Tank'],
+            carryRoles: ['Carry'],
+            mustInclude: ['CheapTank', 'CheapCarry', 'Flex']
         };
-        const results = Engine.search(mockDataCache, params);
+        const results = Engine.search(roleThresholdDataCache, params);
+        assert.deepEqual(results, []);
+    });
+
+    it('allows one 4-cost tank to satisfy the tank requirement', () => {
+        const params = {
+            ...baseParams,
+            boardSize: 2,
+            tankRoles: ['Tank'],
+            carryRoles: ['Carry'],
+            mustInclude: ['EliteTank', 'EliteCarry']
+        };
+        const results = Engine.search(roleThresholdDataCache, params);
         assert.equal(results.length, 1);
-        assert.deepEqual(results[0].units, ['Darius', 'Malph', 'Talon']);
+        assert.deepEqual(results[0].units, ['EliteCarry', 'EliteTank']);
     });
 
     it('prefers higher-cost boards when synergy scores tie', () => {
@@ -1217,10 +1401,146 @@ describe('Engine.search', () => {
     });
 
     it('returns error for oversized search space', () => {
-        // remainingToPick > 7 should error
+        // remainingSlots > 7 should error
         const params = { ...baseParams, boardSize: 50 };
         const results = Engine.search(mockDataCache, params);
         assert.ok(results.length > 0);
         assert.ok(results[0].error);
+    });
+
+    it('can fill a 9-slot board with 8 units by selecting one 2-slot Mecha form', () => {
+        const params = {
+            ...baseParams,
+            boardSize: 9,
+            maxResults: 5,
+            mustInclude: ['Galio', 'VoyagerTwo', 'VoyagerThree', 'ConduitTwo', 'ConduitThree', 'BrawlerTwo', 'Lux', 'Braum'],
+            tankRoles: [],
+            carryRoles: [],
+            includeUnique: true
+        };
+
+        const extendedCache = {
+            ...mechaSlotDataCache,
+            units: [
+                ...mechaSlotDataCache.units.filter((unit) => unit.id !== 'AurelionSol' && unit.id !== 'Urgot'),
+                { id: 'Lux', cost: 2, role: 'Carry', traits: ['Scholar'], traitIds: ['Scholar'] },
+                { id: 'Braum', cost: 2, role: 'Tank', traits: ['Warden'], traitIds: ['Warden'] }
+            ],
+            traits: ['Brawler', 'Conduit', 'Mecha', 'Scholar', 'Voyager', 'Warden'],
+            traitBreakpoints: {
+                Brawler: [2],
+                Conduit: [2],
+                Mecha: [2, 4],
+                Scholar: [1],
+                Voyager: [2],
+                Warden: [1]
+            },
+            hashMap: {
+                Brawler: 'Brawler',
+                Conduit: 'Conduit',
+                Mecha: 'Mecha',
+                Scholar: 'Scholar',
+                Voyager: 'Voyager',
+                Warden: 'Warden'
+            }
+        };
+
+        const results = Engine.search(extendedCache, params);
+
+        assert.equal(results.length, 1);
+        assert.equal(results[0].units.length, 8);
+        assert.equal(results[0].occupiedSlots, 9);
+        assert.equal(results[0].variantAssignments.Galio.label, '2-Slot Mecha');
+        assert.equal(results[0].traitCounts.Mecha, 2);
+    });
+
+    it('can fill a 9-slot board with 7 units by selecting two 2-slot Mecha forms', () => {
+        const params = {
+            ...baseParams,
+            boardSize: 9,
+            maxResults: 5,
+            mustInclude: ['Galio', 'AurelionSol', 'VoyagerTwo', 'ConduitTwo', 'ConduitThree', 'BrawlerTwo', 'Lux'],
+            variantLocks: {
+                Galio: 'two-slot',
+                AurelionSol: 'two-slot'
+            },
+            tankRoles: [],
+            carryRoles: [],
+            includeUnique: true
+        };
+
+        const extendedCache = {
+            ...mechaSlotDataCache,
+            units: [
+                ...mechaSlotDataCache.units.filter((unit) => unit.id !== 'Urgot'),
+                { id: 'Lux', cost: 2, role: 'Carry', traits: ['Scholar'], traitIds: ['Scholar'] }
+            ],
+            traits: ['Brawler', 'Conduit', 'Mecha', 'Scholar', 'Voyager'],
+            traitBreakpoints: {
+                Brawler: [1],
+                Conduit: [2],
+                Mecha: [2, 4],
+                Scholar: [1],
+                Voyager: [2]
+            },
+            hashMap: {
+                Brawler: 'Brawler',
+                Conduit: 'Conduit',
+                Mecha: 'Mecha',
+                Scholar: 'Scholar',
+                Voyager: 'Voyager'
+            }
+        };
+
+        const results = Engine.search(extendedCache, params);
+
+        assert.equal(results.length, 1);
+        assert.equal(results[0].units.length, 7);
+        assert.equal(results[0].occupiedSlots, 9);
+        assert.equal(results[0].variantAssignments.Galio.label, '2-Slot Mecha');
+        assert.equal(results[0].variantAssignments.AurelionSol.label, '2-Slot Mecha');
+        assert.equal(results[0].traitCounts.Mecha, 4);
+    });
+
+    it('rejects Mecha 2-slot locks that overfill the board', () => {
+        const params = {
+            ...baseParams,
+            boardSize: 7,
+            maxResults: 5,
+            mustInclude: ['Galio', 'VoyagerTwo', 'VoyagerThree', 'ConduitTwo', 'ConduitThree', 'BrawlerTwo', 'Lux'],
+            variantLocks: {
+                Galio: 'two-slot'
+            },
+            tankRoles: [],
+            carryRoles: [],
+            includeUnique: true
+        };
+
+        const extendedCache = {
+            ...mechaSlotDataCache,
+            units: [
+                ...mechaSlotDataCache.units.filter((unit) => unit.id !== 'AurelionSol' && unit.id !== 'Urgot'),
+                { id: 'Lux', cost: 2, role: 'Carry', traits: ['Scholar'], traitIds: ['Scholar'] }
+            ],
+            traits: ['Brawler', 'Conduit', 'Mecha', 'Scholar', 'Voyager'],
+            traitBreakpoints: {
+                Brawler: [1],
+                Conduit: [2],
+                Mecha: [2, 4],
+                Scholar: [1],
+                Voyager: [2]
+            },
+            hashMap: {
+                Brawler: 'Brawler',
+                Conduit: 'Conduit',
+                Mecha: 'Mecha',
+                Scholar: 'Scholar',
+                Voyager: 'Voyager'
+            }
+        };
+
+        const results = Engine.search(extendedCache, params);
+
+        assert.deepEqual(results, []);
     });
 });

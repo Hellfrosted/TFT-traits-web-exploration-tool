@@ -138,6 +138,7 @@ module.exports = {
                 ...(profile.conditions && Object.keys(profile.conditions).length > 0
                     ? { conditions: profile.conditions }
                     : {}),
+                ...(Number.isFinite(Number(profile.slotCost)) ? { slotCost: Number(profile.slotCost) } : {}),
                 traits: effectiveTraits,
                 traitContributions
             };
@@ -152,6 +153,7 @@ module.exports = {
                 idParts: [],
                 labelParts: [],
                 role: baseRole,
+                slotCost: Number.isFinite(Number(unitOverride?.slotCost)) ? Number(unitOverride.slotCost) : undefined,
                 addTraits: [],
                 removeTraits: [],
                 traitContributions: {},
@@ -173,6 +175,7 @@ module.exports = {
                             idParts: [...state.idParts, String(option.id || `${group.id || `group-${groupIndex}`}-${optionIndex + 1}`)],
                             labelParts: [...state.labelParts, String(option.label || option.id || `Option ${optionIndex + 1}`)],
                             role: option.role || state.role,
+                            slotCost: Number.isFinite(Number(option.slotCost)) ? Number(option.slotCost) : state.slotCost,
                             addTraits: [...state.addTraits, ...(option.addTraits || [])],
                             removeTraits: [...state.removeTraits, ...(option.removeTraits || [])],
                             traitContributions: {
@@ -202,6 +205,7 @@ module.exports = {
                 id: state.idParts.join('+'),
                 label: state.labelParts.join(' + '),
                 role: state.role,
+                ...(Number.isFinite(Number(state.slotCost)) ? { slotCost: Number(state.slotCost) } : {}),
                 addTraits: state.addTraits,
                 removeTraits: state.removeTraits,
                 traitContributions: state.traitContributions,
@@ -234,6 +238,11 @@ module.exports = {
                 id: String(variant.id || `variant-${index + 1}`),
                 label: String(variant.label || variant.id || `Variant ${index + 1}`),
                 role: variant.role || baseRole,
+                ...(Number.isFinite(Number(variant.slotCost))
+                    ? { slotCost: Number(variant.slotCost) }
+                    : (Number.isFinite(Number(unitOverride?.slotCost))
+                        ? { slotCost: Number(unitOverride.slotCost) }
+                        : {})),
                 traits: effectiveTraits,
                 traitContributions,
                 ...(this._normalizeConditionalEffects(variant.conditionalEffects).length > 0
@@ -261,6 +270,9 @@ module.exports = {
         return {
             ...extraOverride,
             ...baseOverride,
+            slotCost: Number.isFinite(Number(baseOverride.slotCost))
+                ? Number(baseOverride.slotCost)
+                : Number(extraOverride.slotCost),
             addTraits: [...(extraOverride.addTraits || []), ...(baseOverride.addTraits || [])],
             removeTraits: [...(extraOverride.removeTraits || []), ...(baseOverride.removeTraits || [])],
             traitContributions: {

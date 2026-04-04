@@ -32,7 +32,7 @@ const LIMITS = {
     /** Report progress every N combinations checked */
     PROGRESS_INTERVAL: 500_000,
     /** Default number of top results to keep */
-    DEFAULT_MAX_RESULTS: 200,
+    DEFAULT_MAX_RESULTS: 500,
     /** Warn user if estimated combinations exceed this threshold */
     LARGE_SEARCH_THRESHOLD: 6_000_000_000
 };

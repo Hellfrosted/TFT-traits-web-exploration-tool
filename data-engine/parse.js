@@ -155,6 +155,7 @@ module.exports = {
                 id: unit.id,
                 cost: unit.cost,
                 role: unit.role,
+                slotCost: unit.slotCost || 1,
                 traits: unit.traits,
                 traitContributions: unit.traitContributions || null,
                 conditionalEffects: unit.conditionalEffects || null,
@@ -398,6 +399,9 @@ module.exports = {
                 displayName,
                 cost: tier,
                 role: resolvedRoleName,
+                ...(Number.isFinite(Number(mergedUnitOverride?.slotCost))
+                    ? { slotCost: Number(mergedUnitOverride.slotCost) }
+                    : {}),
                 traits: effectiveTraitNames,
                 traitContributions,
                 ...(conditionalEffects.length > 0 ? { conditionalEffects } : {}),
