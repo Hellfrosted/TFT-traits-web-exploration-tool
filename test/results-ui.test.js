@@ -5,10 +5,18 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 function createResultsUiForSortMode(sortMode) {
-    const source = fs.readFileSync(
-        path.join(__dirname, '..', 'renderer', 'results-ui.js'),
-        'utf8'
-    );
+    const sources = [
+        'results-model.js',
+        'results-tooltip.js',
+        'results-renderers.js',
+        'results-ui.js'
+    ].map((fileName) => ({
+        fileName,
+        source: fs.readFileSync(
+            path.join(__dirname, '..', 'renderer', fileName),
+            'utf8'
+        )
+    }));
 
     const sandbox = {
         console,
@@ -37,7 +45,9 @@ function createResultsUiForSortMode(sortMode) {
         }
     };
 
-    vm.runInNewContext(source, sandbox, { filename: 'renderer/results-ui.js' });
+    sources.forEach(({ fileName, source }) => {
+        vm.runInNewContext(source, sandbox, { filename: `renderer/${fileName}` });
+    });
 
     return sandbox.window.TFTRenderer.createResultsUi({
         state: {}
