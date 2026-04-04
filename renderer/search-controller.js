@@ -22,9 +22,11 @@
                 return `Searching ${normalizedPct}%`;
             }
 
-            return Number.isFinite(Number(state.activeSearchEstimate?.count))
-                ? 'Searching...'
-                : 'Estimating...';
+            if (state.isSearching) {
+                return 'Searching...';
+            }
+
+            return 'Estimating...';
         }
 
         function buildSearchTableMessage() {
@@ -79,7 +81,7 @@
             if (state.isSearching) return;
 
             app.queryUi.clampNumericInput('boardSize', 1, 20, 9);
-            app.queryUi.clampNumericInput('maxResults', 1, 10000, 100);
+            app.queryUi.clampNumericInput('maxResults', 1, 10000, state.searchLimits.DEFAULT_MAX_RESULTS || 500);
 
             const tbody = document.getElementById('resBody');
             state.currentResults = [];
@@ -109,14 +111,14 @@
                 const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
                 const largeSearchThreshold = state.searchLimits.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
 
-                if (estimate.remainingToPick > maxRemainingSlots) {
+                if (estimate.remainingSlots > maxRemainingSlots) {
                     app.results.renderEmptySummary('Board too large');
-                    app.queryUi.renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining picks.`);
+                    app.queryUi.renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`);
                     tbody.innerHTML = app.results.renderResultsMessageRow(`Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`, 'results-message-row results-message-row-error');
                     return;
                 }
 
-                if (estimate.count > largeSearchThreshold) {
+                if (Number.isFinite(Number(estimate.count)) && estimate.count > largeSearchThreshold) {
                     const confirmed = await showConfirm(`Search volume: ~${(estimate.count / 1e9).toFixed(1)}B combinations. This may take a minute. Continue?`, 'Performance Warning');
                     if (!confirmed) {
                         app.results.renderEmptySummary('Search aborted');

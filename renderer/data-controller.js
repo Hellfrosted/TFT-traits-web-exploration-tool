@@ -5,6 +5,29 @@
     ns.createDataController = function createDataController(app) {
         const { state } = app;
 
+        function collectUnitTraitLabels(unit) {
+            const traitNames = new Set();
+
+            const addTraitNames = (entity) => {
+                if (!entity || typeof entity !== 'object') return;
+
+                if (entity.traitContributions && typeof entity.traitContributions === 'object') {
+                    Object.keys(entity.traitContributions).forEach((traitName) => {
+                        if (traitName) traitNames.add(traitName);
+                    });
+                } else {
+                    (entity.traits || []).forEach((traitName) => {
+                        if (traitName) traitNames.add(traitName);
+                    });
+                }
+            };
+
+            addTraitNames(unit);
+            (unit?.variants || []).forEach((variant) => addTraitNames(variant));
+
+            return [...traitNames].sort((left, right) => left.localeCompare(right));
+        }
+
         async function fetchData() {
             const source = app.queryUi.getSelectedDataSource();
             const sourceLabel = app.queryUi.getDataSourceLabel(source);
@@ -55,8 +78,13 @@
                     );
                     app.queryUi.renderQuerySummary(null, `Loaded ${setLabel}`);
 
-                    state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', res.units, true);
-                    state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', res.units, true);
+                    const unitOptions = res.units.map((unit) => ({
+                        ...unit,
+                        pillLabel: unit.displayName || unit.id,
+                        dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
+                    }));
+                    state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
+                    state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
 
                     const traitOptions = res.traits.map((trait) => ({
                         value: trait,

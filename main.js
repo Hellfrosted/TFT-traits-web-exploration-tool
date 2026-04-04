@@ -16,7 +16,7 @@ const { DEFAULT_DATA_SOURCE, IPC_CHANNELS, LIMITS } = require('./constants.js');
 
 let mainWindow;
 let activeSearch = null;
-const SEARCH_CACHE_VERSION = 3;
+const SEARCH_CACHE_VERSION = 4;
 const isSmokeTest = process.argv.includes('--smoke-test');
 let smokeTestFinished = false;
 const searchResultMemoryCache = new Map();
@@ -396,7 +396,7 @@ ipcMain.handle(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT
 });
 
 ipcMain.handle(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (event, params) => {
-    if (!dataCache) return { count: 0, remainingToPick: 0 };
+    if (!dataCache) return { count: 0, remainingSlots: 0 };
     const normalizedParams = normalizeSearchParams(params);
     const estimateKey = getCacheKey(dataCache.dataFingerprint, normalizedParams);
     const cachedEstimate = searchEstimateMemoryCache.get(estimateKey);

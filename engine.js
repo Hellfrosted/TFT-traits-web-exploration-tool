@@ -454,6 +454,37 @@ class Engine {
         }, 0n);
     }
 
+    static getEntitySlotCost(entity) {
+        const numericSlotCost = Math.trunc(Number(entity?.slotCost));
+        return Number.isFinite(numericSlotCost) && numericSlotCost > 0 ? numericSlotCost : 1;
+    }
+
+    static getUnitSlotCostRange(unit, lockedVariantId = null) {
+        const baseSlotCost = this.getEntitySlotCost(unit);
+        if (!Array.isArray(unit?.variants) || unit.variants.length === 0) {
+            return {
+                min: baseSlotCost,
+                max: baseSlotCost
+            };
+        }
+
+        const relevantVariants = lockedVariantId
+            ? unit.variants.filter((variant) => variant.id === lockedVariantId)
+            : unit.variants;
+        if (relevantVariants.length === 0) {
+            return {
+                min: baseSlotCost,
+                max: baseSlotCost
+            };
+        }
+
+        const slotCosts = relevantVariants.map((variant) => this.getEntitySlotCost(variant));
+        return {
+            min: Math.min(...slotCosts),
+            max: Math.max(...slotCosts)
+        };
+    }
+
     /**
      * Prepare filtered units and search bookkeeping shared by estimation and DFS.
      * @param {import('./data.js').ParsedData} dataCache
@@ -466,9 +497,10 @@ class Engine {
      *   validUnits: import('./data.js').UnitData[],
      *   mustHaveMask: bigint,
      *   mustHaveCount: number,
-     *   remainingToPick: number,
+     *   remainingSlots: number,
      *   availableCount: number,
-     *   hasAllRequiredUnits: boolean
+     *   hasAllRequiredUnits: boolean,
+     *   hasVariableSlotCosts: boolean
      * }}
      */
     static prepareSearchContext(dataCache, params) {
@@ -483,15 +515,28 @@ class Engine {
         const validUnits = this.getValidUnits(dataCache, mustExclude, mustExcludeTraits, variantLocks);
         const mustHaveMask = this.buildRequiredUnitMask(validUnits, mustInclude);
         const mustHaveCount = this.popcount(mustHaveMask);
-        const remainingToPick = boardSize - mustHaveCount;
+        let mustHaveMinSlots = 0;
+        let hasVariableSlotCosts = false;
+
+        validUnits.forEach((unit, index) => {
+            const slotCostRange = this.getUnitSlotCostRange(unit, variantLocks[unit.id] || null);
+            if (slotCostRange.min !== 1 || slotCostRange.max !== 1) {
+                hasVariableSlotCosts = true;
+            }
+            if ((mustHaveMask & (1n << BigInt(index))) !== 0n) {
+                mustHaveMinSlots += slotCostRange.min;
+            }
+        });
+        const remainingSlots = boardSize - mustHaveMinSlots;
 
         return {
             validUnits,
             mustHaveMask,
             mustHaveCount,
-            remainingToPick,
+            remainingSlots,
             availableCount: validUnits.length - mustHaveCount,
-            hasAllRequiredUnits: mustHaveCount === mustInclude.length
+            hasAllRequiredUnits: mustHaveCount === mustInclude.length,
+            hasVariableSlotCosts
         };
     }
 
@@ -546,27 +591,35 @@ class Engine {
      * Called before search to warn the user about expensive queries.
      * @param {import('./data.js').ParsedData} dataCache - Parsed game data
      * @param {Object} params - Search parameters
-     * @param {number} params.boardSize - Total board size
+     * @param {number} params.boardSize - Total occupied board slots
      * @param {string[]} params.mustInclude - Unit IDs that must be on the board
      * @param {string[]} params.mustExclude - Unit IDs to exclude
      * @param {string[]} [params.mustExcludeTraits] - Trait names to exclude
-     * @returns {{count: number, remainingToPick: number}} Estimated combinations and empty slots
+     * @returns {{count: number | null, remainingSlots: number}} Estimated combinations and empty slots
      */
     static getCombinationCount(dataCache, params, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
         const {
-            remainingToPick,
+            remainingSlots,
             availableCount,
-            hasAllRequiredUnits
+            hasAllRequiredUnits,
+            hasVariableSlotCosts
         } = preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
 
-        if (!hasAllRequiredUnits || remainingToPick < 0) {
-            return { count: 0, remainingToPick };
+        if (!hasAllRequiredUnits || remainingSlots < 0) {
+            return { count: 0, remainingSlots };
+        }
+
+        if (hasVariableSlotCosts) {
+            return {
+                count: null,
+                remainingSlots
+            };
         }
         
         return {
-            count: this.combinations(availableCount, remainingToPick),
-            remainingToPick
+            count: this.combinations(availableCount, remainingSlots),
+            remainingSlots
         };
     }
 
@@ -576,7 +629,7 @@ class Engine {
      *
      * @param {import('./data.js').ParsedData} dataCache - Parsed game data
      * @param {Object} params - Search configuration
-     * @param {number} params.boardSize - Total units on board
+     * @param {number} params.boardSize - Total occupied board slots
      * @param {string[]} params.mustInclude - Required unit IDs
      * @param {string[]} params.mustExclude - Excluded unit IDs
      * @param {string[]} [params.mustIncludeTraits] - Required active trait names
@@ -594,6 +647,7 @@ class Engine {
     static search(dataCache, params, onProgress, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
         const {
+            boardSize,
             mustIncludeTraits,
             mustExcludeTraits,
             variantLocks,
@@ -611,11 +665,12 @@ class Engine {
         const {
             validUnits,
             mustHaveMask,
-            remainingToPick,
-            hasAllRequiredUnits
+            remainingSlots,
+            hasAllRequiredUnits,
+            hasVariableSlotCosts
         } = preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
 
-        if (!hasAllRequiredUnits || remainingToPick < 0) {
+        if (!hasAllRequiredUnits || remainingSlots < 0) {
             return [];
         }
 
@@ -635,6 +690,15 @@ class Engine {
         const carryRoleSet = new Set(carryRoles || []);
         const requireTank = tankRoleSet.size > 0;
         const requireCarry = carryRoleSet.size > 0;
+        const meetsTankRequirement = (tankThreePlusCount, tankFourPlusCount) => (
+            !requireTank ||
+            tankFourPlusCount >= 1 ||
+            tankThreePlusCount >= 2
+        );
+        const meetsCarryRequirement = (carryFourPlusCount) => (
+            !requireCarry ||
+            carryFourPlusCount >= 1
+        );
 
         const numTraits = allTraitNames.length;
         const mustIncludeTraitIndices = (mustIncludeTraits || [])
@@ -654,6 +718,9 @@ class Engine {
             const baseTraitContributionEntries = this.buildTraitContributionEntries(unit, traitIndex, dataCache.hashMap);
             let fixedTraitContributionEntries = baseTraitContributionEntries;
             let variantProfiles = [];
+            const baseSlotCost = this.getEntitySlotCost(unit);
+            let minSlotCost = baseSlotCost;
+            let maxSlotCost = baseSlotCost;
             const conditionalEffectEntries = this.buildConditionalEffectEntries(
                 unit.conditionalEffects,
                 traitIndex,
@@ -680,6 +747,7 @@ class Engine {
                         id: variant.id,
                         label: variant.label || variant.id,
                         role: variant.role || unit.role,
+                        slotCost: this.getEntitySlotCost(variant),
                         traits: variant.traits || [],
                         fullTraitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
                         traitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
@@ -704,7 +772,13 @@ class Engine {
 
                 const variantSummary = this.summarizeVariantProfiles(allowedVariantProfiles);
                 fixedTraitContributionEntries = variantSummary.fixedTraitContributionEntries;
-                variantProfiles = variantSummary.variantProfiles;
+                minSlotCost = Math.min(...allowedVariantProfiles.map((variant) => variant.slotCost));
+                maxSlotCost = Math.max(...allowedVariantProfiles.map((variant) => variant.slotCost));
+                variantProfiles = variantSummary.variantProfiles.map((variant, variantIndex) => ({
+                    ...variant,
+                    slotCost: allowedVariantProfiles[variantIndex].slotCost,
+                    slotDelta: allowedVariantProfiles[variantIndex].slotCost - minSlotCost
+                }));
             }
 
             const traitContributionByIndex = Object.create(null);
@@ -712,10 +786,18 @@ class Engine {
                 traitContributionByIndex[index] = count;
             });
 
+            const isTank = tankRoleSet.has(unit.role);
+            const isCarry = carryRoleSet.has(unit.role);
             return {
                 cost: unit.cost,
-                isTank: tankRoleSet.has(unit.role),
-                isCarry: carryRoleSet.has(unit.role),
+                isTank,
+                isCarry,
+                minSlotCost,
+                maxSlotCost,
+                slotFlex: maxSlotCost - minSlotCost,
+                qualifyingTankThreePlus: isTank && unit.cost >= 3 ? 1 : 0,
+                qualifyingTankFourPlus: isTank && unit.cost >= 4 ? 1 : 0,
+                qualifyingCarryFourPlus: isCarry && unit.cost >= 4 ? 1 : 0,
                 baseTraitContributionEntries,
                 fixedTraitContributionEntries,
                 traitContributionByIndex,
@@ -733,8 +815,11 @@ class Engine {
         });
 
         // Build initial state from must-have units
-        let mustHaveInitialTank = !requireTank;
-        let mustHaveInitialCarry = !requireCarry;
+        let mustHaveInitialTankThreePlusCount = 0;
+        let mustHaveInitialTankFourPlusCount = 0;
+        let mustHaveInitialCarryFourPlusCount = 0;
+        let mustHaveInitialMinSlots = 0;
+        let mustHaveInitialSlotFlex = 0;
         let mustHaveTotalCost = 0;
         const initialTraitCounts = new Uint8Array(numTraits);
         const activeUnitFlags = new Uint8Array(validUnits.length);
@@ -754,8 +839,11 @@ class Engine {
             if ((mustHaveMask & (1n << BigInt(i))) !== 0n) {
                 const info = unitInfo[i];
                 activeUnitFlags[i] = 1;
-                if (info.isTank) mustHaveInitialTank = true;
-                if (info.isCarry) mustHaveInitialCarry = true;
+                mustHaveInitialTankThreePlusCount += info.qualifyingTankThreePlus;
+                mustHaveInitialTankFourPlusCount += info.qualifyingTankFourPlus;
+                mustHaveInitialCarryFourPlusCount += info.qualifyingCarryFourPlus;
+                mustHaveInitialMinSlots += info.minSlotCost;
+                mustHaveInitialSlotFlex += info.slotFlex;
                 mustHaveTotalCost += info.cost;
                 mustHaveComplexUnitCount += info.hasComplexEvaluation;
                 info.fixedTraitContributionEntries.forEach(({ index, count }) => {
@@ -819,17 +907,23 @@ class Engine {
             return synergyScore * 10000 + totalCost;
         };
 
-        const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts) => {
+        const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts, minOccupiedSlots) => {
             const workingCounts = new Uint8Array(baseTraitCounts);
             const selectedVariantByUnitIndex = [];
             let bestEvaluation = null;
 
             const finalizeVariantSelection = () => {
+                let occupiedSlots = minOccupiedSlots;
                 for (const unitIndex of selectedVariantIndices) {
                     const variant = selectedVariantByUnitIndex[unitIndex];
                     if (!this.isCompiledConditionSatisfied(variant?.compiledConditions, workingCounts, activeUnitFlags)) {
                         return;
                     }
+                    occupiedSlots += variant?.slotDelta || 0;
+                }
+
+                if (occupiedSlots !== boardSize) {
+                    return;
                 }
 
                 const resolvedCounts = new Uint8Array(workingCounts);
@@ -912,6 +1006,7 @@ class Engine {
 
                 bestEvaluation = {
                     synergyScore,
+                    occupiedSlots,
                     traitCounts: this.traitCountsToRecord(resolvedCounts, allTraitNames),
                     ...(variantAssignments && Object.keys(variantAssignments).length > 0
                         ? { variantAssignments }
@@ -951,6 +1046,7 @@ class Engine {
             const board = {
                 units: unitIds,
                 synergyScore: evaluation.synergyScore,
+                occupiedSlots: evaluation.occupiedSlots,
                 totalCost,
                 traitCounts: evaluation.traitCounts,
                 ...(evaluation.variantAssignments && Object.keys(evaluation.variantAssignments).length > 0
@@ -974,17 +1070,23 @@ class Engine {
             }
         };
 
-        const totalCombinations = this.combinations(availableIndices.length, remainingToPick);
+        const totalCombinations = hasVariableSlotCosts
+            ? null
+            : this.combinations(availableIndices.length, remainingSlots);
         let combinationsChecked = 0;
         let lastProgressReport = 0;
         
         const currentTraitCounts = new Uint8Array(initialTraitCounts);
-        const remainingTankFrom = new Uint8Array(availableIndices.length + 1);
-        const remainingCarryFrom = new Uint8Array(availableIndices.length + 1);
+        const remainingTankThreePlusFrom = new Uint8Array(availableIndices.length + 1);
+        const remainingTankFourPlusFrom = new Uint8Array(availableIndices.length + 1);
+        const remainingCarryFourPlusFrom = new Uint8Array(availableIndices.length + 1);
+        const remainingMaxSlotsFrom = new Uint8Array(availableIndices.length + 1);
         for (let i = availableIndices.length - 1; i >= 0; i--) {
             const info = unitInfo[availableIndices[i]];
-            remainingTankFrom[i] = remainingTankFrom[i + 1] || info.isTank ? 1 : 0;
-            remainingCarryFrom[i] = remainingCarryFrom[i + 1] || info.isCarry ? 1 : 0;
+            remainingTankThreePlusFrom[i] = remainingTankThreePlusFrom[i + 1] + info.qualifyingTankThreePlus;
+            remainingTankFourPlusFrom[i] = remainingTankFourPlusFrom[i + 1] + info.qualifyingTankFourPlus;
+            remainingCarryFourPlusFrom[i] = remainingCarryFourPlusFrom[i + 1] + info.qualifyingCarryFourPlus;
+            remainingMaxSlotsFrom[i] = remainingMaxSlotsFrom[i + 1] + info.maxSlotCost;
         }
 
         const mustIncludeTraitTargets = mustIncludeTraitIndices.map((tIdx) => {
@@ -992,7 +1094,11 @@ class Engine {
             const bps = traitBPs[name] || [1];
             return bps[0];
         });
-        const useMustIncludePruning = mustIncludeTraitIndices.length > 0 && !hasVariantUnits && !hasConditionalProfiles && !hasConditionalEffects;
+        const useMustIncludePruning = mustIncludeTraitIndices.length > 0
+            && !hasVariantUnits
+            && !hasConditionalProfiles
+            && !hasConditionalEffects
+            && !hasVariableSlotCosts;
         const remainingTraitPotentialFrom = useMustIncludePruning
             ? mustIncludeTraitIndices.map(() => new Uint8Array(availableIndices.length + 1))
             : [];
@@ -1007,14 +1113,55 @@ class Engine {
             }
         }
         const currentVariantUnitIndices = [];
+        const reportProgress = () => {
+            if (!onProgress || (combinationsChecked - lastProgressReport) < LIMITS.PROGRESS_INTERVAL) {
+                return;
+            }
+
+            lastProgressReport = combinationsChecked;
+            if (Number.isFinite(totalCombinations) && totalCombinations > 0) {
+                const pct = Math.min(99, Math.round((combinationsChecked / totalCombinations) * 100));
+                onProgress(pct, combinationsChecked, totalCombinations);
+                return;
+            }
+
+            onProgress(null, combinationsChecked, null);
+        };
 
         /**
          * Depth-first search with backtracking.
          * Mutates currentTraitCounts in place for performance (avoids array copies).
          */
-        const dfs = (startIdx, currentCount, hasTank, hasCarry, currentCost, currentComplexUnitCount, currentIdxList) => {
-            if (requireTank && !hasTank && !remainingTankFrom[startIdx]) return;
-            if (requireCarry && !hasCarry && !remainingCarryFrom[startIdx]) return;
+        const dfs = (
+            startIdx,
+            currentMinSlots,
+            tankThreePlusCount,
+            tankFourPlusCount,
+            carryFourPlusCount,
+            currentCost,
+            currentComplexUnitCount,
+            currentSlotFlex,
+            currentIdxList
+        ) => {
+            if (currentMinSlots > boardSize) {
+                return;
+            }
+            if (
+                requireTank &&
+                !meetsTankRequirement(tankThreePlusCount, tankFourPlusCount) &&
+                !(
+                    tankFourPlusCount + remainingTankFourPlusFrom[startIdx] >= 1 ||
+                    tankThreePlusCount + remainingTankThreePlusFrom[startIdx] >= 2
+                )
+            ) return;
+            if (
+                requireCarry &&
+                !meetsCarryRequirement(carryFourPlusCount) &&
+                (carryFourPlusCount + remainingCarryFourPlusFrom[startIdx] < 1)
+            ) return;
+            if ((currentMinSlots + currentSlotFlex + remainingMaxSlotsFrom[startIdx]) < boardSize) {
+                return;
+            }
 
             if (useMustIncludePruning) {
                 for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
@@ -1026,22 +1173,21 @@ class Engine {
                 }
             }
 
-            if (currentCount === remainingToPick) {
+            if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
                 combinationsChecked++;
+                reportProgress();
 
-                if (onProgress && (combinationsChecked - lastProgressReport) >= LIMITS.PROGRESS_INTERVAL) {
-                    lastProgressReport = combinationsChecked;
-                    const pct = Math.min(99, Math.round((combinationsChecked / totalCombinations) * 100));
-                    onProgress(pct, combinationsChecked, totalCombinations);
-                }
-
-                if (!hasTank || !hasCarry) return;
+                if (!meetsTankRequirement(tankThreePlusCount, tankFourPlusCount)) return;
+                if (!meetsCarryRequirement(carryFourPlusCount)) return;
 
                 const totalCost = mustHaveTotalCost + currentCost;
                 const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
                 const totalComplexUnitCount = mustHaveComplexUnitCount + currentComplexUnitCount;
 
                 if (totalComplexUnitCount === 0) {
+                    if (currentMinSlots !== boardSize) {
+                        return;
+                    }
                     for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
                         const traitIndexValue = mustIncludeTraitIndices[traitPos];
                         const requiredThreshold = mustIncludeTraitTargets[traitPos];
@@ -1058,6 +1204,7 @@ class Engine {
                         this.buildSortedBoardUnits(selectedUnitIndices, unitInfo),
                         {
                             synergyScore,
+                            occupiedSlots: currentMinSlots,
                             traitCounts: this.traitCountsToRecord(currentTraitCounts, allTraitNames)
                         },
                         totalCost
@@ -1066,20 +1213,32 @@ class Engine {
                 }
 
                 const selectedVariantIndices = mustHaveVariantUnitIndices.concat(currentVariantUnitIndices);
-                const evaluation = evaluateBoardSelection(selectedUnitIndices, selectedVariantIndices, currentTraitCounts);
-                if (!evaluation) return;
-                const totalScore = scoreBoard(evaluation.synergyScore, totalCost);
+                const evaluation = evaluateBoardSelection(
+                    selectedUnitIndices,
+                    selectedVariantIndices,
+                    currentTraitCounts,
+                    currentMinSlots
+                );
+                if (evaluation) {
+                    const totalScore = scoreBoard(evaluation.synergyScore, totalCost);
 
-                if (topBoards.length >= MAX_BOARDS && totalScore <= worstScore) return;
-                
-                addResult(this.buildSortedBoardUnits(selectedUnitIndices, unitInfo), evaluation, totalCost);
+                    if (!(topBoards.length >= MAX_BOARDS && totalScore <= worstScore)) {
+                        addResult(this.buildSortedBoardUnits(selectedUnitIndices, unitInfo), evaluation, totalCost);
+                    }
+                }
+            }
+
+            if (currentMinSlots === boardSize) {
                 return;
             }
-            
-            const remainingToFill = remainingToPick - currentCount;
-            for (let i = startIdx; i <= availableIndices.length - remainingToFill; i++) {
+
+            for (let i = startIdx; i < availableIndices.length; i++) {
                 const idx = availableIndices[i];
                 const info = unitInfo[idx];
+                const nextMinSlots = currentMinSlots + info.minSlotCost;
+                if (nextMinSlots > boardSize) {
+                    continue;
+                }
                 
                 // Add this unit's traits (mutate in place)
                 for (const { index, count } of info.fixedTraitContributionEntries) {
@@ -1093,11 +1252,13 @@ class Engine {
                 }
                 dfs(
                     i + 1, 
-                    currentCount + 1, 
-                    hasTank || info.isTank, 
-                    hasCarry || info.isCarry,
+                    nextMinSlots,
+                    tankThreePlusCount + info.qualifyingTankThreePlus,
+                    tankFourPlusCount + info.qualifyingTankFourPlus,
+                    carryFourPlusCount + info.qualifyingCarryFourPlus,
                     currentCost + info.cost,
                     currentComplexUnitCount + info.hasComplexEvaluation,
+                    currentSlotFlex + info.slotFlex,
                     currentIdxList
                 );
                 if (info.variantProfiles.length > 0) {
@@ -1113,11 +1274,30 @@ class Engine {
             }
         };
         
-        if (remainingToPick <= LIMITS.MAX_REMAINING_SLOTS && totalCombinations <= LIMITS.COMBINATION_LIMIT) {
-            dfs(0, 0, mustHaveInitialTank, mustHaveInitialCarry, 0, 0, []);
-            if (onProgress) onProgress(100, totalCombinations, totalCombinations);
+        if (
+            remainingSlots <= LIMITS.MAX_REMAINING_SLOTS &&
+            (!Number.isFinite(totalCombinations) || totalCombinations <= LIMITS.COMBINATION_LIMIT)
+        ) {
+            dfs(
+                0,
+                mustHaveInitialMinSlots,
+                mustHaveInitialTankThreePlusCount,
+                mustHaveInitialTankFourPlusCount,
+                mustHaveInitialCarryFourPlusCount,
+                0,
+                0,
+                mustHaveInitialSlotFlex,
+                []
+            );
+            if (onProgress) {
+                if (Number.isFinite(totalCombinations)) {
+                    onProgress(100, totalCombinations, totalCombinations);
+                } else {
+                    onProgress(100, combinationsChecked, null);
+                }
+            }
         } else {
-             const reason = totalCombinations > LIMITS.COMBINATION_LIMIT 
+             const reason = Number.isFinite(totalCombinations) && totalCombinations > LIMITS.COMBINATION_LIMIT
                 ? `Search space too large (~${(totalCombinations / 1e9).toFixed(1)}B combinations). Pick more Must-Haves.` 
                 : "Board size too large. Supports up to 7 empty slots.";
              topBoards.push({error: reason});

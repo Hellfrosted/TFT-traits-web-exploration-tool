@@ -4,6 +4,7 @@
 
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
+        const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
 
         function setResultsSummary(content) {
             const summary = document.getElementById('resultsSummary');
@@ -242,7 +243,7 @@
         function getCurrentSearchParams() {
             return {
                 boardSize: parseInt(document.getElementById('boardSize').value, 10) || 9,
-                maxResults: parseInt(document.getElementById('maxResults').value, 10) || 100,
+                maxResults: parseInt(document.getElementById('maxResults').value, 10) || getDefaultMaxResults(),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
                 mustExclude: state.selectors.mustExclude?.getValues() || [],
                 mustIncludeTraits: state.selectors.mustIncludeTraits?.getValues() || [],
@@ -294,7 +295,7 @@
                 const input = document.getElementById(id);
                 input.addEventListener('change', () => {
                     if (id === 'boardSize') clampNumericInput('boardSize', 1, 20, 9);
-                    if (id === 'maxResults') clampNumericInput('maxResults', 1, 10000, 100);
+                    if (id === 'maxResults') clampNumericInput('maxResults', 1, 10000, getDefaultMaxResults());
                     refreshDraftQuerySummary();
                 });
             });
