@@ -94,10 +94,7 @@
         }
 
         function renderSearchingSpotlight() {
-            const estimateLabel = Number.isFinite(Number(state.activeSearchEstimate?.count))
-                ? `Current estimate: ~${formatBoardEstimate(state.activeSearchEstimate.count)} boards.`
-                : 'Estimating the search space for this query.';
-            renderEmptySpotlight(`${estimateLabel} Results will appear here when the search completes.`);
+            renderEmptySpotlight('Results will appear here when the search completes.');
         }
 
         function renderResultsMessageRow(message, className = 'results-message-row') {

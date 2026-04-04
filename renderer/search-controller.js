@@ -1,18 +1,57 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { formatBoardEstimate } = ns.shared;
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
 
-        function buildSearchMeta(progressPct = null) {
-            const progressText = Number.isFinite(progressPct)
-                ? `Searching ${progressPct}%`
-                : 'Searching';
-            const estimateSuffix = Number.isFinite(Number(state.activeSearchEstimate?.count))
-                ? ` of ~${formatBoardEstimate(state.activeSearchEstimate.count)} boards`
-                : '';
-            return `${progressText}${estimateSuffix}`;
+        function normalizeProgressPct(progressPct = null) {
+            if (!Number.isFinite(progressPct)) {
+                return null;
+            }
+
+            return Math.max(0, Math.min(100, Math.round(progressPct)));
+        }
+
+        function buildSearchMeta() {
+            return 'Active query';
+        }
+
+        function buildSearchButtonLabel(progressPct = null) {
+            const normalizedPct = normalizeProgressPct(progressPct);
+            if (Number.isFinite(normalizedPct)) {
+                return `Searching ${normalizedPct}%`;
+            }
+
+            return Number.isFinite(Number(state.activeSearchEstimate?.count))
+                ? 'Searching...'
+                : 'Estimating...';
+        }
+
+        function buildSearchTableMessage() {
+            return 'Results pending...';
+        }
+
+        function renderActiveSearchUi(progressPct = null) {
+            const searchBtn = document.getElementById('searchBtn');
+            const tbody = document.getElementById('resBody');
+            const normalizedPct = normalizeProgressPct(progressPct);
+
+            if (searchBtn && state.isSearching) {
+                searchBtn.innerText = buildSearchButtonLabel(normalizedPct);
+            }
+
+            if (state.lastSearchParams) {
+                app.queryUi.renderQuerySummary(state.lastSearchParams, buildSearchMeta());
+            } else {
+                app.queryUi.renderQuerySummary(null, buildSearchMeta());
+            }
+
+            app.results.renderEstimateSummary(state.activeSearchEstimate);
+            app.results.renderSearchingSpotlight();
+
+            if (tbody && state.currentResults.length === 0) {
+                tbody.innerHTML = app.results.renderResultsMessageRow(buildSearchTableMessage());
+            }
         }
 
         function setSearchState(searching) {
@@ -23,7 +62,7 @@
             if (searching) {
                 searchBtn.disabled = true;
                 searchBtn.classList.add('disabled');
-                searchBtn.innerText = 'Searching...';
+                searchBtn.innerText = buildSearchButtonLabel();
                 cancelBtn.style.display = 'block';
             } else {
                 searchBtn.disabled = false;
@@ -43,10 +82,8 @@
             app.queryUi.clampNumericInput('maxResults', 1, 10000, 100);
 
             const tbody = document.getElementById('resBody');
+            state.currentResults = [];
             state.activeSearchEstimate = null;
-            app.results.renderEstimateSummary();
-            app.results.renderSearchingSpotlight();
-            tbody.innerHTML = app.results.renderResultsMessageRow('Estimating search space...');
 
             setSearchState(true);
 
@@ -61,17 +98,14 @@
             try {
                 const params = app.queryUi.getCurrentSearchParams();
                 state.lastSearchParams = params;
-                app.queryUi.renderQuerySummary(params, buildSearchMeta());
+                renderActiveSearchUi();
 
                 if (!state.electronBridge?.getSearchEstimate) {
                     throw new Error('Electron preload bridge is unavailable.');
                 }
                 const estimate = await state.electronBridge.getSearchEstimate(params);
                 state.activeSearchEstimate = estimate;
-                app.queryUi.renderQuerySummary(params, buildSearchMeta());
-                app.results.renderEstimateSummary(estimate);
-                app.results.renderSearchingSpotlight();
-                tbody.innerHTML = app.results.renderResultsMessageRow(`Scanning ~${formatBoardEstimate(estimate.count)} estimated boards...`);
+                renderActiveSearchUi();
                 const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
                 const largeSearchThreshold = state.searchLimits.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
 
@@ -162,11 +196,7 @@
             }
 
             const dispose = state.electronBridge.onSearchProgress((data) => {
-                if (state.lastSearchParams) {
-                    app.queryUi.renderQuerySummary(state.lastSearchParams, buildSearchMeta(data.pct));
-                } else {
-                    app.queryUi.renderQuerySummary(null, buildSearchMeta(data.pct));
-                }
+                renderActiveSearchUi(data.pct);
             });
 
             if (typeof dispose === 'function') {
@@ -176,6 +206,9 @@
 
         return {
             buildSearchMeta,
+            buildSearchButtonLabel,
+            buildSearchTableMessage,
+            renderActiveSearchUi,
             setSearchState,
             handleSearchClick,
             subscribeProgressUpdates
