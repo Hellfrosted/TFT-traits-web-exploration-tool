@@ -75,6 +75,7 @@
 ## Git / Release
 
 - The GitHub repository moved to `Hellfrosted/TFT-traits-web-exploration-tool`. The old remote URL still redirects, but prefer the new repository name in release or GitHub tooling.
+- Avoid pull requests by default. This is mostly a solo project, so prefer direct branch work, local commits, and pushing `master` unless the user explicitly asks for a PR workflow.
 - Version `0.0.1` is the first tagged release. Keep package version and release tag aligned.
 - `AGENTS.md` is committed on purpose so future agent sessions inherit the repo context on a fresh clone.
 - `npmw.cmd` is also committed on purpose, but `tools/node/` remains ignored so a fresh clone may still need system `npm` until a local runtime is restored.
