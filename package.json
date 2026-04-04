@@ -1,0 +1,22 @@
+{
+  "name": "tft-traits-web-exploration-tool",
+  "version": "0.0.1",
+  "description": "TFT Traits Web Exploration Tool - Desktop app for exploring optimal TFT board compositions",
+  "main": "main.js",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "test:smoke": "electron . --smoke-test",
+    "test:all": "npm test && npm run test:smoke",
+    "lint": "eslint *.js components/*.js renderer/*.js data-engine/*.js tools/*.js test/",
+    "validate:data": "node tools/validate-data-sources.js",
+    "pack:win": "electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\""
+  },
+  "devDependencies": {
+    "@electron/packager": "^19.1.0",
+    "@eslint/js": "^10.0.1",
+    "electron": "^41.1.1",
+    "eslint": "^10.1.0"
+  }
+}
