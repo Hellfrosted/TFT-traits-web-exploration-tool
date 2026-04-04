@@ -234,6 +234,124 @@ class Engine {
         return record;
     }
 
+    static compileConditions(conditions, traitIndex, unitIndexById, traitBreakpoints = {}) {
+        if (!conditions || typeof conditions !== 'object') {
+            return null;
+        }
+
+        const requiredUnits = Array.isArray(conditions.requiredUnits) ? conditions.requiredUnits : [];
+        const forbiddenUnits = Array.isArray(conditions.forbiddenUnits) ? conditions.forbiddenUnits : [];
+        const requiredActiveTraits = Array.isArray(conditions.requiredActiveTraits) ? conditions.requiredActiveTraits : [];
+        const forbiddenActiveTraits = Array.isArray(conditions.forbiddenActiveTraits) ? conditions.forbiddenActiveTraits : [];
+        const minTraitCounts = conditions.minTraitCounts && typeof conditions.minTraitCounts === 'object'
+            ? conditions.minTraitCounts
+            : {};
+        const maxTraitCounts = conditions.maxTraitCounts && typeof conditions.maxTraitCounts === 'object'
+            ? conditions.maxTraitCounts
+            : {};
+
+        return {
+            requiredUnitIndices: requiredUnits.map((unitId) => unitIndexById[unitId] ?? -1),
+            forbiddenUnitIndices: forbiddenUnits
+                .map((unitId) => unitIndexById[unitId])
+                .filter((index) => index !== undefined),
+            requiredActiveTraits: requiredActiveTraits.map((traitName) => {
+                const breakpoints = traitBreakpoints[traitName] || [1];
+                return {
+                    index: traitIndex[traitName] ?? -1,
+                    threshold: breakpoints[0] ?? 1
+                };
+            }),
+            forbiddenActiveTraits: forbiddenActiveTraits.map((traitName) => {
+                const breakpoints = traitBreakpoints[traitName] || [1];
+                return {
+                    index: traitIndex[traitName] ?? -1,
+                    threshold: breakpoints[0] ?? 1
+                };
+            }),
+            minTraitCounts: Object.entries(minTraitCounts).map(([traitName, minCount]) => ({
+                index: traitIndex[traitName] ?? -1,
+                threshold: Number(minCount || 0)
+            })),
+            maxTraitCounts: Object.entries(maxTraitCounts).map(([traitName, maxCount]) => ({
+                index: traitIndex[traitName] ?? -1,
+                threshold: Number(maxCount)
+            }))
+        };
+    }
+
+    static isCompiledConditionSatisfied(compiledConditions, traitCounts, activeUnitFlags) {
+        if (!compiledConditions) {
+            return true;
+        }
+
+        for (const unitIndex of compiledConditions.requiredUnitIndices) {
+            if (unitIndex < 0 || !activeUnitFlags[unitIndex]) {
+                return false;
+            }
+        }
+
+        for (const unitIndex of compiledConditions.forbiddenUnitIndices) {
+            if (activeUnitFlags[unitIndex]) {
+                return false;
+            }
+        }
+
+        for (const { index, threshold } of compiledConditions.requiredActiveTraits) {
+            if (index < 0 || (traitCounts[index] || 0) < threshold) {
+                return false;
+            }
+        }
+
+        for (const { index, threshold } of compiledConditions.forbiddenActiveTraits) {
+            if (index >= 0 && (traitCounts[index] || 0) >= threshold) {
+                return false;
+            }
+        }
+
+        for (const { index, threshold } of compiledConditions.minTraitCounts) {
+            if (index < 0) {
+                if (threshold > 0) {
+                    return false;
+                }
+                continue;
+            }
+            if ((traitCounts[index] || 0) < threshold) {
+                return false;
+            }
+        }
+
+        for (const { index, threshold } of compiledConditions.maxTraitCounts) {
+            if (index < 0) {
+                if (0 > threshold) {
+                    return false;
+                }
+                continue;
+            }
+            if ((traitCounts[index] || 0) > threshold) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static findFirstSatisfiedProfile(entries, traitCounts, activeUnitFlags) {
+        for (const entry of entries || []) {
+            if (this.isCompiledConditionSatisfied(entry.compiledConditions, traitCounts, activeUnitFlags)) {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    static buildSortedBoardUnits(selectedUnitIndices, unitInfo) {
+        return [...selectedUnitIndices]
+            .sort((leftIndex, rightIndex) => unitInfo[leftIndex].sortRank - unitInfo[rightIndex].sortRank)
+            .map((unitIndex) => unitInfo[unitIndex].id);
+    }
+
     static isConditionSatisfied(conditions, context) {
         if (!conditions || typeof conditions !== 'object') {
             return true;
@@ -314,8 +432,10 @@ class Engine {
         const excludedTraits = new Set(mustExcludeTraits);
         return dataCache.units.filter((unit) => {
             if (excludedUnits.has(unit.id)) return false;
-            if ([...this.getAutomaticConditionalTraitNames(unit)].some((trait) => excludedTraits.has(trait))) {
-                return false;
+            for (const trait of this.getAutomaticConditionalTraitNames(unit)) {
+                if (excludedTraits.has(trait)) {
+                    return false;
+                }
             }
             return this.hasAllowedTraitProfile(unit, excludedTraits, variantLocks[unit.id] || null);
         });
@@ -506,6 +626,11 @@ class Engine {
             }
         }
 
+        const unitIndexById = Object.create(null);
+        validUnits.forEach((unit, index) => {
+            unitIndexById[unit.id] = index;
+        });
+
         const tankRoleSet = new Set(tankRoles || []);
         const carryRoleSet = new Set(carryRoles || []);
         const requireTank = tankRoleSet.size > 0;
@@ -516,6 +641,13 @@ class Engine {
             .map((traitName) => traitIndex[traitName])
             .filter((index) => index !== undefined);
         const excludedTraitSet = new Set(mustExcludeTraits || []);
+        const unitSortRank = Object.create(null);
+        validUnits
+            .map((unit) => unit.id)
+            .sort((leftId, rightId) => leftId.localeCompare(rightId))
+            .forEach((unitId, sortRank) => {
+                unitSortRank[unitId] = sortRank;
+            });
 
         // Pre-process unit info for fast access in DFS inner loop
         const unitInfo = validUnits.map((unit) => {
@@ -526,12 +658,18 @@ class Engine {
                 unit.conditionalEffects,
                 traitIndex,
                 dataCache.hashMap
-            );
+            ).map((effect) => ({
+                ...effect,
+                compiledConditions: this.compileConditions(effect.conditions, traitIndex, unitIndexById, traitBPs)
+            }));
             const conditionalProfileEntries = this.buildConditionalProfileEntries(
                 unit.conditionalProfiles,
                 traitIndex,
                 dataCache.hashMap
-            );
+            ).map((profile) => ({
+                ...profile,
+                compiledConditions: this.compileConditions(profile.conditions, traitIndex, unitIndexById, traitBPs)
+            }));
 
             if (Array.isArray(unit.variants) && unit.variants.length > 0) {
                 const lockedVariantId = variantLocks?.[unit.id] || null;
@@ -545,17 +683,23 @@ class Engine {
                         traits: variant.traits || [],
                         fullTraitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
                         traitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
-                        conditions: variant.conditions || null,
+                        compiledConditions: this.compileConditions(variant.conditions, traitIndex, unitIndexById, traitBPs),
                         conditionalProfileEntries: this.buildConditionalProfileEntries(
                             variant.conditionalProfiles,
                             traitIndex,
                             dataCache.hashMap
-                        ),
+                        ).map((profile) => ({
+                            ...profile,
+                            compiledConditions: this.compileConditions(profile.conditions, traitIndex, unitIndexById, traitBPs)
+                        })),
                         conditionalEffectEntries: this.buildConditionalEffectEntries(
                             variant.conditionalEffects,
                             traitIndex,
                             dataCache.hashMap
-                        )
+                        ).map((effect) => ({
+                            ...effect,
+                            compiledConditions: this.compileConditions(effect.conditions, traitIndex, unitIndexById, traitBPs)
+                        }))
                     }));
 
                 const variantSummary = this.summarizeVariantProfiles(allowedVariantProfiles);
@@ -578,6 +722,12 @@ class Engine {
                 conditionalProfileEntries,
                 conditionalEffectEntries,
                 variantProfiles,
+                hasComplexEvaluation: (
+                    conditionalProfileEntries.length > 0 ||
+                    conditionalEffectEntries.length > 0 ||
+                    variantProfiles.length > 0
+                ) ? 1 : 0,
+                sortRank: unitSortRank[unit.id] ?? 0,
                 id: unit.id
             };
         });
