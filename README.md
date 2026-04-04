@@ -2,15 +2,14 @@
 
 Desktop app for exploring Teamfight Tactics late-game boards from raw game data.
 
-This project exists because I was using `tactics.tools` Perfect Synergy during games and it could lag my PC for long enough to cost real time in a live round. I wanted a local tool that stays focused on one job: exploring expensive, strong endgame boards built around go wide augment given X board constraints.
+This project exists because I was using `tactics.tools` Perfect Synergy during games and it lag my PC for long enough it cost a whole round. I wanted a local tool that stays focused on one job: exploring expensive, strong endgame boards built around go wide augment given X board constraints.
 
 This tool is built around questions like:
 
 - what can I build around Stand United, Bronze For Life, or similar effects?
 - what expensive boards fit these units, traits, roles, or emblems?
-- what does that search look like on live or PBE data?
 
-It is a board search tool first, not a comp list or trait tracker.
+It is a board search tool, not a comp list or trait tracker solver.
 
 ## Why This Over `tactics.tools`?
 
