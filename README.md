@@ -2,11 +2,10 @@
 
 Desktop app for exploring Teamfight Tactics late-game boards from raw game data.
 
-This project exists because I was using `tactics.tools` Perfect Synergy during games and it could lag my PC for long enough to cost real time in a live round. I wanted a local tool that stays focused on one job: exploring expensive, strong endgame boards built around augment and board constraints.
+This project exists because I was using `tactics.tools` Perfect Synergy during games and it could lag my PC for long enough to cost real time in a live round. I wanted a local tool that stays focused on one job: exploring expensive, strong endgame boards built around go wide augment given X board constraints.
 
-Instead of centering the experience around narrow helper features, this tool is built around questions like:
+This tool is built around questions like:
 
-- what are the strongest capped boards for this augment?
 - what can I build around Stand United, Bronze For Life, or similar effects?
 - what expensive boards fit these units, traits, roles, or emblems?
 - what does that search look like on live or PBE data?
@@ -16,26 +15,24 @@ It is a board search tool first, not a comp list or trait tracker.
 ## Why This Over `tactics.tools`?
 
 - This tool is focused on board exploration, especially high-cap late-game boards, instead of a broader collection of TFT utilities.
-- It runs as a local desktop app, so it does not compete with the rest of your browser session when you are also watching streams, videos, or guides.
-- It is designed for direct constraint-based search: units, traits, roles, emblems, and source selection.
+- It runs as a local desktop app, so it does not clog up your browser session where you are also watching streams, videos, or guides.
 
 ## Q&A
 
 ### Why not just use `tactics.tools`?
 
-`tactics.tools` is useful, but it solves a broader set of problems than I want here. This project is narrower on purpose: fast local search for expensive late-game boards built around augment-style conditions.
+`tactics.tools` is useful, but it solves a broader set of problems than I want here. This project is narrower on purpose: fast local search for expensive late-game boards built around augment conditions.
 
 ### Why Electron?
 
-Because I do not want another heavy browser tab competing with videos, streams, and the rest of the session while I am in game. A desktop app keeps this tool separate from the browser workload.
+Because I do not want another heavy browser tab competing with videos, stream while I am in game. A desktop app keeps this tool separate from the browser workload and I just want to learn how to use electron :)
 
 ### Is this trying to replace comp tier lists?
 
-No. The point is exploration, not replacing every TFT reference site. If you already know the board you want, a tier list is faster. If you want to search for strong boards that fit a condition, this tool is the point.
+No. The point is exploration for day 1 of new set, not replacing TFTacademy. If the meta is already exist, a tier list is faster. This tool is more for when you want to search for strong endgame boards that fit a condition on day 0.
+### Where do you got the game data?
 
-### Does it use live game data?
-
-Yes. It pulls TFT data from [Community Dragon](https://communitydragon.org/) and supports both `latest` and `pbe`.
+TFT data from [Community Dragon](https://communitydragon.org/), supports both `latest` and `pbe`.
 
 ## Setup
 
@@ -48,8 +45,6 @@ npm install
 ```powershell
 npm start
 ```
-
-On Windows, local agent sessions can also use `.\npmw.cmd` if a repo-local runtime is present under `tools/node/`.
 
 ## Development
 
