@@ -1,0 +1,36 @@
+const IPC_CHANNELS = {
+    FETCH_DATA: 'fetch-data',
+    SEARCH_BOARDS: 'search-boards',
+    CANCEL_SEARCH: 'cancel-search',
+    GET_SEARCH_ESTIMATE: 'get-search-estimate',
+    LIST_CACHE: 'list-cache',
+    DELETE_CACHE_ENTRY: 'delete-cache-entry',
+    CLEAR_ALL_CACHE: 'clear-all-cache',
+    SEARCH_PROGRESS: 'search-progress',
+    MAIN_PROCESS_ERROR: 'main-process-error'
+};
+
+const DATA_SOURCES = {
+    PBE: 'pbe',
+    LIVE: 'latest'
+};
+
+const DEFAULT_DATA_SOURCE = DATA_SOURCES.PBE;
+
+const LIMITS = {
+    MAX_REMAINING_SLOTS: 7,
+    COMBINATION_LIMIT: 50_000_000_000,
+    PROGRESS_INTERVAL: 500_000,
+    DEFAULT_MAX_RESULTS: 500,
+    LARGE_SEARCH_THRESHOLD: 6_000_000_000
+};
+
+const SMOKE_TEST_FLAG = '--smoke-test';
+
+module.exports = {
+    IPC_CHANNELS,
+    DATA_SOURCES,
+    DEFAULT_DATA_SOURCE,
+    LIMITS,
+    SMOKE_TEST_FLAG
+};
