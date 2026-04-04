@@ -9,7 +9,7 @@
     "test": "node --test test/*.test.js",
     "test:smoke": "electron . --smoke-test",
     "test:all": "npm test && npm run test:smoke",
-    "lint": "eslint *.js components/*.js renderer/*.js data-engine/*.js tools/*.js test/",
+    "lint": "eslint *.js components/*.js renderer/*.js renderer/**/*.js data-engine/*.js data-engine/**/*.js engine/*.js main-process/*.js tools/*.js test/ test/**/*.js",
     "validate:data": "node tools/validate-data-sources.js",
     "pack:win": "electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\""
   },
