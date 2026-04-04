@@ -135,12 +135,27 @@ function createSearchService({
                     } else if (msg.type === 'done') {
                         searchContext.completed = true;
                         if (searchContext.cancelled) {
+                            terminateWorker();
                             safeResolve(createSearchResponse({ cancelled: true }));
                             return;
                         }
                         if (msg.success) {
                             if (msg.results.length > 0 && !msg.results[0].error) {
-                                cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results);
+                                void (async () => {
+                                    try {
+                                        await cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results);
+                                    } finally {
+                                        terminateWorker();
+                                    }
+                                    if (!searchContext.cancelled) {
+                                        safeResolve(createSearchResponse({
+                                            success: true,
+                                            fromCache: false,
+                                            results: msg.results
+                                        }));
+                                    }
+                                })();
+                                return;
                             }
                             safeResolve(createSearchResponse({
                                 success: true,

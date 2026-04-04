@@ -53,7 +53,7 @@
         }
 
         function loadSearchFromHistory(entry) {
-            if (state.isSearching) {
+            if (state.isSearching || state.isFetchingData) {
                 showAlert('Wait for current search to finish or cancel it.');
                 return;
             }
@@ -61,20 +61,7 @@
             const { params } = entry;
             if (!params) return;
 
-            document.getElementById('boardSize').value = params.boardSize || 9;
-            document.getElementById('maxResults').value = params.maxResults || 200;
-            document.getElementById('onlyActiveToggle').checked = !!params.onlyActive;
-            document.getElementById('tierRankToggle').checked = !!params.tierRank;
-            document.getElementById('includeUniqueToggle').checked = !!params.includeUnique;
-
-            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(params.mustInclude || []);
-            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(params.mustExclude || []);
-            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues(params.mustIncludeTraits || []);
-            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues(params.mustExcludeTraits || []);
-            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues(params.extraEmblems || []);
-            if (state.selectors.tankRoles) state.selectors.tankRoles.setValues(params.tankRoles || []);
-            if (state.selectors.carryRoles) state.selectors.carryRoles.setValues(params.carryRoles || []);
-            app.queryUi.applyVariantLocks(params.variantLocks || {});
+            app.queryUi.applySearchParams(params);
 
             if (state.activeData?.hashMap) {
                 state.selectors.tankRoles?.resolvePills(state.activeData.hashMap);

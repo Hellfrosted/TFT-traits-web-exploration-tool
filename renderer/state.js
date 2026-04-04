@@ -8,11 +8,13 @@
         return {
             selectors: {},
             currentResults: [],
+            currentResultsFingerprint: null,
             lastSearchParams: null,
             activeData: null,
             selectedBoardIndex: -1,
             isFetchingData: false,
             isSearching: false,
+            isCancellingSearch: false,
             activeSearchEstimate: null,
             variantLockControls: new Map(),
             electronBridge,

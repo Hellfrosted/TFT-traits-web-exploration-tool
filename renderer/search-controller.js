@@ -58,6 +58,9 @@
 
         function setSearchState(searching) {
             state.isSearching = searching;
+            if (searching) {
+                state.isCancellingSearch = false;
+            }
             const searchBtn = document.getElementById('searchBtn');
             const cancelBtn = document.getElementById('cancelBtn');
 
@@ -67,18 +70,24 @@
                 searchBtn.innerText = buildSearchButtonLabel();
                 cancelBtn.style.display = 'block';
             } else {
-                searchBtn.disabled = false;
-                searchBtn.classList.remove('disabled');
-                searchBtn.innerText = 'Compute';
+                app.queryUi.syncSearchButtonState();
                 cancelBtn.style.display = 'none';
                 state.activeSearchEstimate = null;
             }
 
             app.queryUi.syncFetchButtonState();
+            if (searching) {
+                app.queryUi.syncSearchButtonState();
+            }
         }
 
         async function handleSearchClick() {
             if (state.isSearching) return;
+            if (state.isFetchingData) {
+                app.queryUi.setStatusMessage('Data refresh is still in progress. Wait for it to finish before searching.');
+                app.queryUi.renderQuerySummary(state.lastSearchParams, 'Waiting for data refresh');
+                return;
+            }
 
             app.queryUi.clampNumericInput('boardSize', 1, 20, 9);
             app.queryUi.clampNumericInput('maxResults', 1, 10000, state.searchLimits.DEFAULT_MAX_RESULTS || 500);
@@ -158,6 +167,7 @@
                 const fromCache = response.fromCache;
 
                 state.currentResults = results && results.length > 0 && !results[0].error ? results : [];
+                state.currentResultsFingerprint = state.activeData?.dataFingerprint || null;
 
                 if (state.currentResults.length > 0) {
                     const statusInfo = fromCache
@@ -198,6 +208,9 @@
             }
 
             const dispose = state.electronBridge.onSearchProgress((data) => {
+                if (!state.isSearching || state.isCancellingSearch) {
+                    return;
+                }
                 renderActiveSearchUi(data.pct);
             });
 

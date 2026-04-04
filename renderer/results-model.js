@@ -107,7 +107,11 @@
             board.units.forEach((unitId) => {
                 const unit = state.activeData.unitMap.get(unitId);
                 if (!unit) return;
-                addContributionMap(resolveDirectTraitContributions(unit));
+                const variantAssignment = getVariantAssignment(board, unitId);
+                const selectedVariant = variantAssignment?.id
+                    ? (unit.variants || []).find((variant) => variant.id === variantAssignment.id) || null
+                    : null;
+                addContributionMap(resolveDirectTraitContributions(selectedVariant || unit));
             });
 
             for (const emblem of state.lastSearchParams?.extraEmblems || []) {
@@ -244,7 +248,11 @@
                     iconUrl: unit.iconUrl || ''
                 };
 
-                addContributorContribution(contributorMap, contributor, resolveDirectTraitContributions(unit));
+                addContributorContribution(
+                    contributorMap,
+                    contributor,
+                    resolveDirectTraitContributions(selectedVariant || unit)
+                );
                 addConditionalEffects(contributorMap, contributor, unit.conditionalEffects, boardUnitIds, traitCounts);
                 addConditionalProfile(contributorMap, contributor, unit.conditionalProfiles, boardUnitIds, traitCounts);
 
@@ -252,7 +260,6 @@
                     return;
                 }
 
-                addContributorContribution(contributorMap, contributor, resolveDirectTraitContributions(selectedVariant));
                 addConditionalEffects(contributorMap, contributor, selectedVariant.conditionalEffects, boardUnitIds, traitCounts);
                 addConditionalProfile(contributorMap, contributor, selectedVariant.conditionalProfiles, boardUnitIds, traitCounts);
             });

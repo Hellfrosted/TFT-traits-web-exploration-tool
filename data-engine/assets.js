@@ -175,7 +175,31 @@ module.exports = {
             .toLowerCase();
         if (!normalized) return null;
 
-        return new URL(normalized, urls.assetBase).toString();
+        return this._resolveTrustedAssetUrl(normalized, urls.assetBase);
+    },
+
+    _resolveTrustedAssetUrl(assetPathOrUrl, baseUrl) {
+        if (!assetPathOrUrl || !baseUrl) {
+            return null;
+        }
+
+        try {
+            const base = new URL(baseUrl);
+            const resolved = new URL(String(assetPathOrUrl), base);
+            if (resolved.protocol !== 'https:') {
+                return null;
+            }
+            if (resolved.origin !== base.origin) {
+                return null;
+            }
+            if (!resolved.pathname.startsWith(base.pathname)) {
+                return null;
+            }
+
+            return resolved.toString();
+        } catch {
+            return null;
+        }
     },
 
     _buildChampionAssetMap(directoryHtml, setNumber, source = DEFAULT_DATA_SOURCE) {
@@ -210,7 +234,7 @@ module.exports = {
                 championAssets.set(slug, {
                     file,
                     rank,
-                    url: new URL(file, urls.championSplashes).toString()
+                    url: this._resolveTrustedAssetUrl(file, urls.championSplashes)
                 });
             }
         });
@@ -222,7 +246,7 @@ module.exports = {
         const candidates = this._createChampionAssetCandidates(rawName, cleanName, displayName);
         for (const candidate of candidates) {
             const match = championAssets.get(candidate);
-            if (match) {
+            if (match?.url) {
                 return { slug: candidate, ...match };
             }
         }
@@ -535,7 +559,10 @@ module.exports = {
             });
 
             if (match) {
-                traitIcons[displayName] = new URL(match.file, urls.traitIcons).toString();
+                const resolvedUrl = this._resolveTrustedAssetUrl(match.file, urls.traitIcons);
+                if (resolvedUrl) {
+                    traitIcons[displayName] = resolvedUrl;
+                }
             }
         });
 

@@ -32,8 +32,10 @@
             const source = app.queryUi.getSelectedDataSource();
             const sourceLabel = app.queryUi.getDataSourceLabel(source);
             const preservedVariantLocks = app.queryUi.getCurrentVariantLocks();
+            const previousFingerprint = state.activeData?.dataFingerprint || null;
             state.isFetchingData = true;
             app.queryUi.syncFetchButtonState();
+            app.queryUi.syncSearchButtonState();
             app.queryUi.setStatusMessage(`Connecting to ${sourceLabel} Data Engine...`);
 
             try {
@@ -65,6 +67,8 @@
                         snapshotFetchedAt: res.snapshotFetchedAt || null,
                         usedCachedSnapshot: !!res.usedCachedSnapshot
                     };
+
+                    const dataChanged = previousFingerprint && previousFingerprint !== state.activeData.dataFingerprint;
 
                     const assetSummary = app.queryUi.summarizeAssetValidation(res.assetValidation);
                     app.queryUi.setStatusMessage(assetSummary
@@ -102,7 +106,20 @@
                     Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
                     app.queryUi.applyDefaultRoleFilters();
                     app.queryUi.bindDraftQueryListeners();
-                    app.queryUi.refreshDraftQuerySummary();
+                    if (dataChanged) {
+                        state.currentResults = [];
+                        state.currentResultsFingerprint = null;
+                        state.selectedBoardIndex = -1;
+                        app.results.renderEmptySummary('Data refreshed');
+                        app.results.renderEmptySpotlight('Data changed. Re-run the query to view results for the new dataset.');
+                        document.getElementById('resBody').innerHTML = app.results.renderResultsMessageRow(
+                            'Data changed. Re-run the query to compute boards for the active dataset.',
+                            'results-message-row results-message-row-muted'
+                        );
+                        app.queryUi.renderQuerySummary(state.lastSearchParams, `Loaded ${setLabel}. Re-run query.`);
+                    } else {
+                        app.queryUi.refreshDraftQuerySummary();
+                    }
                     app.history.updateHistoryList();
                 } else {
                     const retained = state.activeData?.unitMap?.size
@@ -126,6 +143,7 @@
             } finally {
                 state.isFetchingData = false;
                 app.queryUi.syncFetchButtonState();
+                app.queryUi.syncSearchButtonState();
             }
         }
 
