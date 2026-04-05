@@ -84,6 +84,9 @@
                 app.queryUi.syncSearchButtonState();
                 cancelBtn.style.display = 'none';
                 state.activeSearchEstimate = null;
+                if (state.activeSearchId !== null && state.activeSearchId !== undefined) {
+                    state.lastCompletedSearchId = state.activeSearchId;
+                }
                 state.activeSearchId = null;
             }
 
@@ -179,12 +182,7 @@
                 }
                 const response = await state.electronBridge.searchBoards(params);
                 if (response?.searchId !== null && response?.searchId !== undefined) {
-                    if (state.activeSearchId === null || state.activeSearchId === undefined) {
-                        state.activeSearchId = response.searchId;
-                    }
-                    if (response.searchId !== state.activeSearchId) {
-                        return;
-                    }
+                    state.activeSearchId = response.searchId;
                 }
                 if (response.cancelled) {
                     state.currentResults = [];
@@ -260,6 +258,10 @@
                     return;
                 }
                 if (state.activeSearchId === null || state.activeSearchId === undefined) {
+                    const lwm = state.lastCompletedSearchId;
+                    if (lwm !== null && lwm !== undefined && data.searchId <= lwm) {
+                        return;
+                    }
                     state.activeSearchId = data.searchId;
                 }
                 if (data.searchId !== state.activeSearchId) {
