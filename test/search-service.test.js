@@ -40,13 +40,22 @@ function createDeferred() {
     return { promise, resolve, reject };
 }
 
-async function waitForWorker(count = 1) {
+async function waitForWorker(count = 1, timeoutMs = 2000) {
     if (FakeWorker.instances.length >= count) {
         return FakeWorker.instances[count - 1];
     }
 
-    await new Promise((resolve) => {
-        FakeWorker.waiters.push(resolve);
+    await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error(
+                `Timed out after ${timeoutMs}ms waiting for worker ${count}. ` +
+                `Found ${FakeWorker.instances.length} instance(s).`
+            ));
+        }, timeoutMs);
+        FakeWorker.waiters.push(() => {
+            clearTimeout(timer);
+            resolve();
+        });
     });
 
     if (FakeWorker.instances.length >= count) {

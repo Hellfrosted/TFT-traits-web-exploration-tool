@@ -17,9 +17,15 @@ function createWindowServiceUnderTest({
                 this.exitResolvers.shift()(code);
             }
         },
-        waitForExit() {
-            return new Promise((resolve) => {
-                this.exitResolvers.push(resolve);
+        waitForExit(timeoutMs = 2000) {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    reject(new Error(`Timed out after ${timeoutMs}ms waiting for app exit.`));
+                }, timeoutMs);
+                this.exitResolvers.push((code) => {
+                    clearTimeout(timer);
+                    resolve(code);
+                });
             });
         }
     };

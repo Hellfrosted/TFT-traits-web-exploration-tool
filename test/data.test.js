@@ -289,10 +289,10 @@ describe('DataEngine._fetchWithRetry', () => {
         await assert.rejects(
             DataEngine._fetchWithRetry('https://example.com/stalled.json', 'json', stalledFetch, {
                 MAX_RETRIES: 2,
-                RETRY_BASE_DELAY_MS: 1,
-                FETCH_TIMEOUT_MS: 5
+                RETRY_BASE_DELAY_MS: 0,
+                FETCH_TIMEOUT_MS: 100
             }),
-            /timed out after 5ms/i
+            /timed out after 100ms/i
         );
         assert.equal(fetchCalls, 2);
     });
@@ -319,8 +319,8 @@ describe('DataEngine._fetchWithRetry', () => {
 
         const result = await DataEngine._fetchWithRetry('https://example.com/flaky.json', 'json', flakyFetch, {
             MAX_RETRIES: 2,
-            RETRY_BASE_DELAY_MS: 1,
-            FETCH_TIMEOUT_MS: 5
+            RETRY_BASE_DELAY_MS: 0,
+            FETCH_TIMEOUT_MS: 100
         });
 
         assert.deepEqual(result, { ok: true });
