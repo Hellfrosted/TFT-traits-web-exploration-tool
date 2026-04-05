@@ -68,6 +68,7 @@
             state.isSearching = searching;
             if (searching) {
                 setCancellingSearch(false);
+                state.activeSearchId = null;
             }
             const searchBtn = document.getElementById('searchBtn');
             const cancelBtn = document.getElementById('cancelBtn');
@@ -83,6 +84,7 @@
                 app.queryUi.syncSearchButtonState();
                 cancelBtn.style.display = 'none';
                 state.activeSearchEstimate = null;
+                state.activeSearchId = null;
             }
 
             app.queryUi.syncFetchButtonState();
@@ -176,6 +178,14 @@
                     throw new Error('Electron preload bridge is unavailable.');
                 }
                 const response = await state.electronBridge.searchBoards(params);
+                if (response?.searchId !== null && response?.searchId !== undefined) {
+                    if (state.activeSearchId === null || state.activeSearchId === undefined) {
+                        state.activeSearchId = response.searchId;
+                    }
+                    if (response.searchId !== state.activeSearchId) {
+                        return;
+                    }
+                }
                 if (response.cancelled) {
                     state.currentResults = [];
                     app.queryUi.setStatusMessage('Search cancelled.');
@@ -244,6 +254,15 @@
 
             const dispose = state.electronBridge.onSearchProgress((data) => {
                 if (!state.isSearching || state.isCancellingSearch) {
+                    return;
+                }
+                if (!data || data.searchId === null || data.searchId === undefined) {
+                    return;
+                }
+                if (state.activeSearchId === null || state.activeSearchId === undefined) {
+                    state.activeSearchId = data.searchId;
+                }
+                if (data.searchId !== state.activeSearchId) {
                     return;
                 }
                 renderActiveSearchUi(data.pct);

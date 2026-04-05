@@ -89,13 +89,70 @@ describe('renderer search controller', () => {
         const controller = createSearchController(app);
         controller.subscribeProgressUpdates();
         await controller.requestCancelSearch();
-        app.progressHandler({ pct: 73 });
+        app.progressHandler({ searchId: 10, pct: 73 });
 
         assert.equal(app.state.isCancellingSearch, true);
         assert.equal(cancelBtn.disabled, true);
         assert.deepEqual(statusMessages, ['Cancelling search...']);
         assert.deepEqual(querySummaries, ['Cancelling active search...']);
         assert.equal(searchBtn.innerText, 'Compute');
+    });
+
+    it('ignores progress events for non-active search ids', () => {
+        const searchBtn = createSearchButton();
+        const cancelBtn = createCancelButton();
+        const resBody = { innerHTML: '' };
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => ({
+                    searchBtn,
+                    cancelBtn,
+                    resBody
+                }[id] || null)
+            },
+            window: {
+                TFTRenderer: {}
+            }
+        };
+
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isCancellingSearch: false,
+                activeSearchId: 42,
+                currentResults: [],
+                activeSearchEstimate: null,
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                cleanupFns: [],
+                electronBridge: {
+                    onSearchProgress: (handler) => {
+                        app.progressHandler = handler;
+                        return () => {};
+                    }
+                }
+            },
+            queryUi: {
+                renderQuerySummary: () => {},
+                setStatusMessage: () => {},
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+        controller.subscribeProgressUpdates();
+
+        app.progressHandler({ searchId: 7, pct: 88 });
+
+        assert.equal(searchBtn.innerText, 'Compute');
+        assert.equal(app.state.activeSearchId, 42);
     });
 
     it('sets a fresh status message when a search returns no results', async () => {
