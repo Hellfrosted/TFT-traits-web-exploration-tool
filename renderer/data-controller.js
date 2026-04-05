@@ -32,6 +32,9 @@
             const source = app.queryUi.getSelectedDataSource();
             const sourceLabel = app.queryUi.getDataSourceLabel(source);
             const preservedVariantLocks = app.queryUi.getCurrentVariantLocks();
+            const requestId = (Number.isFinite(state.nextDataFetchRequestId) ? state.nextDataFetchRequestId : 0) + 1;
+            state.nextDataFetchRequestId = requestId;
+            state.activeDataFetchRequestId = requestId;
             const previousFingerprint = state.activeData?.dataFingerprint || null;
             state.isFetchingData = true;
             app.queryUi.syncFetchButtonState();
@@ -44,6 +47,9 @@
                 }
 
                 const res = await state.electronBridge.fetchData(source);
+                if (requestId !== state.activeDataFetchRequestId) {
+                    return;
+                }
                 if (res.success) {
                     const activeSource = res.dataSource || source;
                     const activeSourceLabel = app.queryUi.getDataSourceLabel(activeSource);
@@ -132,6 +138,9 @@
                     showAlert(res.error, 'Data Fetch Failed');
                 }
             } catch (err) {
+                if (requestId !== state.activeDataFetchRequestId) {
+                    return;
+                }
                 const retained = state.activeData?.unitMap?.size
                     ? ` Retaining previously loaded ${state.activeData.unitMap.size}-unit ${app.queryUi.getDataSourceLabel(state.activeData.dataSource)} dataset.`
                     : '';
@@ -141,9 +150,11 @@
                 }
                 console.error(err);
             } finally {
-                state.isFetchingData = false;
-                app.queryUi.syncFetchButtonState();
-                app.queryUi.syncSearchButtonState();
+                if (requestId === state.activeDataFetchRequestId) {
+                    state.isFetchingData = false;
+                    app.queryUi.syncFetchButtonState();
+                    app.queryUi.syncSearchButtonState();
+                }
             }
         }
 

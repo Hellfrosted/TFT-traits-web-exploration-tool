@@ -45,16 +45,9 @@ async function waitForWorker(count = 1) {
         return FakeWorker.instances[count - 1];
     }
 
-    await Promise.race([
-        new Promise((resolve) => {
-            FakeWorker.waiters.push(resolve);
-        }),
-        new Promise((_, reject) => {
-            setTimeout(() => {
-                reject(new Error(`Timed out waiting for ${count} worker instance(s).`));
-            }, 1000);
-        })
-    ]);
+    await new Promise((resolve) => {
+        FakeWorker.waiters.push(resolve);
+    });
 
     if (FakeWorker.instances.length >= count) {
         return FakeWorker.instances[count - 1];
@@ -200,5 +193,33 @@ describe('main-process search service', () => {
 
         assert.equal(searchResponse.success, false);
         assert.match(searchResponse.error, /exited before returning a result/i);
+    });
+
+    it('returns successful worker results even if cancellation happens during cache persistence', async () => {
+        resetWorkers();
+        const cacheWrite = createDeferred();
+        const { searchService, cacheService } = createSearchServiceUnderTest();
+        cacheService.writeCache = async (...args) => {
+            cacheService.writes.push(args);
+            await cacheWrite.promise;
+        };
+
+        const pendingSearch = searchService.searchBoards({ boardSize: 9 });
+        const worker = await waitForWorker();
+        worker.emit('message', {
+            type: 'done',
+            success: true,
+            results: [{ units: ['A'] }]
+        });
+
+        const searchResponse = await pendingSearch;
+        const cancelResponse = await searchService.cancelSearch();
+        cacheWrite.resolve();
+
+        assert.equal(searchResponse.success, true);
+        assert.equal(searchResponse.cancelled, false);
+        assert.deepEqual(searchResponse.results, [{ units: ['A'] }]);
+        assert.equal(cancelResponse.success, false);
+        assert.match(cancelResponse.error, /no active search/i);
     });
 });

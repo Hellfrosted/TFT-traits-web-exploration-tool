@@ -147,6 +147,10 @@ function createWindowService({
         });
 
         mainWindow.setMenuBarVisibility(false);
+        mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+        mainWindow.webContents.on('will-navigate', (event) => {
+            event.preventDefault();
+        });
         mainWindow.webContents.on('did-finish-load', () => {
             console.log('[Main] Renderer finished loading index.html');
             if (isSmokeTest) {
@@ -169,11 +173,7 @@ function createWindowService({
             });
             finishSmokeTest(1, `Preload failed: ${error?.message || String(error)}`);
         });
-        mainWindow.webContents.on('console-message', (event) => {
-            const level = event.level ?? 'log';
-            const message = event.message ?? '';
-            const line = event.lineNumber ?? '';
-            const sourceId = event.sourceId ?? 'unknown';
+        mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
             console.log(`[Renderer:${level}] ${message} (${sourceId}:${line})`);
         });
         mainWindow.loadFile('index.html');

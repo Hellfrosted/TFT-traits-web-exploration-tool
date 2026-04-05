@@ -376,7 +376,7 @@
                 document.getElementById(id).addEventListener('change', refreshDraftQuerySummary);
             });
 
-            document.querySelector('.controls-body')?.addEventListener('selectionchange', refreshDraftQuerySummary);
+            document.querySelector('.controls-body')?.addEventListener('multiselectchange', refreshDraftQuerySummary);
         }
 
         return {

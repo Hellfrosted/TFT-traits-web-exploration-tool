@@ -13,6 +13,8 @@
             activeData: null,
             selectedBoardIndex: -1,
             isFetchingData: false,
+            nextDataFetchRequestId: 0,
+            activeDataFetchRequestId: 0,
             isSearching: false,
             isCancellingSearch: false,
             activeSearchEstimate: null,

@@ -55,6 +55,42 @@ describe('main-process cache service', () => {
         assert.equal(first, second);
     });
 
+    it('writes cache entries through a temp file before renaming into place', async () => {
+        const operations = [];
+        const storagePaths = {
+            cacheDir: 'C:\\cache'
+        };
+        const service = createSearchCacheService({
+            storagePaths,
+            ensureStorageDirs: () => {},
+            resolveCacheEntryPath: () => 'C:\\cache\\entry.json',
+            resolveDataFallbackPath: () => 'C:\\cache\\data.json',
+            engine: {
+                prepareSearchContext: () => ({ prepared: true })
+            },
+            fsp: {
+                writeFile: async (filePath, payload) => {
+                    operations.push(['writeFile', filePath, payload]);
+                },
+                rename: async (fromPath, toPath) => {
+                    operations.push(['rename', fromPath, toPath]);
+                }
+            },
+            crypto,
+            limits: LIMITS,
+            searchCacheVersion: 4
+        });
+
+        await service.writeCache('entry', 'fingerprint-1', { boardSize: 9 }, [{ units: ['A'] }]);
+
+        assert.equal(operations.length, 2);
+        assert.equal(operations[0][0], 'writeFile');
+        assert.match(operations[0][1], /entry\.json\..+\.tmp$/);
+        assert.equal(operations[1][0], 'rename');
+        assert.equal(operations[1][1], operations[0][1]);
+        assert.equal(operations[1][2], 'C:\\cache\\entry.json');
+    });
+
     it('prunes stale cache entries and supports list/delete/clear flows', async () => {
         const sandboxRoot = makeTempDir('tft-cache-service-');
 
