@@ -54,12 +54,12 @@ describe('renderer data controller', () => {
         const sandbox = {
             console,
             showAlert: (message) => alerts.push(message),
-            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
                         formatSnapshotAge: () => ''
-                    }
+                    },
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit)
                 }
             }
         };
@@ -126,12 +126,12 @@ describe('renderer data controller', () => {
         const sandbox = {
             console,
             showAlert: () => {},
-            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    },
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit)
                 }
             }
         };
@@ -243,12 +243,12 @@ describe('renderer data controller', () => {
                 getElementById: () => ({ innerHTML: '' })
             },
             showAlert: () => {},
-            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    },
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit)
                 }
             }
         };
@@ -390,12 +390,12 @@ describe('renderer data controller', () => {
                 getElementById: () => ({ innerHTML: '' })
             },
             showAlert: () => {},
-            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    },
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit)
                 }
             }
         };
@@ -538,12 +538,12 @@ describe('renderer data controller', () => {
                 getElementById: () => ({ innerHTML: '' })
             },
             showAlert: () => {},
-            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
                         formatSnapshotAge: () => ''
-                    }
+                    },
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit)
                 }
             }
         };

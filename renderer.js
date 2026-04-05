@@ -1,4 +1,8 @@
-const rendererNamespace = window.TFTRenderer || {};
+// All renderer/*.js modules must be loaded before this file to populate window.TFTRenderer.
+const rendererNamespace = window.TFTRenderer;
+if (!rendererNamespace) {
+    throw new Error('window.TFTRenderer is not defined. Ensure all renderer modules are loaded before renderer.js.');
+}
 
 const app = {
     state: rendererNamespace.createState()

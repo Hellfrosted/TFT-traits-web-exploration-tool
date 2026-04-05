@@ -323,4 +323,4 @@ function setupMultiSelect(containerId, options, isUnit = true) {
     return api;
 }
 
-window.setupMultiSelect = setupMultiSelect;
+(window.TFTRenderer = window.TFTRenderer || {}).setupMultiSelect = setupMultiSelect;

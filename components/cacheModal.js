@@ -1,8 +1,9 @@
 // --- Cache Management Modal ---
 
-const modalEscapeHtml = window.escapeHtml || ((value) => String(value ?? ''));
-const summarizeHistoryParams = window.summarizeParams || ((params) => JSON.stringify(params || {}));
-const formatHistoryTimestamp = window.formatTimestamp || ((value) => String(value ?? '-'));
+const { escapeHtml: _sharedEscapeHtml, summarizeParams: _sharedSummarizeParams, formatTimestamp: _sharedFormatTimestamp } = window.TFTRenderer?.shared || {};
+const modalEscapeHtml = _sharedEscapeHtml || ((value) => String(value ?? ''));
+const summarizeHistoryParams = _sharedSummarizeParams || ((params) => JSON.stringify(params || {}));
+const formatHistoryTimestamp = _sharedFormatTimestamp || ((value) => String(value ?? '-'));
 let cacheModal = null;
 let cacheModalBody = null;
 

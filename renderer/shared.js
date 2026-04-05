@@ -102,7 +102,4 @@
         formatTimestamp
     };
 
-    window.escapeHtml = escapeHtml;
-    window.summarizeParams = summarizeParams;
-    window.formatTimestamp = formatTimestamp;
 })();

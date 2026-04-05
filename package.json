@@ -17,6 +17,6 @@
     "@electron/packager": "^19.1.0",
     "@eslint/js": "^10.0.1",
     "electron": "^41.1.1",
-    "eslint": "^10.1.0"
+    "eslint": "^10.2.0"
   }
 }

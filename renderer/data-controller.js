@@ -201,19 +201,19 @@
                         pillLabel: unit.displayName || unit.id,
                         dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
                     }));
-                    state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
-                    state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
+                    state.selectors.mustInclude = ns.setupMultiSelect('mustIncludeContainer', unitOptions, true);
+                    state.selectors.mustExclude = ns.setupMultiSelect('mustExcludeContainer', unitOptions, true);
 
                     const traitOptions = res.traits.map((trait) => ({
                         value: trait,
                         label: trait,
                         iconUrl: res.traitIcons?.[trait] || null
                     }));
-                    state.selectors.mustIncludeTraits = setupMultiSelect('mustIncludeTraitsContainer', traitOptions, false);
-                    state.selectors.mustExcludeTraits = setupMultiSelect('mustExcludeTraitsContainer', traitOptions, false);
-                    state.selectors.extraEmblems = setupMultiSelect('extraEmblemsContainer', traitOptions, false);
-                    state.selectors.tankRoles = setupMultiSelect('tankRolesContainer', res.roles, false);
-                    state.selectors.carryRoles = setupMultiSelect('carryRolesContainer', res.roles, false);
+                    state.selectors.mustIncludeTraits = ns.setupMultiSelect('mustIncludeTraitsContainer', traitOptions, false);
+                    state.selectors.mustExcludeTraits = ns.setupMultiSelect('mustExcludeTraitsContainer', traitOptions, false);
+                    state.selectors.extraEmblems = ns.setupMultiSelect('extraEmblemsContainer', traitOptions, false);
+                    state.selectors.tankRoles = ns.setupMultiSelect('tankRolesContainer', res.roles, false);
+                    state.selectors.carryRoles = ns.setupMultiSelect('carryRolesContainer', res.roles, false);
 
                     app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
 

@@ -30,13 +30,10 @@ module.exports = [
                 Event: 'readonly',
                 // Project-specific globals (from components/*.js)
                 electronAPI: 'readonly',
-                setupMultiSelect: 'readonly',
                 showDialog: 'readonly',
                 showAlert: 'readonly',
                 showConfirm: 'readonly',
                 updateHistoryList: 'readonly',
-                summarizeParams: 'readonly',
-                formatTimestamp: 'readonly',
                 loadSearchFromHistory: 'readonly',
                 renderCacheList: 'readonly'
             }
