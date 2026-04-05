@@ -36,7 +36,8 @@
             app.results.renderEmptySummary('Awaiting execution');
             app.results.renderEmptySpotlight();
             app.queryUi.renderQuerySummary(null, 'Filters reset. Build a fresh query and compute when ready.');
-            document.getElementById('resBody').innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
+            const resBody = document.getElementById('resBody');
+            if (resBody) resBody.innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
             app.queryUi.setStatusMessage(state.activeData
                 ? `Loaded ${state.activeData.unitMap.size} parsed champions and ready for a new query.`
                 : 'Status: Unloaded');

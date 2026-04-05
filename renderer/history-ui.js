@@ -69,7 +69,7 @@
             }
 
             app.queryUi.renderQuerySummary(params, 'Loaded a recent search. Replaying query now.');
-            document.getElementById('searchBtn').click();
+            document.getElementById('searchBtn')?.click();
         }
 
         window.updateHistoryList = updateHistoryList;

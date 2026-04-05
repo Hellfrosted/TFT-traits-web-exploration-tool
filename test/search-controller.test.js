@@ -231,4 +231,101 @@ describe('renderer search controller', () => {
         assert.equal(querySummaries.at(-1), 'No matching boards');
         assert.deepEqual(renderedResults.at(-1), []);
     });
+
+    it('does not throw when searchBtn and cancelBtn are absent from the DOM', () => {
+        const sandbox = {
+            console,
+            document: {
+                getElementById: () => null
+            },
+            window: {
+                TFTRenderer: {}
+            }
+        };
+
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isCancellingSearch: false,
+                activeSearchId: null,
+                currentResults: [],
+                activeSearchEstimate: null,
+                lastSearchParams: null,
+                cleanupFns: []
+            },
+            queryUi: {
+                renderQuerySummary: () => {},
+                setStatusMessage: () => {},
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+
+        assert.doesNotThrow(() => controller.setSearchState(true));
+        assert.equal(app.state.isSearching, true, 'state.isSearching should be true after setSearchState(true)');
+        assert.doesNotThrow(() => controller.setSearchState(false));
+        assert.equal(app.state.isSearching, false, 'state.isSearching should be false after setSearchState(false)');
+    });
+
+    it('does not throw when resBody is absent from the DOM during a search with no data', async () => {
+        const statusMessages = [];
+        const sandbox = {
+            console,
+            showAlert: () => {},
+            showConfirm: async () => true,
+            document: {
+                getElementById: (id) => {
+                    if (id === 'searchBtn') return createSearchButton();
+                    if (id === 'cancelBtn') return createCancelButton();
+                    return null;
+                }
+            },
+            window: {
+                TFTRenderer: {}
+            }
+        };
+
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isCancellingSearch: false,
+                isFetchingData: false,
+                currentResults: [],
+                activeSearchEstimate: null,
+                lastSearchParams: null,
+                selectors: {},
+                searchLimits: {},
+                activeData: null,
+                cleanupFns: [],
+                electronBridge: {}
+            },
+            queryUi: {
+                clampNumericInput: () => {},
+                getCurrentSearchParams: () => ({ boardSize: 9, maxResults: 50 }),
+                renderQuerySummary: () => {},
+                setStatusMessage: (msg) => statusMessages.push(msg),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEmptySummary: () => {},
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+        await assert.doesNotReject(() => controller.handleSearchClick());
+        assert.equal(app.state.isSearching, false, 'search should have exited cleanly');
+    });
 });

@@ -234,7 +234,8 @@
                         state.selectedBoardIndex = -1;
                         app.results.renderEmptySummary('Data refreshed');
                         app.results.renderEmptySpotlight('Query controls changed after refresh. Re-run the query to compute aligned results.');
-                        document.getElementById('resBody').innerHTML = app.results.renderResultsMessageRow(
+                        const resBody = document.getElementById('resBody');
+                        if (resBody) resBody.innerHTML = app.results.renderResultsMessageRow(
                             'Data refresh normalized the active query. Re-run the query to compute aligned results.',
                             'results-message-row results-message-row-muted'
                         );

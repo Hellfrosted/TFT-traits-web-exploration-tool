@@ -74,15 +74,21 @@
             const cancelBtn = document.getElementById('cancelBtn');
 
             if (searching) {
-                searchBtn.disabled = true;
-                searchBtn.classList.add('disabled');
-                searchBtn.innerText = buildSearchButtonLabel();
-                cancelBtn.style.display = 'block';
-                cancelBtn.disabled = false;
+                if (searchBtn) {
+                    searchBtn.disabled = true;
+                    searchBtn.classList.add('disabled');
+                    searchBtn.innerText = buildSearchButtonLabel();
+                }
+                if (cancelBtn) {
+                    cancelBtn.style.display = 'block';
+                    cancelBtn.disabled = false;
+                }
             } else {
                 setCancellingSearch(false);
                 app.queryUi.syncSearchButtonState();
-                cancelBtn.style.display = 'none';
+                if (cancelBtn) {
+                    cancelBtn.style.display = 'none';
+                }
                 state.activeSearchEstimate = null;
                 state.activeSearchId = null;
             }
@@ -137,7 +143,7 @@
             if (!state.selectors.mustInclude) {
                 app.results.renderEmptySummary('Data required');
                 app.queryUi.renderQuerySummary(null, 'Load data first');
-                tbody.innerHTML = app.results.renderResultsMessageRow('Please fetch data first.', 'results-message-row results-message-row-error');
+                if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow('Please fetch data first.', 'results-message-row results-message-row-error');
                 setSearchState(false);
                 return;
             }
@@ -159,7 +165,7 @@
                 if (estimate.remainingSlots > maxRemainingSlots) {
                     app.results.renderEmptySummary('Board too large');
                     app.queryUi.renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`);
-                    tbody.innerHTML = app.results.renderResultsMessageRow(`Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`, 'results-message-row results-message-row-error');
+                    if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow(`Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`, 'results-message-row results-message-row-error');
                     return;
                 }
 
@@ -168,7 +174,7 @@
                     if (!confirmed) {
                         app.results.renderEmptySummary('Search aborted');
                         app.queryUi.renderQuerySummary(params, 'Search cancelled');
-                        tbody.innerHTML = app.results.renderResultsMessageRow('Search aborted by user.', 'results-message-row results-message-row-muted');
+                        if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow('Search aborted by user.', 'results-message-row results-message-row-muted');
                         return;
                     }
                 }
@@ -191,7 +197,7 @@
                     app.queryUi.setStatusMessage('Search cancelled.');
                     app.results.renderEmptySummary('Search cancelled');
                     app.queryUi.renderQuerySummary(params, 'Search cancelled');
-                    tbody.innerHTML = app.results.renderResultsMessageRow('Search cancelled.', 'results-message-row results-message-row-error');
+                    if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow('Search cancelled.', 'results-message-row results-message-row-error');
                     return;
                 }
 
@@ -202,7 +208,7 @@
                     showAlert(errorMessage, 'Search Failed');
                     app.results.renderEmptySummary('Search error');
                     app.queryUi.renderQuerySummary(params, `Error: ${errorMessage}`);
-                    tbody.innerHTML = app.results.renderResultsMessageRow(errorMessage, 'results-message-row results-message-row-error');
+                    if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow(errorMessage, 'results-message-row results-message-row-error');
                     return;
                 }
 
@@ -241,7 +247,7 @@
                 showAlert(error.message || String(error), 'Search Failed');
                 app.results.renderEmptySummary('Search error');
                 app.queryUi.renderQuerySummary(state.lastSearchParams, `Unexpected failure: ${error.message || String(error)}`);
-                tbody.innerHTML = app.results.renderResultsMessageRow('Search failed unexpectedly.', 'results-message-row results-message-row-error');
+                if (tbody) tbody.innerHTML = app.results.renderResultsMessageRow('Search failed unexpectedly.', 'results-message-row results-message-row-error');
             } finally {
                 setSearchState(false);
             }
