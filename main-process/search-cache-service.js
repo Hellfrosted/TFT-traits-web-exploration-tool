@@ -117,13 +117,24 @@ function createSearchCacheService({
         });
         try {
             const filePath = resolveCacheEntryPath(storagePaths, key);
-            await fsp.writeFile(filePath, JSON.stringify({
+            const tempPath = `${filePath}.${process.pid || 'cache'}.${Date.now()}.tmp`;
+            const payload = JSON.stringify({
                 searchVersion: searchCacheVersion,
                 dataFingerprint,
                 params,
                 results,
                 timestamp: Date.now()
-            }));
+            });
+            await fsp.writeFile(tempPath, payload, 'utf-8');
+            try {
+                await fsp.rename(tempPath, filePath);
+            } catch (renameError) {
+                if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
+                    throw renameError;
+                }
+                await fsp.unlink(filePath).catch(() => {});
+                await fsp.rename(tempPath, filePath);
+            }
         } catch (error) {
             console.error('Failed to write cache:', error.message);
         }

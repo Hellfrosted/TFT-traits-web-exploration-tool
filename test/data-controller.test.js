@@ -248,4 +248,117 @@ describe('renderer data controller', () => {
         assert.ok(renderedMessages.some((message) => /Data refreshed/i.test(message)));
         assert.ok(renderedMessages.some((message) => /Re-run query/i.test(message)));
     });
+
+    it('keeps the newest fetch result when overlapping refreshes resolve out of order', async () => {
+        const pendingResponses = [];
+        const bridgeCalls = [];
+        const sandbox = {
+            console,
+            document: {
+                getElementById: () => ({ innerHTML: '' })
+            },
+            showAlert: () => {},
+            setupMultiSelect: () => createSelector(),
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        formatSnapshotAge: () => ''
+                    }
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const app = {
+            state: {
+                selectors: {},
+                hasElectronAPI: true,
+                nextDataFetchRequestId: 0,
+                activeDataFetchRequestId: 0,
+                electronBridge: {
+                    fetchData: async (source) => {
+                        bridgeCalls.push(source);
+                        return await new Promise((resolve) => {
+                            pendingResponses.push(resolve);
+                        });
+                    }
+                },
+                activeData: null,
+                lastSearchParams: null
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: () => 'PBE',
+                getCurrentVariantLocks: () => ({}),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {},
+                setStatusMessage: () => {},
+                summarizeAssetValidation: () => '',
+                setDataStats: () => {},
+                renderQuerySummary: () => {},
+                getAssetCoverageLabel: () => 'N/A',
+                renderVariantLockControls: () => {},
+                applyDefaultRoleFilters: () => {},
+                bindDraftQueryListeners: () => {},
+                refreshDraftQuerySummary: () => {}
+            },
+            results: {
+                renderEmptySummary: () => {},
+                renderEmptySpotlight: () => {},
+                renderResultsMessageRow: (message) => message
+            },
+            history: {
+                updateHistoryList: () => {}
+            }
+        };
+
+        const controller = createDataController(app);
+        const firstFetch = controller.fetchData();
+        const secondFetch = controller.fetchData();
+
+        pendingResponses[0]({
+            success: true,
+            dataSource: 'pbe',
+            setNumber: '17',
+            dataFingerprint: 'older',
+            snapshotFetchedAt: null,
+            usedCachedSnapshot: false,
+            count: 1,
+            units: [{ id: 'A', displayName: 'A', variants: [] }],
+            traits: ['TraitA'],
+            roles: ['Carry'],
+            traitBreakpoints: {},
+            traitIcons: {},
+            assetValidation: null,
+            hashMap: {}
+        });
+
+        await firstFetch;
+        assert.equal(app.state.activeData, null);
+        assert.equal(app.state.isFetchingData, true);
+
+        pendingResponses[1]({
+            success: true,
+            dataSource: 'pbe',
+            setNumber: '17',
+            dataFingerprint: 'newer',
+            snapshotFetchedAt: null,
+            usedCachedSnapshot: false,
+            count: 1,
+            units: [{ id: 'B', displayName: 'B', variants: [] }],
+            traits: ['TraitB'],
+            roles: ['Tank'],
+            traitBreakpoints: {},
+            traitIcons: {},
+            assetValidation: null,
+            hashMap: {}
+        });
+
+        await secondFetch;
+
+        assert.deepEqual(bridgeCalls, ['pbe', 'pbe']);
+        assert.equal(app.state.activeData.dataFingerprint, 'newer');
+        assert.equal(app.state.activeData.unitMap.has('B'), true);
+        assert.equal(app.state.isFetchingData, false);
+    });
 });

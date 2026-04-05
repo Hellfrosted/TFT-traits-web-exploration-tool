@@ -46,11 +46,10 @@
                 app.results.renderResults(app.results.getSortedResults(state.currentResults));
             });
 
-            document.getElementById('cancelBtn')?.addEventListener('click', async () => {
-                if (!state.electronBridge?.cancelSearch) return;
-                await state.electronBridge.cancelSearch();
-                app.queryUi.setStatusMessage('Cancelling search...');
-                app.queryUi.renderQuerySummary(state.lastSearchParams, 'Cancelling active search...');
+            document.getElementById('cancelBtn')?.addEventListener('click', () => {
+                app.search.requestCancelSearch().catch((error) => {
+                    reportRendererInitFailure(error);
+                });
             });
 
             document.getElementById('resetFiltersBtn')?.addEventListener('click', resetFilters);
@@ -108,12 +107,12 @@
 
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', runBootstrap, { once: true });
-            } else {
-                runBootstrap();
+                window.addEventListener('load', runBootstrap, { once: true });
+                setTimeout(runBootstrap, 1500);
+                return;
             }
 
-            window.addEventListener('load', runBootstrap, { once: true });
-            setTimeout(runBootstrap, 1500);
+            runBootstrap();
         }
 
         function installErrorHandlers() {

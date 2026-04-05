@@ -86,7 +86,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
     }
 
     function emitChange() {
-        container.dispatchEvent(new CustomEvent('selectionchange', {
+        container.dispatchEvent(new CustomEvent('multiselectchange', {
             bubbles: true,
             detail: { values: [...selectedValues] }
         }));

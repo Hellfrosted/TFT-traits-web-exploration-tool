@@ -141,20 +141,16 @@ function createSearchService({
                         }
                         if (msg.success) {
                             if (msg.results.length > 0 && !msg.results[0].error) {
-                                void (async () => {
-                                    try {
-                                        await cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results);
-                                    } finally {
+                                safeResolve(createSearchResponse({
+                                    success: true,
+                                    fromCache: false,
+                                    results: msg.results
+                                }));
+                                void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
+                                    .catch(() => {})
+                                    .finally(() => {
                                         terminateWorker();
-                                    }
-                                    if (!searchContext.cancelled) {
-                                        safeResolve(createSearchResponse({
-                                            success: true,
-                                            fromCache: false,
-                                            results: msg.results
-                                        }));
-                                    }
-                                })();
+                                    });
                                 return;
                             }
                             safeResolve(createSearchResponse({

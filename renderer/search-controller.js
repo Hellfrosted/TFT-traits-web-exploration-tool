@@ -56,10 +56,18 @@
             }
         }
 
+        function setCancellingSearch(cancelling) {
+            state.isCancellingSearch = cancelling;
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (cancelBtn) {
+                cancelBtn.disabled = cancelling;
+            }
+        }
+
         function setSearchState(searching) {
             state.isSearching = searching;
             if (searching) {
-                state.isCancellingSearch = false;
+                setCancellingSearch(false);
             }
             const searchBtn = document.getElementById('searchBtn');
             const cancelBtn = document.getElementById('cancelBtn');
@@ -69,7 +77,9 @@
                 searchBtn.classList.add('disabled');
                 searchBtn.innerText = buildSearchButtonLabel();
                 cancelBtn.style.display = 'block';
+                cancelBtn.disabled = false;
             } else {
+                setCancellingSearch(false);
                 app.queryUi.syncSearchButtonState();
                 cancelBtn.style.display = 'none';
                 state.activeSearchEstimate = null;
@@ -78,6 +88,30 @@
             app.queryUi.syncFetchButtonState();
             if (searching) {
                 app.queryUi.syncSearchButtonState();
+            }
+        }
+
+        async function requestCancelSearch() {
+            if (!state.isSearching || state.isCancellingSearch) {
+                return;
+            }
+            if (!state.electronBridge?.cancelSearch) {
+                throw new Error('Electron preload bridge is unavailable.');
+            }
+
+            setCancellingSearch(true);
+            app.queryUi.setStatusMessage('Cancelling search...');
+            app.queryUi.renderQuerySummary(state.lastSearchParams, 'Cancelling active search...');
+
+            try {
+                const response = await state.electronBridge.cancelSearch();
+                if (!response?.success) {
+                    setCancellingSearch(false);
+                    app.queryUi.setStatusMessage(response?.error || 'Unable to cancel the active search.');
+                }
+            } catch (error) {
+                setCancellingSearch(false);
+                throw error;
             }
         }
 
@@ -185,6 +219,7 @@
                     app.queryUi.setStatusMessage(`Search Error: ${results[0].error}`);
                     app.queryUi.renderQuerySummary(params, `Error: ${results[0].error}`);
                 } else {
+                    app.queryUi.setStatusMessage('No matching boards found.');
                     app.queryUi.renderQuerySummary(params, 'No matching boards');
                 }
 
@@ -224,7 +259,9 @@
             buildSearchButtonLabel,
             buildSearchTableMessage,
             renderActiveSearchUi,
+            setCancellingSearch,
             setSearchState,
+            requestCancelSearch,
             handleSearchClick,
             subscribeProgressUpdates
         };

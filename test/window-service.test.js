@@ -9,11 +9,21 @@ function createWindowServiceUnderTest({
 } = {}) {
     const app = {
         exitCalls: [],
+        exitResolvers: [],
         exit(code) {
             this.exitCalls.push(code);
+            while (this.exitResolvers.length > 0) {
+                this.exitResolvers.shift()(code);
+            }
+        },
+        waitForExit() {
+            return new Promise((resolve) => {
+                this.exitResolvers.push(resolve);
+            });
         }
     };
     const listeners = {};
+    let windowOpenHandler = null;
     const webContents = {
         executeJavaScript: executeJavaScriptImpl || (async () => ({
             hasElectronAPI: true,
@@ -23,6 +33,9 @@ function createWindowServiceUnderTest({
         })),
         on(eventName, handler) {
             listeners[eventName] = handler;
+        },
+        setWindowOpenHandler(handler) {
+            windowOpenHandler = handler;
         },
         send: () => {}
     };
@@ -51,7 +64,8 @@ function createWindowServiceUnderTest({
     return {
         service,
         app,
-        listeners
+        listeners,
+        getWindowOpenHandler: () => windowOpenHandler
     };
 }
 
@@ -78,7 +92,24 @@ describe('window service smoke test', () => {
             preloadFailureText: false
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 75));
+        await app.waitForExit();
         assert.deepEqual(app.exitCalls, [0]);
+    });
+
+    it('denies popup creation and blocks window navigation', () => {
+        const { service, listeners, getWindowOpenHandler } = createWindowServiceUnderTest();
+
+        service.createWindow();
+
+        assert.equal(getWindowOpenHandler()().action, 'deny');
+
+        let prevented = false;
+        listeners['will-navigate']({
+            preventDefault() {
+                prevented = true;
+            }
+        });
+
+        assert.equal(prevented, true);
     });
 });
