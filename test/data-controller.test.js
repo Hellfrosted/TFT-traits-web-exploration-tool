@@ -4,11 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const normalizeParams = require('../renderer/normalize-params.js');
+
 function loadDataControllerFactory(sandbox) {
     const source = fs.readFileSync(
         path.join(__dirname, '..', 'renderer', 'data-controller.js'),
         'utf8'
     );
+
+    if (sandbox.window?.TFTRenderer && !sandbox.window.TFTRenderer.normalizeParams) {
+        sandbox.window.TFTRenderer.normalizeParams = normalizeParams;
+    }
 
     vm.runInNewContext(source, sandbox, { filename: 'renderer/data-controller.js' });
     return sandbox.window.TFTRenderer.createDataController;
@@ -679,5 +685,188 @@ describe('renderer data controller', () => {
         assert.equal(app.state.activeData.dataFingerprint, 'newer');
         assert.equal(app.state.activeData.unitMap.has('B'), true);
         assert.equal(app.state.isFetchingData, false);
+    });
+});
+
+describe('normalize-params shared contract', () => {
+    it('normalizeStringList deduplicates and trims values identically to searchParams', () => {
+        const { normalizeStringList: fromShared } = require('../renderer/normalize-params.js');
+        const { normalizeStringList: fromBackend } = require('../searchParams.js');
+
+        const input = ['Lux', '  Lux  ', '', null, 'Mage', { value: 'Mage' }, { id: 'Riven' }];
+        assert.deepEqual(fromShared(input), fromBackend(input));
+    });
+
+    it('normalizeStringMap produces the same output from shared and backend', () => {
+        const { normalizeStringMap: fromShared } = require('../renderer/normalize-params.js');
+        const { normalizeStringMap: fromBackend } = require('../searchParams.js');
+
+        const input = {
+            MissFortune: { value: 'conduit' },
+            Vex: '  shadow  ',
+            ' ': 'ignored',
+            Annie: ''
+        };
+        assert.deepEqual(fromShared(input), fromBackend(input));
+    });
+
+    it('normalizeBoolean resolves falsy strings the same way in shared and backend paths', () => {
+        const { normalizeBoolean: fromShared } = require('../renderer/normalize-params.js');
+        const { normalizeBoolean: fromBackend } = require('../searchParams.js');
+
+        const falsyCases = ['false', '0', 'off', 'no'];
+        const truthyCases = ['true', '1', 'on', 'yes'];
+
+        falsyCases.forEach((v) => {
+            assert.equal(fromShared(v), false, `shared: '${v}' should be false`);
+            assert.equal(fromBackend(v), false, `backend: '${v}' should be false`);
+        });
+        truthyCases.forEach((v) => {
+            assert.equal(fromShared(v), true, `shared: '${v}' should be true`);
+            assert.equal(fromBackend(v), true, `backend: '${v}' should be true`);
+        });
+    });
+
+    it('normalizes boolean flags consistently with backend (string false is false, not truthy)', async () => {
+        const sandbox = {
+            console,
+            showAlert: () => {},
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+            window: {
+                TFTRenderer: {
+                    shared: { formatSnapshotAge: () => '' }
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const app = {
+            state: {
+                selectors: {},
+                hasElectronAPI: true,
+                electronBridge: {
+                    fetchData: async () => ({
+                        success: true,
+                        dataSource: 'pbe',
+                        setNumber: '17',
+                        dataFingerprint: 'abc123',
+                        snapshotFetchedAt: null,
+                        usedCachedSnapshot: false,
+                        count: 1,
+                        units: [{ id: 'Lux', displayName: 'Lux', variants: [] }],
+                        traits: ['Mage'],
+                        roles: ['Carry'],
+                        traitBreakpoints: {},
+                        traitIcons: {},
+                        assetValidation: null,
+                        hashMap: {}
+                    })
+                },
+                activeData: null,
+                lastSearchParams: {
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: [],
+                    carryRoles: [],
+                    onlyActive: 'false',
+                    tierRank: 0,
+                    includeUnique: 'yes'
+                }
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: () => 'PBE',
+                getCurrentVariantLocks: () => ({}),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {},
+                setStatusMessage: () => {},
+                summarizeAssetValidation: () => '',
+                setDataStats: () => {},
+                renderQuerySummary: () => {},
+                getAssetCoverageLabel: () => 'N/A',
+                renderVariantLockControls: () => {},
+                applyDefaultRoleFilters: () => {},
+                bindDraftQueryListeners: () => {},
+                refreshDraftQuerySummary: () => {},
+                getDefaultSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: [],
+                    carryRoles: [],
+                    onlyActive: true,
+                    tierRank: false,
+                    includeUnique: false
+                }),
+                applySearchParams: () => {},
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: [],
+                    variantLocks: {},
+                    onlyActive: 'false',
+                    tierRank: 0,
+                    includeUnique: 'yes'
+                })
+            },
+            history: { updateHistoryList: () => {} }
+        };
+
+        const controller = createDataController(app);
+        await controller.fetchData();
+
+        const { normalizeSearchParams } = require('../searchParams.js');
+        const backend = normalizeSearchParams({
+            boardSize: 9,
+            maxResults: 500,
+            mustInclude: [],
+            mustExclude: [],
+            mustIncludeTraits: [],
+            mustExcludeTraits: [],
+            extraEmblems: [],
+            tankRoles: [],
+            carryRoles: [],
+            variantLocks: {},
+            onlyActive: 'false',
+            tierRank: 0,
+            includeUnique: 'yes'
+        });
+
+        assert.equal(backend.onlyActive, false, "backend: 'false' → false");
+        assert.equal(backend.tierRank, false, 'backend: 0 → false');
+        assert.equal(backend.includeUnique, true, "backend: 'yes' → true");
+
+        // The renderer replay path must produce the same booleans (state.lastSearchParams
+        // is updated to effectiveQuery when it was already set before the refresh).
+        assert.equal(app.state.lastSearchParams.onlyActive, false, "renderer replay: 'false' → false, same as backend");
+        assert.equal(app.state.lastSearchParams.tierRank, false, 'renderer replay: 0 → false, same as backend');
+        assert.equal(app.state.lastSearchParams.includeUnique, true, "renderer replay: 'yes' → true, same as backend");
+    });
+
+    it('clampInteger behaviour is identical between shared and backend', () => {
+        const { clampInteger: fromShared } = require('../renderer/normalize-params.js');
+
+        assert.equal(fromShared('0', 9, 1, 20), 1);
+        assert.equal(fromShared('25', 9, 1, 20), 20);
+        assert.equal(fromShared('abc', 9, 1, 20), 9);
+        assert.equal(fromShared(null, 9, 1, 20), 9);
+        assert.equal(fromShared(7, 9, 1, 20), 7);
     });
 });

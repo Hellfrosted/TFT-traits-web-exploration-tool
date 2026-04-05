@@ -1,13 +1,10 @@
 (function initializeDataControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
     const { formatSnapshotAge } = ns.shared;
+    const { normalizeBoolean, normalizeStringList, normalizeStringMap, clampInteger, UI_LIMITS } = ns.normalizeParams;
 
     ns.createDataController = function createDataController(app) {
         const { state } = app;
-        const MIN_BOARD_SIZE = 1;
-        const MAX_BOARD_SIZE = 20;
-        const MIN_RESULTS = 1;
-        const MAX_RESULTS = 10000;
 
         function collectUnitTraitLabels(unit) {
             const traitNames = new Set();
@@ -32,29 +29,11 @@
             return [...traitNames].sort((left, right) => left.localeCompare(right));
         }
 
-        function normalizeList(values, allowedValues = null) {
-            if (!Array.isArray(values)) return [];
-            const seen = new Set();
-            const normalized = [];
-            values.forEach((value) => {
-                const candidate = String(value ?? '').trim();
-                if (!candidate || seen.has(candidate)) return;
-                if (allowedValues && !allowedValues.has(candidate)) return;
-                seen.add(candidate);
-                normalized.push(candidate);
-            });
-            return normalized;
-        }
-
         function normalizeVariantLocks(variantLocks = {}, variantByUnit = new Map()) {
-            if (!variantLocks || typeof variantLocks !== 'object' || Array.isArray(variantLocks)) {
-                return {};
-            }
-
+            const base = normalizeStringMap(variantLocks);
             const normalized = {};
-            Object.keys(variantLocks).sort((left, right) => left.localeCompare(right)).forEach((unitId) => {
-                const lockValue = String(variantLocks[unitId] ?? '').trim();
-                if (!lockValue) return;
+            Object.keys(base).sort((left, right) => left.localeCompare(right)).forEach((unitId) => {
+                const lockValue = base[unitId];
                 const allowedVariants = variantByUnit.get(unitId);
                 if (!allowedVariants || !allowedVariants.has(lockValue)) {
                     return;
@@ -62,14 +41,6 @@
                 normalized[unitId] = lockValue;
             });
             return normalized;
-        }
-
-        function clampInteger(value, fallback, min, max) {
-            const parsed = Number.parseInt(value, 10);
-            if (!Number.isFinite(parsed)) {
-                return fallback;
-            }
-            return Math.min(Math.max(parsed, min), max);
         }
 
         function normalizeSearchParamsForActiveData(params = {}) {
@@ -89,19 +60,19 @@
             }
 
             return {
-                boardSize: clampInteger(params.boardSize, defaults.boardSize, MIN_BOARD_SIZE, MAX_BOARD_SIZE),
-                maxResults: clampInteger(params.maxResults, defaults.maxResults, MIN_RESULTS, MAX_RESULTS),
-                mustInclude: normalizeList(params.mustInclude, activeUnits),
-                mustExclude: normalizeList(params.mustExclude, activeUnits),
-                mustIncludeTraits: normalizeList(params.mustIncludeTraits, activeTraits),
-                mustExcludeTraits: normalizeList(params.mustExcludeTraits, activeTraits),
-                tankRoles: normalizeList(params.tankRoles, activeRoles),
-                carryRoles: normalizeList(params.carryRoles, activeRoles),
-                extraEmblems: normalizeList(params.extraEmblems, activeTraits),
+                boardSize: clampInteger(params.boardSize, defaults.boardSize, UI_LIMITS.MIN_BOARD_SIZE, UI_LIMITS.MAX_BOARD_SIZE),
+                maxResults: clampInteger(params.maxResults, defaults.maxResults, UI_LIMITS.MIN_RESULTS, UI_LIMITS.MAX_RESULTS),
+                mustInclude: normalizeStringList(params.mustInclude).filter((v) => activeUnits.has(v)),
+                mustExclude: normalizeStringList(params.mustExclude).filter((v) => activeUnits.has(v)),
+                mustIncludeTraits: normalizeStringList(params.mustIncludeTraits).filter((v) => activeTraits.has(v)),
+                mustExcludeTraits: normalizeStringList(params.mustExcludeTraits).filter((v) => activeTraits.has(v)),
+                tankRoles: normalizeStringList(params.tankRoles).filter((v) => activeRoles.has(v)),
+                carryRoles: normalizeStringList(params.carryRoles).filter((v) => activeRoles.has(v)),
+                extraEmblems: normalizeStringList(params.extraEmblems).filter((v) => activeTraits.has(v)),
                 variantLocks: normalizeVariantLocks(params.variantLocks, variantByUnit),
-                onlyActive: !!params.onlyActive,
-                tierRank: !!params.tierRank,
-                includeUnique: !!params.includeUnique
+                onlyActive: normalizeBoolean(params.onlyActive),
+                tierRank: normalizeBoolean(params.tierRank),
+                includeUnique: normalizeBoolean(params.includeUnique)
             };
         }
 
@@ -109,24 +80,18 @@
             const normalized = {
                 boardSize: Number.parseInt(params.boardSize, 10) || 0,
                 maxResults: Number.parseInt(params.maxResults, 10) || 0,
-                mustInclude: normalizeList(params.mustInclude).sort(),
-                mustExclude: normalizeList(params.mustExclude).sort(),
-                mustIncludeTraits: normalizeList(params.mustIncludeTraits).sort(),
-                mustExcludeTraits: normalizeList(params.mustExcludeTraits).sort(),
-                tankRoles: normalizeList(params.tankRoles).sort(),
-                carryRoles: normalizeList(params.carryRoles).sort(),
-                extraEmblems: normalizeList(params.extraEmblems).sort(),
-                variantLocks: {}
+                mustInclude: normalizeStringList(params.mustInclude).sort(),
+                mustExclude: normalizeStringList(params.mustExclude).sort(),
+                mustIncludeTraits: normalizeStringList(params.mustIncludeTraits).sort(),
+                mustExcludeTraits: normalizeStringList(params.mustExcludeTraits).sort(),
+                tankRoles: normalizeStringList(params.tankRoles).sort(),
+                carryRoles: normalizeStringList(params.carryRoles).sort(),
+                extraEmblems: normalizeStringList(params.extraEmblems).sort(),
+                variantLocks: normalizeStringMap(params.variantLocks)
             };
-            Object.keys(params.variantLocks || {}).sort((left, right) => left.localeCompare(right)).forEach((unitId) => {
-                const value = String(params.variantLocks[unitId] ?? '').trim();
-                if (value) {
-                    normalized.variantLocks[unitId] = value;
-                }
-            });
-            normalized.onlyActive = !!params.onlyActive;
-            normalized.tierRank = !!params.tierRank;
-            normalized.includeUnique = !!params.includeUnique;
+            normalized.onlyActive = normalizeBoolean(params.onlyActive);
+            normalized.tierRank = normalizeBoolean(params.tierRank);
+            normalized.includeUnique = normalizeBoolean(params.includeUnique);
             return JSON.stringify(normalized);
         }
 
