@@ -17,6 +17,7 @@
             activeDataFetchRequestId: 0,
             isSearching: false,
             isCancellingSearch: false,
+            activeSearchId: null,
             activeSearchEstimate: null,
             variantLockControls: new Map(),
             electronBridge,
