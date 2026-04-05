@@ -23,16 +23,25 @@ function createDataService({
     defaultDataSource
 }) {
     let dataCache = null;
+    let latestRequestedFetchToken = 0;
 
     async function fetchData(requestedSource = defaultDataSource) {
         const source = dataEngine.normalizeDataSource(requestedSource);
-        dataCache = await dataEngine.fetchAndParse({
+        const fetchToken = ++latestRequestedFetchToken;
+        const fetchedData = await dataEngine.fetchAndParse({
             source,
             readFallback: async () => await cacheService.readDataFallback(source),
             writeFallback: async (data) => await cacheService.writeDataFallback(source, data)
         });
-        await cacheService.pruneCache(dataCache.dataFingerprint);
-        return mapDataResponse(dataCache);
+
+        // Only the newest fetch invocation may mutate shared main-process state.
+        if (fetchToken === latestRequestedFetchToken) {
+            dataCache = fetchedData;
+            await cacheService.pruneCache(dataCache.dataFingerprint);
+        }
+
+        // Stale fetches still return their payload to the original caller.
+        return mapDataResponse(fetchedData);
     }
 
     function getDataCache() {

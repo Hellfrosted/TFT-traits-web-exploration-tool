@@ -163,7 +163,7 @@ function createSearchCacheService({
         return null;
     }
 
-    async function pruneCache(dataFingerprint) {
+    async function pruneCache(_activeDataFingerprint) {
         ensureCacheDir();
         try {
             clearSearchMemoryCaches();
@@ -173,10 +173,7 @@ function createSearchCacheService({
                 try {
                     const raw = await fsp.readFile(filePath, 'utf-8');
                     const parsed = JSON.parse(raw);
-                    if (
-                        parsed?.dataFingerprint !== dataFingerprint ||
-                        (parsed?.searchVersion ?? 1) !== searchCacheVersion
-                    ) {
+                    if ((parsed?.searchVersion ?? 1) !== searchCacheVersion) {
                         await fsp.unlink(filePath);
                     }
                 } catch {

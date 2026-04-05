@@ -4,6 +4,8 @@ module.exports = {
     async fetchAndParse(options = {}) {
         const source = this.normalizeDataSource(options.source);
         const urls = this.getSourceUrls(source);
+        const fetchJson = options.fetchJson || (async (url) => await this._fetchJsonWithRetry(url));
+        const fetchText = options.fetchText || (async (url) => await this._fetchTextWithRetry(url));
         let rawData;
         let usedCachedSnapshot = false;
         const cachedSnapshot = options.readFallback
@@ -18,16 +20,16 @@ module.exports = {
         if (!rawData) {
             try {
                 const [rawChar, rawTraits] = await Promise.all([
-                    this._fetchJsonWithRetry(urls.characters),
-                    this._fetchJsonWithRetry(urls.cdragon)
+                    fetchJson(urls.characters),
+                    fetchJson(urls.cdragon)
                 ]);
 
                 const [rawTraitIconsHtml, rawChampionSplashesHtml] = await Promise.all([
-                    this._fetchTextWithRetry(urls.traitIcons).catch((error) => {
+                    fetchText(urls.traitIcons).catch((error) => {
                         console.warn('Failed to fetch trait icon directory:', error.message);
                         return null;
                     }),
-                    this._fetchTextWithRetry(urls.championSplashes).catch((error) => {
+                    fetchText(urls.championSplashes).catch((error) => {
                         console.warn('Failed to fetch champion splash directory:', error.message);
                         return null;
                     })
@@ -90,11 +92,18 @@ module.exports = {
         return this._fetchWithRetry(url, 'text');
     },
 
-    async _fetchWithRetry(url, responseType = 'json') {
+    async _fetchWithRetry(url, responseType = 'json', fetchImpl = fetch, networkConfig = NETWORK) {
         let lastError;
-        for (let attempt = 0; attempt < NETWORK.MAX_RETRIES; attempt++) {
+        for (let attempt = 0; attempt < networkConfig.MAX_RETRIES; attempt++) {
+            const controller = new AbortController();
+            const timeoutMs = Number.isFinite(networkConfig.FETCH_TIMEOUT_MS) ? networkConfig.FETCH_TIMEOUT_MS : 15000;
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+            }, timeoutMs);
             try {
-                const res = await fetch(url);
+                const res = await fetchImpl(url, {
+                    signal: controller.signal
+                });
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 }
@@ -103,14 +112,17 @@ module.exports = {
                 }
                 return await res.json();
             } catch (err) {
-                lastError = err;
-                if (attempt < NETWORK.MAX_RETRIES - 1) {
-                    const delay = NETWORK.RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+                const timedOut = controller.signal.aborted && (err?.name === 'AbortError' || err?.code === 'ABORT_ERR');
+                lastError = timedOut ? new Error(`Request timed out after ${timeoutMs}ms`) : err;
+                if (attempt < networkConfig.MAX_RETRIES - 1) {
+                    const delay = networkConfig.RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
                     console.warn(`Fetch attempt ${attempt + 1} failed for ${url}, retrying in ${delay}ms...`);
                     await new Promise((resolve) => setTimeout(resolve, delay));
                 }
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
-        throw new Error(`Failed to fetch ${url} after ${NETWORK.MAX_RETRIES} attempts: ${lastError.message}`);
+        throw new Error(`Failed to fetch ${url} after ${networkConfig.MAX_RETRIES} attempts: ${lastError.message}`);
     }
 };

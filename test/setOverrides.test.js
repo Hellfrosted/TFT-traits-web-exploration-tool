@@ -39,4 +39,16 @@ describe('set overrides', () => {
         assert.deepEqual(overrides.unitOverrides.MissFortune.removeTraits, ['Choose Trait']);
         assert.equal(overrides.unitOverrides.MissFortune.selectionGroups, undefined);
     });
+
+    it('reuses the same Set 17 Mecha selection-group payload shape for all Mecha overrides', () => {
+        const overrides = getSetOverrides({ setNumber: 17 });
+        const galio = overrides.unitOverrides.Galio;
+        const aurelionSol = overrides.unitOverrides.AurelionSol;
+        const urgot = overrides.unitOverrides.Urgot;
+
+        assert.deepEqual(galio, aurelionSol);
+        assert.deepEqual(galio, urgot);
+        assert.equal(galio.selectionGroups[0].id, 'mechaForm');
+        assert.deepEqual(galio.selectionGroups[0].options.map((option) => option.id), ['standard', 'two-slot']);
+    });
 });

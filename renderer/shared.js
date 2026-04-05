@@ -1,6 +1,6 @@
 (function initializeRendererShared() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const REQUIRED_SHELL_IDS = [
+    const FALLBACK_REQUIRED_SHELL_IDS = [
         'dataSourceSelect',
         'fetchBtn',
         'status',
@@ -13,6 +13,9 @@
         'resetFiltersBtn',
         'resBody'
     ];
+    const REQUIRED_SHELL_IDS = Array.isArray(window.electronAPI?.rendererContract?.requiredShellIds)
+        ? [...window.electronAPI.rendererContract.requiredShellIds]
+        : FALLBACK_REQUIRED_SHELL_IDS;
 
     function hasRequiredShellElements() {
         return REQUIRED_SHELL_IDS.every((id) => !!document.getElementById(id));

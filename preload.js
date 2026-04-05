@@ -1,8 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Keep preload self-contained so a local module load cannot break the renderer bridge.
-// The shared bridge contract is mirrored here and verified by tests against bridge-contract.js.
-const IPC_CHANNELS = {
+// The bridge contract is loaded when available and falls back to local mirrors if not.
+let bridgeContract;
+try {
+    bridgeContract = require('./bridge-contract.js');
+} catch {
+    bridgeContract = undefined;
+}
+
+const IPC_CHANNELS = bridgeContract?.IPC_CHANNELS || {
     FETCH_DATA: 'fetch-data',
     SEARCH_BOARDS: 'search-boards',
     CANCEL_SEARCH: 'cancel-search',
@@ -14,26 +21,51 @@ const IPC_CHANNELS = {
     MAIN_PROCESS_ERROR: 'main-process-error'
 };
 
-const DATA_SOURCES = {
+const DATA_SOURCES = bridgeContract?.DATA_SOURCES || {
     PBE: 'pbe',
     LIVE: 'latest'
 };
 
-const DEFAULT_DATA_SOURCE = DATA_SOURCES.PBE;
-const SMOKE_TEST_FLAG = '--smoke-test';
+const DEFAULT_DATA_SOURCE = bridgeContract?.DEFAULT_DATA_SOURCE || DATA_SOURCES.PBE;
+const SMOKE_TEST_FLAG = bridgeContract?.SMOKE_TEST_FLAG || '--smoke-test';
 
-const LIMITS = {
+const LIMITS = bridgeContract?.LIMITS || {
     MAX_REMAINING_SLOTS: 7,
     COMBINATION_LIMIT: 50_000_000_000,
     PROGRESS_INTERVAL: 500_000,
     DEFAULT_MAX_RESULTS: 500,
     LARGE_SEARCH_THRESHOLD: 6_000_000_000
 };
+const RENDERER_CONTRACT = bridgeContract?.RENDERER_CONTRACT || {
+    requiredBridgeMethods: [
+        'fetchData',
+        'searchBoards',
+        'cancelSearch',
+        'listCache',
+        'deleteCacheEntry',
+        'clearAllCache',
+        'getSearchEstimate'
+    ],
+    requiredShellIds: [
+        'dataSourceSelect',
+        'fetchBtn',
+        'status',
+        'dataStats',
+        'resultsQuerySummary',
+        'boardSpotlight',
+        'sortMode',
+        'searchBtn',
+        'cancelBtn',
+        'resetFiltersBtn',
+        'resBody'
+    ]
+};
 
 contextBridge.exposeInMainWorld('electronAPI', {
     limits: LIMITS,
     dataSources: DATA_SOURCES,
     defaultDataSource: DEFAULT_DATA_SOURCE,
+    rendererContract: RENDERER_CONTRACT,
     flags: {
         smokeTest: process.argv.includes(SMOKE_TEST_FLAG)
     },

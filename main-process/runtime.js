@@ -28,7 +28,8 @@ function createMainRuntime(options = {}) {
         DEFAULT_DATA_SOURCE,
         IPC_CHANNELS,
         LIMITS,
-        SMOKE_TEST_FLAG
+        SMOKE_TEST_FLAG,
+        RENDERER_CONTRACT
     } = constants;
     const isSmokeTest = argv.includes(SMOKE_TEST_FLAG);
 
@@ -59,6 +60,7 @@ function createMainRuntime(options = {}) {
         BrowserWindow,
         preloadPath: path.join(appRoot, 'preload.js'),
         ipcChannels: IPC_CHANNELS,
+        rendererContract: RENDERER_CONTRACT,
         isSmokeTest
     });
 

@@ -113,38 +113,33 @@ describe('DataEngine.fetchAndParse', () => {
             }
         };
 
-        const originalFetchJson = DataEngine._fetchJsonWithRetry;
-        const originalFetchText = DataEngine._fetchTextWithRetry;
         let networkCalls = 0;
-        DataEngine._fetchJsonWithRetry = async () => {
+        const fetchJson = async () => {
             networkCalls += 1;
             throw new Error('network should not be used');
         };
-        DataEngine._fetchTextWithRetry = async () => {
+        const fetchText = async () => {
             networkCalls += 1;
             throw new Error('network should not be used');
         };
 
-        try {
-            const parsed = await DataEngine.fetchAndParse({
+        const parsed = await DataEngine.fetchAndParse({
+            source: 'latest',
+            fetchJson,
+            fetchText,
+            readFallback: async () => ({
                 source: 'latest',
-                readFallback: async () => ({
-                    source: 'latest',
-                    fetchedAt: Date.now(),
-                    rawChar,
-                    rawTraits
-                })
-            });
+                fetchedAt: Date.now(),
+                rawChar,
+                rawTraits
+            })
+        });
 
-            assert.equal(networkCalls, 0);
-            assert.equal(parsed.usedCachedSnapshot, true);
-            assert.equal(parsed.dataSource, 'latest');
-            assert.equal(parsed.snapshotFetchedAt > 0, true);
-            assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
-        } finally {
-            DataEngine._fetchJsonWithRetry = originalFetchJson;
-            DataEngine._fetchTextWithRetry = originalFetchText;
-        }
+        assert.equal(networkCalls, 0);
+        assert.equal(parsed.usedCachedSnapshot, true);
+        assert.equal(parsed.dataSource, 'latest');
+        assert.equal(parsed.snapshotFetchedAt > 0, true);
+        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
     });
 
     it('refreshes Community Dragon data when the cached live snapshot is stale', async () => {
@@ -168,45 +163,40 @@ describe('DataEngine.fetchAndParse', () => {
             }
         };
 
-        const originalFetchJson = DataEngine._fetchJsonWithRetry;
-        const originalFetchText = DataEngine._fetchTextWithRetry;
         const jsonUrls = [];
         const textUrls = [];
         let cachedSnapshot = null;
 
-        DataEngine._fetchJsonWithRetry = async (url) => {
+        const fetchJson = async (url) => {
             jsonUrls.push(url);
             return jsonUrls.length === 1 ? freshRawChar : freshRawTraits;
         };
-        DataEngine._fetchTextWithRetry = async (url) => {
+        const fetchText = async (url) => {
             textUrls.push(url);
             return null;
         };
 
-        try {
-            const parsed = await DataEngine.fetchAndParse({
+        const parsed = await DataEngine.fetchAndParse({
+            source: 'latest',
+            fetchJson,
+            fetchText,
+            readFallback: async () => ({
                 source: 'latest',
-                readFallback: async () => ({
-                    source: 'latest',
-                    fetchedAt: staleFetchedAt,
-                    rawChar: { stale: true }
-                }),
-                writeFallback: async (data) => {
-                    cachedSnapshot = data;
-                }
-            });
+                fetchedAt: staleFetchedAt,
+                rawChar: { stale: true }
+            }),
+            writeFallback: async (data) => {
+                cachedSnapshot = data;
+            }
+        });
 
-            assert.equal(parsed.usedCachedSnapshot, false);
-            assert.equal(jsonUrls.length, 2);
-            assert.equal(textUrls.length, 2);
-            assert.ok(cachedSnapshot);
-            assert.equal(cachedSnapshot.source, 'latest');
-            assert.equal(typeof cachedSnapshot.fetchedAt, 'number');
-            assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
-        } finally {
-            DataEngine._fetchJsonWithRetry = originalFetchJson;
-            DataEngine._fetchTextWithRetry = originalFetchText;
-        }
+        assert.equal(parsed.usedCachedSnapshot, false);
+        assert.equal(jsonUrls.length, 2);
+        assert.equal(textUrls.length, 2);
+        assert.ok(cachedSnapshot);
+        assert.equal(cachedSnapshot.source, 'latest');
+        assert.equal(typeof cachedSnapshot.fetchedAt, 'number');
+        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
     });
 
     it('keeps a PBE snapshot fresh until the next 11 AM Pacific rollover', () => {
@@ -281,6 +271,60 @@ describe('DataEngine.fetchAndParse', () => {
 
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', nextMorning), true);
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', afterNextRollover), false);
+    });
+});
+
+describe('DataEngine._fetchWithRetry', () => {
+    it('times out stalled requests and retries per-attempt with AbortController', async () => {
+        let fetchCalls = 0;
+        const stalledFetch = async (_url, { signal }) => await new Promise((_resolve, reject) => {
+            fetchCalls += 1;
+            signal.addEventListener('abort', () => {
+                const abortError = new Error('aborted');
+                abortError.name = 'AbortError';
+                reject(abortError);
+            }, { once: true });
+        });
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/stalled.json', 'json', stalledFetch, {
+                MAX_RETRIES: 2,
+                RETRY_BASE_DELAY_MS: 1,
+                FETCH_TIMEOUT_MS: 5
+            }),
+            /timed out after 5ms/i
+        );
+        assert.equal(fetchCalls, 2);
+    });
+
+    it('preserves retry behavior when a timed-out attempt is followed by a successful retry', async () => {
+        let fetchCalls = 0;
+        const flakyFetch = async (_url, { signal }) => {
+            fetchCalls += 1;
+            if (fetchCalls === 1) {
+                return await new Promise((_resolve, reject) => {
+                    signal.addEventListener('abort', () => {
+                        const abortError = new Error('aborted');
+                        abortError.name = 'AbortError';
+                        reject(abortError);
+                    }, { once: true });
+                });
+            }
+            return {
+                ok: true,
+                json: async () => ({ ok: true }),
+                text: async () => 'ok'
+            };
+        };
+
+        const result = await DataEngine._fetchWithRetry('https://example.com/flaky.json', 'json', flakyFetch, {
+            MAX_RETRIES: 2,
+            RETRY_BASE_DELAY_MS: 1,
+            FETCH_TIMEOUT_MS: 5
+        });
+
+        assert.deepEqual(result, { ok: true });
+        assert.equal(fetchCalls, 2);
     });
 });
 

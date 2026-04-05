@@ -1,32 +1,9 @@
-const REQUIRED_BRIDGE_METHODS = [
-    'fetchData',
-    'searchBoards',
-    'cancelSearch',
-    'listCache',
-    'deleteCacheEntry',
-    'clearAllCache',
-    'getSearchEstimate'
-];
-
-const REQUIRED_SHELL_IDS = [
-    'dataSourceSelect',
-    'fetchBtn',
-    'status',
-    'dataStats',
-    'resultsQuerySummary',
-    'boardSpotlight',
-    'sortMode',
-    'searchBtn',
-    'cancelBtn',
-    'resetFiltersBtn',
-    'resBody'
-];
-
 function createWindowService({
     app,
     BrowserWindow,
     preloadPath,
     ipcChannels,
+    rendererContract,
     isSmokeTest,
     smokeTimeoutMs = 20000
 }) {
@@ -35,6 +12,12 @@ function createWindowService({
     let smokeTimeoutHandle = null;
     let smokeExitHandle = null;
     const rendererInspectionTimeoutMs = Math.max(1000, smokeTimeoutMs - 1000);
+    const requiredBridgeMethods = Array.isArray(rendererContract?.requiredBridgeMethods)
+        ? rendererContract.requiredBridgeMethods
+        : [];
+    const requiredShellIds = Array.isArray(rendererContract?.requiredShellIds)
+        ? rendererContract.requiredShellIds
+        : [];
 
     function clearTimer(handle) {
         if (handle) {
@@ -82,19 +65,37 @@ function createWindowService({
 
         try {
             const result = await mainWindow.webContents.executeJavaScript(`(() => {
-                const requiredMethods = ${JSON.stringify(REQUIRED_BRIDGE_METHODS)};
-                const requiredIds = ${JSON.stringify(REQUIRED_SHELL_IDS)};
+                const requiredMethods = ${JSON.stringify(requiredBridgeMethods)};
+                const requiredIds = ${JSON.stringify(requiredShellIds)};
                 const deadline = Date.now() + ${rendererInspectionTimeoutMs};
 
                 return new Promise((resolve) => {
+                    let deadlineTimer = null;
+                    let observer = null;
+
+                    const cleanup = () => {
+                        if (deadlineTimer) {
+                            clearTimeout(deadlineTimer);
+                            deadlineTimer = null;
+                        }
+                        if (observer) {
+                            observer.disconnect();
+                            observer = null;
+                        }
+                        window.removeEventListener('tft-renderer-ready', inspect);
+                        document.removeEventListener('readystatechange', inspect);
+                    };
+
                     const inspect = () => {
                         const electronApi = window.electronAPI;
                         const missingMethods = requiredMethods.filter((methodName) => typeof electronApi?.[methodName] !== 'function');
                         const missingIds = requiredIds.filter((id) => !document.getElementById(id));
                         const preloadFailureText = document.body?.innerText?.includes('Electron preload bridge unavailable') || false;
-                        const ready = !!electronApi && missingMethods.length === 0 && missingIds.length === 0 && !preloadFailureText;
+                        const explicitReady = document.documentElement?.dataset?.tftReady === '1';
+                        const ready = explicitReady && !!electronApi && missingMethods.length === 0 && missingIds.length === 0 && !preloadFailureText;
 
                         if (ready || Date.now() >= deadline) {
+                            cleanup();
                             resolve({
                                 hasElectronAPI: !!electronApi,
                                 missingMethods,
@@ -103,10 +104,20 @@ function createWindowService({
                             });
                             return;
                         }
-
-                        setTimeout(inspect, 50);
                     };
 
+                    window.addEventListener('tft-renderer-ready', inspect);
+                    document.addEventListener('readystatechange', inspect);
+                    if (typeof MutationObserver === 'function' && document.documentElement) {
+                        observer = new MutationObserver(inspect);
+                        observer.observe(document.documentElement, {
+                            attributes: true,
+                            childList: true,
+                            subtree: true,
+                            attributeFilter: ['data-tft-ready']
+                        });
+                    }
+                    deadlineTimer = setTimeout(inspect, Math.max(0, deadline - Date.now()));
                     inspect();
                 });
             })()`, true);

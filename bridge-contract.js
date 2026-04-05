@@ -27,10 +27,36 @@ const LIMITS = {
 
 const SMOKE_TEST_FLAG = '--smoke-test';
 
+const RENDERER_CONTRACT = {
+    requiredBridgeMethods: [
+        'fetchData',
+        'searchBoards',
+        'cancelSearch',
+        'listCache',
+        'deleteCacheEntry',
+        'clearAllCache',
+        'getSearchEstimate'
+    ],
+    requiredShellIds: [
+        'dataSourceSelect',
+        'fetchBtn',
+        'status',
+        'dataStats',
+        'resultsQuerySummary',
+        'boardSpotlight',
+        'sortMode',
+        'searchBtn',
+        'cancelBtn',
+        'resetFiltersBtn',
+        'resBody'
+    ]
+};
+
 module.exports = {
     IPC_CHANNELS,
     DATA_SOURCES,
     DEFAULT_DATA_SOURCE,
     LIMITS,
-    SMOKE_TEST_FLAG
+    SMOKE_TEST_FLAG,
+    RENDERER_CONTRACT
 };

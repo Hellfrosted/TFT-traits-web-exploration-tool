@@ -5,10 +5,21 @@
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
 
+        function publishRendererReadyState(isReady) {
+            const root = document.documentElement;
+            if (root) {
+                root.dataset.tftReady = isReady ? '1' : '0';
+            }
+            window.dispatchEvent(new CustomEvent('tft-renderer-ready', {
+                detail: { ready: !!isReady }
+            }));
+        }
+
         function reportRendererInitFailure(error) {
             const errorMessage = error?.message || String(error);
             console.error('[Renderer Init Failed]', error);
             app.queryUi.setStatusMessage(`Renderer init failed: ${errorMessage}`);
+            publishRendererReadyState(false);
         }
 
         function resetFilters() {
@@ -93,6 +104,7 @@
             if (!state.flags.smokeTest) {
                 await app.data.fetchData();
             }
+            publishRendererReadyState(true);
         }
 
         function scheduleRendererBootstrap() {
@@ -147,6 +159,7 @@
         }
 
         function start() {
+            publishRendererReadyState(false);
             installErrorHandlers();
             app.search.subscribeProgressUpdates();
             scheduleRendererBootstrap();
