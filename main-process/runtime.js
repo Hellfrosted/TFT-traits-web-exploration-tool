@@ -121,7 +121,15 @@ function createMainRuntime(options = {}) {
     }
 
     function registerIpcHandlers() {
-        ipcMain.handle(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
+        function isExpectedSender(event) {
+            const mainWindow = windowService.getMainWindow();
+            return mainWindow !== null && event.sender === mainWindow.webContents;
+        }
+
+        ipcMain.handle(IPC_CHANNELS.FETCH_DATA, async (event, requestedSource = DEFAULT_DATA_SOURCE) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             try {
                 return await dataService.fetchData(requestedSource);
             } catch (error) {
@@ -129,19 +137,31 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
+        ipcMain.handle(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (event, params) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             return await searchService.getSearchEstimate(params);
         });
 
-        ipcMain.handle(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
+        ipcMain.handle(IPC_CHANNELS.SEARCH_BOARDS, async (event, params) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             return await searchService.searchBoards(params);
         });
 
-        ipcMain.handle(IPC_CHANNELS.CANCEL_SEARCH, async () => {
+        ipcMain.handle(IPC_CHANNELS.CANCEL_SEARCH, async (event) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             return await searchService.cancelSearch();
         });
 
-        ipcMain.handle(IPC_CHANNELS.LIST_CACHE, async () => {
+        ipcMain.handle(IPC_CHANNELS.LIST_CACHE, async (event) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             try {
                 const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
                 const entries = await cacheService.listCacheEntries(activeDataFingerprint);
@@ -151,7 +171,10 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (_event, key) => {
+        ipcMain.handle(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (event, key) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             try {
                 await cacheService.deleteCacheEntry(key);
                 return { success: true };
@@ -160,7 +183,10 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
+        ipcMain.handle(IPC_CHANNELS.CLEAR_ALL_CACHE, async (event) => {
+            if (!isExpectedSender(event)) {
+                return { success: false, error: 'Unauthorized sender' };
+            }
             try {
                 const deleted = await cacheService.clearAllCache();
                 return { success: true, deleted };
