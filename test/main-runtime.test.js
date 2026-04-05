@@ -199,6 +199,14 @@ describe('IPC sender validation', () => {
         const fetchResult = await fetchData(validEvent, 'pbe');
         assert.equal(fetchResult.success, true);
 
+        const getSearchEstimate = fakeIpcMain.handlers.get('get-search-estimate');
+        const estimateResult = await getSearchEstimate(validEvent, {});
+        assert.ok(estimateResult !== null && typeof estimateResult === 'object');
+
+        const searchBoards = fakeIpcMain.handlers.get('search-boards');
+        const searchResult = await searchBoards(validEvent, {});
+        assert.equal(searchResult.success, true);
+
         const cancelSearch = fakeIpcMain.handlers.get('cancel-search');
         const cancelResult = await cancelSearch(validEvent);
         assert.equal(cancelResult.success, true);
@@ -206,6 +214,14 @@ describe('IPC sender validation', () => {
         const listCache = fakeIpcMain.handlers.get('list-cache');
         const listResult = await listCache(validEvent);
         assert.equal(listResult.success, true);
+
+        const deleteCacheEntry = fakeIpcMain.handlers.get('delete-cache-entry');
+        const deleteResult = await deleteCacheEntry(validEvent, 'some-key');
+        assert.equal(deleteResult.success, true);
+
+        const clearAllCache = fakeIpcMain.handlers.get('clear-all-cache');
+        const clearResult = await clearAllCache(validEvent);
+        assert.equal(clearResult.success, true);
     });
 
     it('rejects calls from an unexpected sender', async () => {
