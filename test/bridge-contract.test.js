@@ -32,6 +32,9 @@ function loadPreloadBridge() {
                     }
                 };
             }
+            if (name === './bridge-contract.js') {
+                return bridgeContract;
+            }
             throw new Error(`Unexpected preload dependency: ${name}`);
         }
     };
@@ -51,6 +54,7 @@ describe('shared bridge contract', () => {
         assert.equal(constants.DEFAULT_DATA_SOURCE, bridgeContract.DEFAULT_DATA_SOURCE);
         assert.deepEqual(constants.LIMITS, bridgeContract.LIMITS);
         assert.equal(constants.SMOKE_TEST_FLAG, bridgeContract.SMOKE_TEST_FLAG);
+        assert.deepEqual(constants.RENDERER_CONTRACT, bridgeContract.RENDERER_CONTRACT);
     });
 
     it('keeps the self-contained preload bridge aligned with the shared contract', () => {
@@ -59,5 +63,6 @@ describe('shared bridge contract', () => {
         assert.deepEqual(toPlainData(preloadBridge.dataSources), bridgeContract.DATA_SOURCES);
         assert.equal(preloadBridge.defaultDataSource, bridgeContract.DEFAULT_DATA_SOURCE);
         assert.deepEqual(toPlainData(preloadBridge.limits), bridgeContract.LIMITS);
+        assert.deepEqual(toPlainData(preloadBridge.rendererContract), bridgeContract.RENDERER_CONTRACT);
     });
 });

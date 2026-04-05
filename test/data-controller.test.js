@@ -14,11 +14,36 @@ function loadDataControllerFactory(sandbox) {
     return sandbox.window.TFTRenderer.createDataController;
 }
 
-function createSelector() {
+function getOptionValue(option, isUnit = true) {
+    if (typeof option === 'string') return option;
+    if (isUnit) return String(option?.id ?? option?.value ?? '').trim();
+    return String(option?.value ?? option?.id ?? option?.label ?? '').trim();
+}
+
+function createSelector(options = [], isUnit = true) {
+    const allowedValues = new Set(
+        options
+            .map((option) => getOptionValue(option, isUnit))
+            .filter(Boolean)
+    );
+    let selectedValues = [];
+
     return {
-        resolvePills: () => {},
-        getValues: () => [],
-        setValues: () => {}
+        resolvePills: (hashMap = {}) => {
+            selectedValues = selectedValues
+                .map((value) => hashMap[value] || value)
+                .filter((value, index, all) => all.indexOf(value) === index)
+                .filter((value) => !allowedValues.size || allowedValues.has(value));
+        },
+        getValues: () => [...selectedValues],
+        setValues: (values) => {
+            const nextValues = Array.isArray(values) ? values : [];
+            selectedValues = nextValues
+                .map((value) => String(value ?? '').trim())
+                .filter(Boolean)
+                .filter((value, index, all) => all.indexOf(value) === index)
+                .filter((value) => !allowedValues.size || allowedValues.has(value));
+        }
     };
 }
 
@@ -29,7 +54,7 @@ describe('renderer data controller', () => {
         const sandbox = {
             console,
             showAlert: (message) => alerts.push(message),
-            setupMultiSelect: () => createSelector(),
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
@@ -66,7 +91,22 @@ describe('renderer data controller', () => {
                 renderVariantLockControls: () => {},
                 applyDefaultRoleFilters: () => {},
                 bindDraftQueryListeners: () => {},
-                refreshDraftQuerySummary: () => {}
+                refreshDraftQuerySummary: () => {},
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                })
             },
             history: {
                 updateHistoryList: () => {}
@@ -86,7 +126,7 @@ describe('renderer data controller', () => {
         const sandbox = {
             console,
             showAlert: () => {},
-            setupMultiSelect: () => createSelector(),
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
@@ -142,7 +182,46 @@ describe('renderer data controller', () => {
                 renderVariantLockControls: (locks) => renderedVariantLocks.push(locks),
                 applyDefaultRoleFilters: () => {},
                 bindDraftQueryListeners: () => {},
-                refreshDraftQuerySummary: () => {}
+                refreshDraftQuerySummary: () => {},
+                getDefaultSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: null,
+                    carryRoles: null,
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                applySearchParams: (params) => {
+                    app.state.selectors.mustInclude?.setValues(params.mustInclude || []);
+                    app.state.selectors.mustExclude?.setValues(params.mustExclude || []);
+                    app.state.selectors.mustIncludeTraits?.setValues(params.mustIncludeTraits || []);
+                    app.state.selectors.mustExcludeTraits?.setValues(params.mustExcludeTraits || []);
+                    app.state.selectors.extraEmblems?.setValues(params.extraEmblems || []);
+                    app.state.selectors.tankRoles?.setValues(params.tankRoles || []);
+                    app.state.selectors.carryRoles?.setValues(params.carryRoles || []);
+                },
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: app.state.selectors.mustInclude?.getValues() || [],
+                    mustExclude: app.state.selectors.mustExclude?.getValues() || [],
+                    mustIncludeTraits: app.state.selectors.mustIncludeTraits?.getValues() || [],
+                    mustExcludeTraits: app.state.selectors.mustExcludeTraits?.getValues() || [],
+                    extraEmblems: app.state.selectors.extraEmblems?.getValues() || [],
+                    tankRoles: app.state.selectors.tankRoles?.getValues() || [],
+                    carryRoles: app.state.selectors.carryRoles?.getValues() || [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                })
             },
             history: {
                 updateHistoryList: () => {}
@@ -156,7 +235,7 @@ describe('renderer data controller', () => {
         assert.equal(app.state.activeData.unitMap.has('MissFortune'), true);
     });
 
-    it('invalidates stale results when a different dataset fingerprint is loaded', async () => {
+    it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {
             console,
@@ -164,7 +243,154 @@ describe('renderer data controller', () => {
                 getElementById: () => ({ innerHTML: '' })
             },
             showAlert: () => {},
-            setupMultiSelect: () => createSelector(),
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        formatSnapshotAge: () => 'freshly cached'
+                    }
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const app = {
+            state: {
+                selectors: {},
+                hasElectronAPI: true,
+                currentResults: [{ units: ['OldBoard'] }],
+                currentResultsFingerprint: 'old-fingerprint',
+                selectedBoardIndex: 0,
+                electronBridge: {
+                    fetchData: async () => ({
+                        success: true,
+                        dataSource: 'pbe',
+                        setNumber: '17',
+                        dataFingerprint: 'new-fingerprint',
+                        snapshotFetchedAt: Date.now(),
+                        usedCachedSnapshot: false,
+                        count: 1,
+                        units: [
+                            {
+                                id: 'MissFortune',
+                                displayName: 'Miss Fortune',
+                                variants: [{ id: 'conduit', label: 'Conduit' }]
+                            }
+                        ],
+                        traits: ['Conduit'],
+                        roles: ['Carry'],
+                        traitBreakpoints: { Conduit: [2] },
+                        traitIcons: {},
+                        assetValidation: null,
+                        hashMap: {}
+                    })
+                },
+                activeData: {
+                    unitMap: new Map([['MissFortune', { id: 'MissFortune' }]]),
+                    traits: ['Conduit'],
+                    roles: ['Carry'],
+                    dataSource: 'pbe',
+                    dataFingerprint: 'old-fingerprint'
+                },
+                lastSearchParams: {
+                    boardSize: 9,
+                    maxResults: 50,
+                    mustInclude: ['MissFortune'],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: ['Carry'],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: () => 'PBE',
+                getCurrentVariantLocks: () => ({}),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {},
+                setStatusMessage: () => {},
+                summarizeAssetValidation: () => '',
+                setDataStats: () => {},
+                renderQuerySummary: (_params, meta) => renderedMessages.push(meta),
+                getAssetCoverageLabel: () => 'N/A',
+                renderVariantLockControls: () => {},
+                applyDefaultRoleFilters: () => {},
+                bindDraftQueryListeners: () => {},
+                refreshDraftQuerySummary: () => {},
+                getDefaultSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: null,
+                    carryRoles: null,
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                applySearchParams: (params) => {
+                    app.state.selectors.mustInclude?.setValues(params.mustInclude || []);
+                    app.state.selectors.mustExclude?.setValues(params.mustExclude || []);
+                    app.state.selectors.mustIncludeTraits?.setValues(params.mustIncludeTraits || []);
+                    app.state.selectors.mustExcludeTraits?.setValues(params.mustExcludeTraits || []);
+                    app.state.selectors.extraEmblems?.setValues(params.extraEmblems || []);
+                    app.state.selectors.tankRoles?.setValues(params.tankRoles || []);
+                    app.state.selectors.carryRoles?.setValues(params.carryRoles || []);
+                },
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 50,
+                    mustInclude: app.state.selectors.mustInclude?.getValues() || [],
+                    mustExclude: app.state.selectors.mustExclude?.getValues() || [],
+                    mustIncludeTraits: app.state.selectors.mustIncludeTraits?.getValues() || [],
+                    mustExcludeTraits: app.state.selectors.mustExcludeTraits?.getValues() || [],
+                    extraEmblems: app.state.selectors.extraEmblems?.getValues() || [],
+                    tankRoles: app.state.selectors.tankRoles?.getValues() || [],
+                    carryRoles: app.state.selectors.carryRoles?.getValues() || [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                })
+            },
+            results: {
+                renderEmptySummary: (message) => renderedMessages.push(message),
+                renderEmptySpotlight: (message) => renderedMessages.push(message),
+                renderResultsMessageRow: (message) => message
+            },
+            history: {
+                updateHistoryList: () => {}
+            }
+        };
+
+        const controller = createDataController(app);
+        await controller.fetchData();
+
+        assert.equal(app.state.currentResults.length, 1);
+        assert.equal(app.state.currentResultsFingerprint, 'old-fingerprint');
+        assert.equal(app.state.selectedBoardIndex, 0);
+        assert.ok(renderedMessages.some((message) => /Query preserved/i.test(message)));
+    });
+
+    it('clears visible results when refresh normalizes the effective query', async () => {
+        const renderedMessages = [];
+        const sandbox = {
+            console,
+            document: {
+                getElementById: () => ({ innerHTML: '' })
+            },
+            showAlert: () => {},
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
@@ -208,10 +434,26 @@ describe('renderer data controller', () => {
                 },
                 activeData: {
                     unitMap: new Map([['Legacy', { id: 'Legacy' }]]),
+                    traits: ['LegacyTrait'],
+                    roles: ['Carry'],
                     dataSource: 'pbe',
                     dataFingerprint: 'old-fingerprint'
                 },
-                lastSearchParams: { boardSize: 9, maxResults: 50, variantLocks: {} }
+                lastSearchParams: {
+                    boardSize: 9,
+                    maxResults: 50,
+                    mustInclude: ['Legacy'],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: ['Carry'],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }
             },
             queryUi: {
                 getSelectedDataSource: () => 'pbe',
@@ -227,7 +469,46 @@ describe('renderer data controller', () => {
                 renderVariantLockControls: () => {},
                 applyDefaultRoleFilters: () => {},
                 bindDraftQueryListeners: () => {},
-                refreshDraftQuerySummary: () => {}
+                refreshDraftQuerySummary: () => {},
+                getDefaultSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: null,
+                    carryRoles: null,
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                applySearchParams: (params) => {
+                    app.state.selectors.mustInclude?.setValues(params.mustInclude || []);
+                    app.state.selectors.mustExclude?.setValues(params.mustExclude || []);
+                    app.state.selectors.mustIncludeTraits?.setValues(params.mustIncludeTraits || []);
+                    app.state.selectors.mustExcludeTraits?.setValues(params.mustExcludeTraits || []);
+                    app.state.selectors.extraEmblems?.setValues(params.extraEmblems || []);
+                    app.state.selectors.tankRoles?.setValues(params.tankRoles || []);
+                    app.state.selectors.carryRoles?.setValues(params.carryRoles || []);
+                },
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 50,
+                    mustInclude: app.state.selectors.mustInclude?.getValues() || [],
+                    mustExclude: app.state.selectors.mustExclude?.getValues() || [],
+                    mustIncludeTraits: app.state.selectors.mustIncludeTraits?.getValues() || [],
+                    mustExcludeTraits: app.state.selectors.mustExcludeTraits?.getValues() || [],
+                    extraEmblems: app.state.selectors.extraEmblems?.getValues() || [],
+                    tankRoles: app.state.selectors.tankRoles?.getValues() || [],
+                    carryRoles: app.state.selectors.carryRoles?.getValues() || [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                })
             },
             results: {
                 renderEmptySummary: (message) => renderedMessages.push(message),
@@ -245,8 +526,7 @@ describe('renderer data controller', () => {
         assert.equal(app.state.currentResults.length, 0);
         assert.equal(app.state.currentResultsFingerprint, null);
         assert.equal(app.state.selectedBoardIndex, -1);
-        assert.ok(renderedMessages.some((message) => /Data refreshed/i.test(message)));
-        assert.ok(renderedMessages.some((message) => /Re-run query/i.test(message)));
+        assert.ok(renderedMessages.some((message) => /Query normalized/i.test(message)));
     });
 
     it('keeps the newest fetch result when overlapping refreshes resolve out of order', async () => {
@@ -258,7 +538,7 @@ describe('renderer data controller', () => {
                 getElementById: () => ({ innerHTML: '' })
             },
             showAlert: () => {},
-            setupMultiSelect: () => createSelector(),
+            setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
                     shared: {
@@ -300,7 +580,46 @@ describe('renderer data controller', () => {
                 renderVariantLockControls: () => {},
                 applyDefaultRoleFilters: () => {},
                 bindDraftQueryListeners: () => {},
-                refreshDraftQuerySummary: () => {}
+                refreshDraftQuerySummary: () => {},
+                getDefaultSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    variantLocks: {},
+                    tankRoles: null,
+                    carryRoles: null,
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                applySearchParams: (params) => {
+                    app.state.selectors.mustInclude?.setValues(params.mustInclude || []);
+                    app.state.selectors.mustExclude?.setValues(params.mustExclude || []);
+                    app.state.selectors.mustIncludeTraits?.setValues(params.mustIncludeTraits || []);
+                    app.state.selectors.mustExcludeTraits?.setValues(params.mustExcludeTraits || []);
+                    app.state.selectors.extraEmblems?.setValues(params.extraEmblems || []);
+                    app.state.selectors.tankRoles?.setValues(params.tankRoles || []);
+                    app.state.selectors.carryRoles?.setValues(params.carryRoles || []);
+                },
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: app.state.selectors.mustInclude?.getValues() || [],
+                    mustExclude: app.state.selectors.mustExclude?.getValues() || [],
+                    mustIncludeTraits: app.state.selectors.mustIncludeTraits?.getValues() || [],
+                    mustExcludeTraits: app.state.selectors.mustExcludeTraits?.getValues() || [],
+                    extraEmblems: app.state.selectors.extraEmblems?.getValues() || [],
+                    tankRoles: app.state.selectors.tankRoles?.getValues() || [],
+                    carryRoles: app.state.selectors.carryRoles?.getValues() || [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                })
             },
             results: {
                 renderEmptySummary: () => {},

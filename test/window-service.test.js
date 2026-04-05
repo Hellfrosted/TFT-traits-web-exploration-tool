@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createWindowService } = require('../main-process/window-service.js');
+const { RENDERER_CONTRACT } = require('../bridge-contract.js');
 
 function createWindowServiceUnderTest({
     executeJavaScriptImpl,
@@ -57,6 +58,7 @@ function createWindowServiceUnderTest({
         ipcChannels: {
             MAIN_PROCESS_ERROR: 'main-process-error'
         },
+        rendererContract: RENDERER_CONTRACT,
         isSmokeTest: true,
         smokeTimeoutMs
     });
@@ -70,6 +72,29 @@ function createWindowServiceUnderTest({
 }
 
 describe('window service smoke test', () => {
+    it('uses explicit renderer readiness signals instead of tight polling loops', async () => {
+        let inspectionScript = '';
+        const { service, app, listeners } = createWindowServiceUnderTest({
+            executeJavaScriptImpl: async (script) => {
+                inspectionScript = script;
+                return {
+                    hasElectronAPI: true,
+                    missingMethods: [],
+                    missingIds: [],
+                    preloadFailureText: false
+                };
+            }
+        });
+
+        service.createWindow();
+        listeners['did-finish-load']();
+        await app.waitForExit();
+
+        assert.match(inspectionScript, /tft-renderer-ready/);
+        assert.match(inspectionScript, /MutationObserver/);
+        assert.doesNotMatch(inspectionScript, /setTimeout\(inspect, 50\)/);
+    });
+
     it('waits for the renderer inspection promise before finishing the smoke test', async () => {
         let resolveInspection;
         const inspectionPromise = new Promise((resolve) => {

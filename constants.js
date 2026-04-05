@@ -3,7 +3,8 @@ const {
     DATA_SOURCES,
     DEFAULT_DATA_SOURCE,
     LIMITS,
-    SMOKE_TEST_FLAG
+    SMOKE_TEST_FLAG,
+    RENDERER_CONTRACT
 } = require('./bridge-contract.js');
 
 /**
@@ -15,6 +16,7 @@ const {
 const NETWORK = {
     MAX_RETRIES: 3,
     RETRY_BASE_DELAY_MS: 1000,
+    FETCH_TIMEOUT_MS: 15000,
     DATA_CACHE_TTL_MS_BY_SOURCE: {
         [DATA_SOURCES.LIVE]: 13 * 24 * 60 * 60 * 1000
     },
@@ -32,5 +34,6 @@ module.exports = {
     DEFAULT_DATA_SOURCE,
     LIMITS,
     NETWORK,
-    SMOKE_TEST_FLAG
+    SMOKE_TEST_FLAG,
+    RENDERER_CONTRACT
 };

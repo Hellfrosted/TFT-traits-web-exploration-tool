@@ -9,77 +9,47 @@ const GLOBAL_OVERRIDES = Object.freeze({
     unitOverrides: {}
 });
 
+function createSelectionGroup(id, options) {
+    return {
+        id,
+        options
+    };
+}
+
+function createSet17MechaFormSelectionGroup() {
+    return createSelectionGroup('mechaForm', [
+        {
+            id: 'standard',
+            label: 'Standard',
+            slotCost: 1
+        },
+        {
+            id: 'two-slot',
+            label: '2-Slot Mecha',
+            slotCost: 2,
+            traitContributions: {
+                Mecha: 2
+            }
+        }
+    ]);
+}
+
+function createSet17MechaOverride() {
+    return {
+        selectionGroups: [
+            createSet17MechaFormSelectionGroup()
+        ]
+    };
+}
+
 const SET_OVERRIDES = Object.freeze({
     '17': {
         excludedTraitNames: ['Choose Trait'],
         roleOverrides: {},
         unitOverrides: {
-            Galio: {
-                selectionGroups: [
-                    {
-                        id: 'mechaForm',
-                        options: [
-                            {
-                                id: 'standard',
-                                label: 'Standard',
-                                slotCost: 1
-                            },
-                            {
-                                id: 'two-slot',
-                                label: '2-Slot Mecha',
-                                slotCost: 2,
-                                traitContributions: {
-                                    Mecha: 2
-                                }
-                            }
-                        ]
-                    }
-                ]
-            },
-            AurelionSol: {
-                selectionGroups: [
-                    {
-                        id: 'mechaForm',
-                        options: [
-                            {
-                                id: 'standard',
-                                label: 'Standard',
-                                slotCost: 1
-                            },
-                            {
-                                id: 'two-slot',
-                                label: '2-Slot Mecha',
-                                slotCost: 2,
-                                traitContributions: {
-                                    Mecha: 2
-                                }
-                            }
-                        ]
-                    }
-                ]
-            },
-            Urgot: {
-                selectionGroups: [
-                    {
-                        id: 'mechaForm',
-                        options: [
-                            {
-                                id: 'standard',
-                                label: 'Standard',
-                                slotCost: 1
-                            },
-                            {
-                                id: 'two-slot',
-                                label: '2-Slot Mecha',
-                                slotCost: 2,
-                                traitContributions: {
-                                    Mecha: 2
-                                }
-                            }
-                        ]
-                    }
-                ]
-            },
+            Galio: createSet17MechaOverride(),
+            AurelionSol: createSet17MechaOverride(),
+            Urgot: createSet17MechaOverride(),
             MissFortune: {
                 allowUnknownRole: true,
                 removeTraits: ['Choose Trait'],

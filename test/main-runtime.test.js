@@ -80,7 +80,11 @@ function createRuntimeUnderTest() {
             LIMITS: {
                 DEFAULT_MAX_RESULTS: 500
             },
-            SMOKE_TEST_FLAG: '--smoke-test'
+            SMOKE_TEST_FLAG: '--smoke-test',
+            RENDERER_CONTRACT: {
+                requiredBridgeMethods: [],
+                requiredShellIds: []
+            }
         },
         storage: {
             getStoragePaths: () => ({

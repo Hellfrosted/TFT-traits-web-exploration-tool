@@ -91,7 +91,52 @@ describe('main-process cache service', () => {
         assert.equal(operations[1][2], 'C:\\cache\\entry.json');
     });
 
-    it('prunes stale cache entries and supports list/delete/clear flows', async () => {
+    it('prunes obsolete/corrupt cache entries while preserving valid fingerprints', async () => {
+        const sandboxRoot = makeTempDir('tft-cache-service-');
+
+        try {
+            const userDataPath = path.join(sandboxRoot, 'userData');
+            fs.mkdirSync(userDataPath, { recursive: true });
+            const service = createService(userDataPath);
+            const keepParams = { boardSize: 9, maxResults: 10 };
+            const alsoKeepParams = { boardSize: 8, maxResults: 10 };
+            const keepKey = service.getCacheKey('keep-fingerprint', keepParams);
+            const alsoKeepKey = service.getCacheKey('other-fingerprint', alsoKeepParams);
+            const obsoleteKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+            const corruptKey = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+            await service.writeCache(keepKey, 'keep-fingerprint', keepParams, [{ units: ['A'] }]);
+            await service.writeCache(alsoKeepKey, 'other-fingerprint', alsoKeepParams, [{ units: ['B'] }]);
+
+            const storagePaths = getStoragePaths({ userDataPath });
+            const obsoletePath = resolveCacheEntryPath(storagePaths, obsoleteKey);
+            const corruptPath = resolveCacheEntryPath(storagePaths, corruptKey);
+            await fsp.writeFile(obsoletePath, JSON.stringify({
+                searchVersion: 3,
+                dataFingerprint: 'obsolete',
+                params: { boardSize: 7 },
+                results: []
+            }), 'utf-8');
+            await fsp.writeFile(corruptPath, '{not-json', 'utf-8');
+
+            await service.pruneCache('keep-fingerprint');
+
+            const activeListed = await service.listCacheEntries('keep-fingerprint');
+            const inactiveListed = await service.listCacheEntries('other-fingerprint');
+            const allListed = await service.listCacheEntries();
+            assert.equal(activeListed.length, 1);
+            assert.equal(activeListed[0].key, keepKey);
+            assert.equal(inactiveListed.length, 1);
+            assert.equal(inactiveListed[0].key, alsoKeepKey);
+            assert.deepEqual(new Set(allListed.map((entry) => entry.key)), new Set([keepKey, alsoKeepKey]));
+            assert.equal(fs.existsSync(obsoletePath), false);
+            assert.equal(fs.existsSync(corruptPath), false);
+        } finally {
+            fs.rmSync(sandboxRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('supports list/delete/clear flows', async () => {
         const sandboxRoot = makeTempDir('tft-cache-service-');
 
         try {
@@ -101,20 +146,15 @@ describe('main-process cache service', () => {
             const keepParams = { boardSize: 9, maxResults: 10 };
             const pruneParams = { boardSize: 8, maxResults: 10 };
             const keepKey = service.getCacheKey('keep-fingerprint', keepParams);
-            const pruneKey = service.getCacheKey('old-fingerprint', pruneParams);
+            const pruneKey = service.getCacheKey('keep-fingerprint', pruneParams);
 
             await service.writeCache(keepKey, 'keep-fingerprint', keepParams, [{ units: ['A'] }]);
-            await service.writeCache(pruneKey, 'old-fingerprint', pruneParams, [{ units: ['B'] }]);
-
-            await service.pruneCache('keep-fingerprint');
-
-            const listed = await service.listCacheEntries('keep-fingerprint');
-            assert.equal(listed.length, 1);
-            assert.equal(listed[0].key, keepKey);
+            await service.writeCache(pruneKey, 'keep-fingerprint', pruneParams, [{ units: ['B'] }]);
 
             await service.deleteCacheEntry(keepKey);
             const afterDelete = await service.listCacheEntries('keep-fingerprint');
-            assert.deepEqual(afterDelete, []);
+            assert.equal(afterDelete.length, 1);
+            assert.equal(afterDelete[0].key, pruneKey);
 
             await service.writeCache(keepKey, 'keep-fingerprint', keepParams, [{ units: ['A'] }]);
             await service.writeCache(pruneKey, 'keep-fingerprint', pruneParams, [{ units: ['B'] }]);
