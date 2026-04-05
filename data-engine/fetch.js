@@ -107,10 +107,12 @@ module.exports = {
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 }
+                const maxBytes = Number.isFinite(networkConfig.MAX_RESPONSE_BYTES) ? networkConfig.MAX_RESPONSE_BYTES : 50 * 1024 * 1024;
+                const text = await this._readBodyWithSizeLimit(res, maxBytes);
                 if (responseType === 'text') {
-                    return await res.text();
+                    return text;
                 }
-                return await res.json();
+                return JSON.parse(text);
             } catch (err) {
                 const timedOut = controller.signal.aborted && (err?.name === 'AbortError' || err?.code === 'ABORT_ERR');
                 lastError = timedOut ? new Error(`Request timed out after ${timeoutMs}ms`) : err;
@@ -124,5 +126,33 @@ module.exports = {
             }
         }
         throw new Error(`Failed to fetch ${url} after ${networkConfig.MAX_RETRIES} attempts: ${lastError.message}`);
+    },
+
+    async _readBodyWithSizeLimit(res, maxBytes) {
+        const contentLength = Number(res.headers.get('content-length'));
+        if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+            throw new Error(`Response too large: Content-Length ${contentLength} exceeds ${maxBytes}-byte limit`);
+        }
+        const reader = res.body.getReader();
+        const chunks = [];
+        let totalBytes = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                totalBytes += value.length;
+                if (totalBytes > maxBytes) {
+                    await reader.cancel();
+                    throw new Error(`Response too large: body exceeded ${maxBytes}-byte limit`);
+                }
+                chunks.push(value);
+            }
+        } catch (err) {
+            reader.cancel().catch(() => {});
+            throw err;
+        }
+        const decoder = new TextDecoder();
+        const parts = chunks.map((chunk, i) => decoder.decode(chunk, { stream: i < chunks.length - 1 }));
+        return parts.join('');
     }
 };

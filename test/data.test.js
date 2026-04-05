@@ -275,6 +275,35 @@ describe('DataEngine.fetchAndParse', () => {
 });
 
 describe('DataEngine._fetchWithRetry', () => {
+    function makeMockResponse(bodyText, { contentLengthOverride = null } = {}) {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(bodyText);
+        return {
+            ok: true,
+            headers: {
+                get: (name) => {
+                    if (name.toLowerCase() === 'content-length') {
+                        return contentLengthOverride !== null ? String(contentLengthOverride) : String(bytes.length);
+                    }
+                    return null;
+                }
+            },
+            body: {
+                getReader() {
+                    let sent = false;
+                    return {
+                        read: async () => {
+                            if (sent) return { done: true, value: undefined };
+                            sent = true;
+                            return { done: false, value: bytes };
+                        },
+                        cancel: async () => {}
+                    };
+                }
+            }
+        };
+    }
+
     it('times out stalled requests and retries per-attempt with AbortController', async () => {
         let fetchCalls = 0;
         const stalledFetch = async (_url, { signal }) => await new Promise((_resolve, reject) => {
@@ -310,11 +339,7 @@ describe('DataEngine._fetchWithRetry', () => {
                     }, { once: true });
                 });
             }
-            return {
-                ok: true,
-                json: async () => ({ ok: true }),
-                text: async () => 'ok'
-            };
+            return makeMockResponse(JSON.stringify({ ok: true }));
         };
 
         const result = await DataEngine._fetchWithRetry('https://example.com/flaky.json', 'json', flakyFetch, {
@@ -325,6 +350,82 @@ describe('DataEngine._fetchWithRetry', () => {
 
         assert.deepEqual(result, { ok: true });
         assert.equal(fetchCalls, 2);
+    });
+
+    it('rejects when Content-Length header exceeds the configured size limit', async () => {
+        const limitedFetch = async () => makeMockResponse('{"x":1}', { contentLengthOverride: 200 });
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/data.json', 'json', limitedFetch, {
+                MAX_RETRIES: 1,
+                RETRY_BASE_DELAY_MS: 1,
+                FETCH_TIMEOUT_MS: 5000,
+                MAX_RESPONSE_BYTES: 100
+            }),
+            /response too large/i
+        );
+    });
+
+    it('rejects when the streamed body size exceeds the configured size limit', async () => {
+        const bigBody = 'x'.repeat(200);
+        const limitedFetch = async () => {
+            const encoder = new TextEncoder();
+            const bytes = encoder.encode(bigBody);
+            return {
+                ok: true,
+                headers: { get: () => null },
+                body: {
+                    getReader() {
+                        let sent = false;
+                        return {
+                            read: async () => {
+                                if (sent) return { done: true, value: undefined };
+                                sent = true;
+                                return { done: false, value: bytes };
+                            },
+                            cancel: async () => {}
+                        };
+                    }
+                }
+            };
+        };
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/data.json', 'text', limitedFetch, {
+                MAX_RETRIES: 1,
+                RETRY_BASE_DELAY_MS: 1,
+                FETCH_TIMEOUT_MS: 5000,
+                MAX_RESPONSE_BYTES: 100
+            }),
+            /response too large/i
+        );
+    });
+
+    it('returns parsed JSON for a response within the size limit', async () => {
+        const payload = { units: [1, 2, 3] };
+        const okFetch = async () => makeMockResponse(JSON.stringify(payload));
+
+        const result = await DataEngine._fetchWithRetry('https://example.com/data.json', 'json', okFetch, {
+            MAX_RETRIES: 1,
+            RETRY_BASE_DELAY_MS: 1,
+            FETCH_TIMEOUT_MS: 5000,
+            MAX_RESPONSE_BYTES: 1024
+        });
+
+        assert.deepEqual(result, payload);
+    });
+
+    it('returns raw text for a text response within the size limit', async () => {
+        const okFetch = async () => makeMockResponse('<html>listing</html>');
+
+        const result = await DataEngine._fetchWithRetry('https://example.com/listing.html', 'text', okFetch, {
+            MAX_RETRIES: 1,
+            RETRY_BASE_DELAY_MS: 1,
+            FETCH_TIMEOUT_MS: 5000,
+            MAX_RESPONSE_BYTES: 1024
+        });
+
+        assert.equal(result, '<html>listing</html>');
     });
 });
 

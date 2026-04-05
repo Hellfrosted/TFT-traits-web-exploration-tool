@@ -17,6 +17,10 @@ const NETWORK = {
     MAX_RETRIES: 3,
     RETRY_BASE_DELAY_MS: 1000,
     FETCH_TIMEOUT_MS: 15000,
+    // Maximum allowed response body size per fetch (50 MB). CDragon JSON files are
+    // typically 5–20 MB; this cap guards against unexpectedly large upstream payloads
+    // without blocking legitimate data.
+    MAX_RESPONSE_BYTES: 50 * 1024 * 1024,
     DATA_CACHE_TTL_MS_BY_SOURCE: {
         [DATA_SOURCES.LIVE]: 13 * 24 * 60 * 60 * 1000
     },
