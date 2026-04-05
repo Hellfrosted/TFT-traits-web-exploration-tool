@@ -31,7 +31,12 @@ function createDataService({
         const fetchedData = await dataEngine.fetchAndParse({
             source,
             readFallback: async () => await cacheService.readDataFallback(source),
-            writeFallback: async (data) => await cacheService.writeDataFallback(source, data)
+            writeFallback: async (data) => {
+                // Only the newest fetch may write the on-disk fallback snapshot.
+                if (fetchToken === latestRequestedFetchToken) {
+                    await cacheService.writeDataFallback(source, data);
+                }
+            }
         });
 
         // Only the newest fetch invocation may mutate shared main-process state.
