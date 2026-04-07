@@ -24,16 +24,19 @@ function createDataService({
 }) {
     let dataCache = null;
     let latestRequestedFetchToken = 0;
+    const latestRequestedFallbackFetchTokenBySource = new Map();
 
     async function fetchData(requestedSource = defaultDataSource) {
         const source = dataEngine.normalizeDataSource(requestedSource);
         const fetchToken = ++latestRequestedFetchToken;
+        const sourceFetchToken = (latestRequestedFallbackFetchTokenBySource.get(source) || 0) + 1;
+        latestRequestedFallbackFetchTokenBySource.set(source, sourceFetchToken);
         const fetchedData = await dataEngine.fetchAndParse({
             source,
             readFallback: async () => await cacheService.readDataFallback(source),
             writeFallback: async (data) => {
-                // Only the newest fetch may write the on-disk fallback snapshot.
-                if (fetchToken === latestRequestedFetchToken) {
+                // Only the newest fetch for this source may write its on-disk fallback snapshot.
+                if (latestRequestedFallbackFetchTokenBySource.get(source) === sourceFetchToken) {
                     await cacheService.writeDataFallback(source, data);
                 }
             }

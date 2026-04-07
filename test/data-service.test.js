@@ -120,7 +120,7 @@ describe('main-process data service', () => {
         assert.deepEqual(pruneCalls, []);
     });
 
-    it('prevents older fetch from overwriting fallback snapshot when a newer fetch completed first', async () => {
+    it('prevents an older fetch from overwriting the fallback snapshot for the same source', async () => {
         const pendingFetches = [];
         const writeFallbackCalls = [];
 
@@ -144,11 +144,11 @@ describe('main-process data service', () => {
         });
 
         const olderFetchPromise = dataService.fetchData('pbe');
-        const newerFetchPromise = dataService.fetchData('latest');
+        const newerFetchPromise = dataService.fetchData('pbe');
 
         // Newer fetch (index 1) completes first and writes its fallback.
         await pendingFetches[1].writeFallback({ dataFingerprint: 'newer-fingerprint' });
-        pendingFetches[1].resolve(createParsedData({ source: 'latest', fingerprint: 'newer-fingerprint', unitId: 'NewerUnit' }));
+        pendingFetches[1].resolve(createParsedData({ source: 'pbe', fingerprint: 'newer-fingerprint', unitId: 'NewerUnit' }));
         await newerFetchPromise;
 
         // Older fetch (index 0) finishes late and attempts to write its fallback.
@@ -157,6 +157,46 @@ describe('main-process data service', () => {
         await olderFetchPromise;
 
         // Only the newer fetch's fallback write should have reached cacheService.
-        assert.deepEqual(writeFallbackCalls, [{ source: 'latest', fingerprint: 'newer-fingerprint' }]);
+        assert.deepEqual(writeFallbackCalls, [{ source: 'pbe', fingerprint: 'newer-fingerprint' }]);
+    });
+
+    it('allows overlapping fetches for different sources to refresh their own fallback snapshots', async () => {
+        const pendingFetches = [];
+        const writeFallbackCalls = [];
+
+        const dataService = createDataService({
+            dataEngine: {
+                normalizeDataSource: (source) => source,
+                fetchAndParse: async (options) => {
+                    const deferred = createDeferred();
+                    pendingFetches.push({ source: options.source, writeFallback: options.writeFallback, ...deferred });
+                    return await deferred.promise;
+                }
+            },
+            cacheService: {
+                readDataFallback: async () => null,
+                writeDataFallback: async (source, data) => {
+                    writeFallbackCalls.push({ source, fingerprint: data.dataFingerprint });
+                },
+                pruneCache: async () => {}
+            },
+            defaultDataSource: 'pbe'
+        });
+
+        const pbeFetchPromise = dataService.fetchData('pbe');
+        const latestFetchPromise = dataService.fetchData('latest');
+
+        await pendingFetches[1].writeFallback({ dataFingerprint: 'latest-fingerprint' });
+        pendingFetches[1].resolve(createParsedData({ source: 'latest', fingerprint: 'latest-fingerprint', unitId: 'LatestUnit' }));
+        await latestFetchPromise;
+
+        await pendingFetches[0].writeFallback({ dataFingerprint: 'pbe-fingerprint' });
+        pendingFetches[0].resolve(createParsedData({ source: 'pbe', fingerprint: 'pbe-fingerprint', unitId: 'PbeUnit' }));
+        await pbeFetchPromise;
+
+        assert.deepEqual(writeFallbackCalls, [
+            { source: 'latest', fingerprint: 'latest-fingerprint' },
+            { source: 'pbe', fingerprint: 'pbe-fingerprint' }
+        ]);
     });
 });
