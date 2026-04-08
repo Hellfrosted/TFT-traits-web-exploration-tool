@@ -8,6 +8,7 @@ function createWindowServiceUnderTest({
     executeJavaScriptImpl,
     smokeTimeoutMs = 20000
 } = {}) {
+    const EXIT_TIMEOUT_MS = 500;
     const app = {
         exitCalls: [],
         exitResolvers: [],
@@ -17,9 +18,16 @@ function createWindowServiceUnderTest({
                 this.exitResolvers.shift()(code);
             }
         },
-        waitForExit() {
-            return new Promise((resolve) => {
-                this.exitResolvers.push(resolve);
+        waitForExit(timeoutMs = EXIT_TIMEOUT_MS) {
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    reject(new Error(`Timed out waiting for app.exit() after ${timeoutMs}ms.`));
+                }, timeoutMs);
+
+                this.exitResolvers.push((code) => {
+                    clearTimeout(timeoutId);
+                    resolve(code);
+                });
             });
         }
     };

@@ -1,4 +1,4 @@
-const { describe, it } = require('node:test');
+const { afterEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 
@@ -25,10 +25,16 @@ class FakeWorker extends EventEmitter {
     }
 }
 
+const TEST_TIMEOUT_MS = 250;
+
 function resetWorkers() {
     FakeWorker.instances.length = 0;
     FakeWorker.waiters.length = 0;
 }
+
+afterEach(() => {
+    resetWorkers();
+});
 
 function createDeferred() {
     let resolve;
@@ -45,9 +51,20 @@ async function waitForWorker(count = 1) {
         return FakeWorker.instances[count - 1];
     }
 
-    await new Promise((resolve) => {
-        FakeWorker.waiters.push(resolve);
-    });
+    let timeoutId;
+    await Promise.race([
+        new Promise((resolve) => {
+            FakeWorker.waiters.push(resolve);
+        }),
+        new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`Timed out waiting for ${count} worker instance(s).`));
+            }, TEST_TIMEOUT_MS);
+        })
+    ]);
+    if (timeoutId) {
+        clearTimeout(timeoutId);
+    }
 
     if (FakeWorker.instances.length >= count) {
         return FakeWorker.instances[count - 1];

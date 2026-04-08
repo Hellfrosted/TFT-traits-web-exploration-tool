@@ -437,6 +437,7 @@ describe('DataEngine._fetchWithRetry', () => {
 
     it('times out stalled requests and retries per-attempt with AbortController', async () => {
         let fetchCalls = 0;
+        const fetchTimeoutMs = 25;
         const stalledFetch = async (_url, { signal }) => await new Promise((_resolve, reject) => {
             fetchCalls += 1;
             signal.addEventListener('abort', () => {
@@ -450,15 +451,16 @@ describe('DataEngine._fetchWithRetry', () => {
             DataEngine._fetchWithRetry('https://example.com/stalled.json', 'json', stalledFetch, {
                 MAX_RETRIES: 2,
                 RETRY_BASE_DELAY_MS: 1,
-                FETCH_TIMEOUT_MS: 5
+                FETCH_TIMEOUT_MS: fetchTimeoutMs
             }),
-            /timed out after 5ms/i
+            new RegExp(`timed out after ${fetchTimeoutMs}ms`, 'i')
         );
         assert.equal(fetchCalls, 2);
     });
 
     it('preserves retry behavior when a timed-out attempt is followed by a successful retry', async () => {
         let fetchCalls = 0;
+        const fetchTimeoutMs = 25;
         const flakyFetch = async (_url, { signal }) => {
             fetchCalls += 1;
             if (fetchCalls === 1) {
@@ -483,7 +485,7 @@ describe('DataEngine._fetchWithRetry', () => {
         const result = await DataEngine._fetchWithRetry('https://example.com/flaky.json', 'json', flakyFetch, {
             MAX_RETRIES: 2,
             RETRY_BASE_DELAY_MS: 1,
-            FETCH_TIMEOUT_MS: 5
+            FETCH_TIMEOUT_MS: fetchTimeoutMs
         });
 
         assert.deepEqual(result, { ok: true });
