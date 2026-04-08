@@ -225,7 +225,6 @@ function setupMultiSelect(containerId, options, isUnit = true) {
     input.addEventListener('focus', () => renderDropdown(input.value), { signal });
     input.addEventListener('input', () => {
         renderDropdown(input.value);
-        emitChange();
     }, { signal });
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Backspace' && input.value === '' && selectedValues.length > 0) {

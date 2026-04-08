@@ -178,7 +178,49 @@ describe('renderer search controller', () => {
         assert.equal(app.state.activeSearchId, 42);
     });
 
-    it('shows checked-count progress when the search space estimate is indeterminate', () => {
+    it('derives percentage progress from checked and total when pct is absent', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isCancellingSearch: false,
+                currentResults: [],
+                activeSearchId: null,
+                activeSearchEstimate: { count: null, remainingSlots: 6 },
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                cleanupFns: [],
+                electronBridge: {
+                    onSearchProgress: (handler) => {
+                        app.progressHandler = handler;
+                        return () => {};
+                    }
+                }
+            },
+            queryUi: {
+                renderQuerySummary: () => {},
+                setStatusMessage: () => {},
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+        controller.subscribeProgressUpdates();
+
+        app.progressHandler({ searchId: 9, pct: null, checked: 1250000, total: 5000000 });
+
+        assert.equal(app.state.activeSearchId, 9);
+        assert.equal(shell.searchBtn.innerText, 'Searching 25%');
+    });
+
+    it('falls back to checked-count progress only when the total is unavailable', () => {
         const shell = createShell();
         const sandbox = createSandbox(shell);
         const createSearchController = loadSearchControllerFactory(sandbox);

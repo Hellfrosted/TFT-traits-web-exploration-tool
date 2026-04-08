@@ -817,15 +817,26 @@ describe('Engine.getCombinationCount', () => {
         assert.equal(result.remainingSlots, 3);
     });
 
-    it('returns an indeterminate count for slot-varying variant searches', () => {
+    it('counts candidate boards for slot-varying variant searches', () => {
         const result = Engine.getCombinationCount(mechaSlotDataCache, {
             boardSize: 9,
             mustInclude: [],
             mustExclude: [],
             mustExcludeTraits: []
         });
-        assert.equal(result.count, null);
+        assert.equal(result.count, 19);
         assert.equal(result.remainingSlots, 9);
+    });
+
+    it('keeps slot-varying estimates bounded for one-open-slot searches', () => {
+        const result = Engine.getCombinationCount(mechaSlotDataCache, {
+            boardSize: 2,
+            mustInclude: ['Galio'],
+            mustExclude: [],
+            mustExcludeTraits: []
+        });
+        assert.equal(result.count, 8);
+        assert.equal(result.remainingSlots, 1);
     });
 
     it('leaves units in the pool unless explicitly excluded', () => {
@@ -1398,6 +1409,28 @@ describe('Engine.search', () => {
         // Progress may or may not be called depending on combination count vs interval
         // Just verify it doesn't crash
         assert.ok(true);
+    });
+
+    it('reports percentage progress for slot-varying searches using the counted candidate total', () => {
+        const progressUpdates = [];
+        const params = {
+            ...baseParams,
+            boardSize: 9,
+            mustInclude: ['Galio', 'AurelionSol'],
+            tankRoles: [],
+            carryRoles: []
+        };
+        const expectedTotal = Engine.getCombinationCount(mechaSlotDataCache, params).count;
+
+        Engine.search(mechaSlotDataCache, params, (pct, checked, total) => {
+            progressUpdates.push({ pct, checked, total });
+        });
+
+        assert.deepEqual(progressUpdates.at(-1), {
+            pct: 100,
+            checked: expectedTotal,
+            total: expectedTotal
+        });
     });
 
     it('returns error for oversized search space', () => {

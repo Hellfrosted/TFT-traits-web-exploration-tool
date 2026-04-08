@@ -149,7 +149,7 @@ module.exports = {
 
         if (hasVariableSlotCosts) {
             return {
-                count: null,
+                count: this.countSearchSpaceCandidates(dataCache, normalizedParams, preparedSearchContext),
                 remainingSlots
             };
         }

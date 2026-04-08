@@ -2,6 +2,70 @@ const { LIMITS } = require('../constants.js');
 const { normalizeSearchParams } = require('../searchParams.js');
 
 module.exports = {
+    countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
+        const normalizedParams = normalizeSearchParams(params);
+        const {
+            variantLocks,
+        } = normalizedParams;
+        const {
+            remainingSlots,
+            validUnits,
+            mustHaveMask,
+            hasAllRequiredUnits
+        } = preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
+
+        if (!hasAllRequiredUnits || remainingSlots < 0) {
+            return 0;
+        }
+
+        const cap = LIMITS.COMBINATION_LIMIT + 1;
+        const maxBucket = remainingSlots;
+        const overflowMinBucket = remainingSlots + 1;
+        const minStateSize = overflowMinBucket + 1;
+        const maxStateSize = maxBucket + 1;
+        let requiredSlotFlex = 0;
+        let dp = Array.from({ length: minStateSize }, () => Array(maxStateSize).fill(0));
+        dp[0][0] = 1;
+
+        for (let i = 0; i < validUnits.length; i++) {
+            const unit = validUnits[i];
+            const slotRange = this.getUnitSlotCostRange(unit, variantLocks?.[unit.id] || null);
+            if ((mustHaveMask & (1n << BigInt(i))) !== 0n) {
+                requiredSlotFlex += slotRange.max - slotRange.min;
+                continue;
+            }
+            const next = dp.map((row) => row.slice());
+
+            for (let minSlots = 0; minSlots <= overflowMinBucket; minSlots++) {
+                for (let maxSlots = 0; maxSlots <= maxBucket; maxSlots++) {
+                    const count = dp[minSlots][maxSlots];
+                    if (count === 0) {
+                        continue;
+                    }
+
+                    const nextMinSlots = Math.min(overflowMinBucket, minSlots + slotRange.min);
+                    const nextMaxSlots = Math.min(maxBucket, maxSlots + slotRange.max);
+                    next[nextMinSlots][nextMaxSlots] = Math.min(
+                        cap,
+                        next[nextMinSlots][nextMaxSlots] + count
+                    );
+                }
+            }
+
+            dp = next;
+        }
+
+        let total = 0;
+        const requiredMaxFloor = Math.max(0, remainingSlots - requiredSlotFlex);
+        for (let minSlots = 0; minSlots <= remainingSlots; minSlots++) {
+            for (let maxSlots = requiredMaxFloor; maxSlots <= maxBucket; maxSlots++) {
+                total = Math.min(cap, total + dp[minSlots][maxSlots]);
+            }
+        }
+
+        return total;
+    },
+
     search(dataCache, params, onProgress, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
         const {
@@ -419,7 +483,7 @@ module.exports = {
         };
 
         const totalCombinations = hasVariableSlotCosts
-            ? null
+            ? this.countSearchSpaceCandidates(dataCache, normalizedParams, preparedSearchContext)
             : this.combinations(availableIndices.length, remainingSlots);
         let combinationsChecked = 0;
         let lastProgressReport = 0;
@@ -473,7 +537,7 @@ module.exports = {
                 return;
             }
 
-            onProgress(null, combinationsChecked, null);
+            onProgress(null, combinationsChecked, totalCombinations);
         };
 
         const dfs = (
@@ -635,7 +699,7 @@ module.exports = {
                 if (Number.isFinite(totalCombinations)) {
                     onProgress(100, totalCombinations, totalCombinations);
                 } else {
-                    onProgress(100, combinationsChecked, null);
+                    onProgress(100, combinationsChecked, totalCombinations);
                 }
             }
         } else {
