@@ -19,6 +19,7 @@
             isCancellingSearch: false,
             activeSearchId: null,
             activeSearchEstimate: null,
+            activeSearchProgress: null,
             variantLockControls: new Map(),
             electronBridge,
             hasElectronAPI: !!electronBridge,

@@ -1,27 +1,66 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { resolveShellElements } = ns.shared;
+    const { resolveShellElements, formatBoardEstimate } = ns.shared;
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
         let hasReportedShellMismatch = false;
 
-        function normalizeProgressPct(progressPct = null) {
-            if (!Number.isFinite(progressPct)) {
+        function normalizeSearchProgress(progress = null) {
+            if (Number.isFinite(progress)) {
+                return {
+                    pct: Math.max(0, Math.min(100, Math.round(progress))),
+                    checked: null,
+                    total: null
+                };
+            }
+
+            if (!progress || typeof progress !== 'object') {
+                return {
+                    pct: null,
+                    checked: null,
+                    total: null
+                };
+            }
+
+            const pct = Number.isFinite(progress.pct)
+                ? Math.max(0, Math.min(100, Math.round(progress.pct)))
+                : null;
+            const checked = Number.isFinite(progress.checked) && progress.checked >= 0
+                ? progress.checked
+                : null;
+            const total = Number.isFinite(progress.total) && progress.total >= 0
+                ? progress.total
+                : null;
+
+            return { pct, checked, total };
+        }
+
+        function formatCheckedProgressLabel(checked = null, total = null) {
+            if (!Number.isFinite(checked)) {
                 return null;
             }
 
-            return Math.max(0, Math.min(100, Math.round(progressPct)));
+            if (Number.isFinite(total) && total > 0) {
+                return `${formatBoardEstimate(checked)} / ${formatBoardEstimate(total)}`;
+            }
+
+            return `${formatBoardEstimate(checked)} checked`;
         }
 
         function buildSearchMeta() {
             return 'Active query';
         }
 
-        function buildSearchButtonLabel(progressPct = null) {
-            const normalizedPct = normalizeProgressPct(progressPct);
-            if (Number.isFinite(normalizedPct)) {
-                return `Searching ${normalizedPct}%`;
+        function buildSearchButtonLabel(progress = null) {
+            const normalizedProgress = normalizeSearchProgress(progress);
+            if (Number.isFinite(normalizedProgress.pct)) {
+                return `Searching ${normalizedProgress.pct}%`;
+            }
+
+            const checkedLabel = formatCheckedProgressLabel(normalizedProgress.checked, normalizedProgress.total);
+            if (checkedLabel) {
+                return `Searching ${checkedLabel}`;
             }
 
             if (state.isSearching) {
@@ -64,17 +103,17 @@
             return null;
         }
 
-        function renderActiveSearchUi(progressPct = null) {
+        function renderActiveSearchUi(progress = null) {
             const shell = resolveSearchShell('Unable to render active search UI.');
             if (!shell) {
                 return;
             }
 
             const { searchBtn, resBody: tbody } = shell;
-            const normalizedPct = normalizeProgressPct(progressPct);
+            const activeProgress = progress ?? state.activeSearchProgress ?? null;
 
             if (searchBtn && state.isSearching) {
-                searchBtn.innerText = buildSearchButtonLabel(normalizedPct);
+                searchBtn.innerText = buildSearchButtonLabel(activeProgress);
             }
 
             if (state.lastSearchParams) {
@@ -112,6 +151,7 @@
             if (searching) {
                 setCancellingSearch(false);
                 state.activeSearchId = null;
+                state.activeSearchProgress = null;
             }
             const { searchBtn, cancelBtn } = shell;
 
@@ -126,6 +166,7 @@
                 app.queryUi.syncSearchButtonState();
                 cancelBtn.style.display = 'none';
                 state.activeSearchEstimate = null;
+                state.activeSearchProgress = null;
                 if (state.activeSearchId !== null && state.activeSearchId !== undefined) {
                     state.lastCompletedSearchId = state.activeSearchId;
                 }
@@ -321,7 +362,12 @@
                 if (data.searchId !== state.activeSearchId) {
                     return;
                 }
-                renderActiveSearchUi(data.pct);
+                state.activeSearchProgress = {
+                    pct: data.pct,
+                    checked: data.checked,
+                    total: data.total
+                };
+                renderActiveSearchUi(state.activeSearchProgress);
             });
 
             if (typeof dispose === 'function') {

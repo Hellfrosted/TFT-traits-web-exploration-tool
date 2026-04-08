@@ -50,7 +50,58 @@ function createResultsUiForSortMode(sortMode) {
     });
 
     return sandbox.window.TFTRenderer.createResultsUi({
-        state: {}
+        state: {},
+        queryUi: {
+            setResultsSummary: () => {}
+        }
+    });
+}
+
+function createResultsUiForSummary(summarySink) {
+    const sources = [
+        'results-model.js',
+        'results-tooltip.js',
+        'results-renderers.js',
+        'results-ui.js'
+    ].map((fileName) => ({
+        fileName,
+        source: fs.readFileSync(
+            path.join(__dirname, '..', 'renderer', fileName),
+            'utf8'
+        )
+    }));
+
+    const sandbox = {
+        console,
+        window: {
+            TFTRenderer: {
+                shared: {
+                    escapeHtml: (value) => String(value ?? ''),
+                    renderIconImage: () => '',
+                    getBoardMetric: (board) => board.synergyScore ?? board.traitsCount ?? 0,
+                    formatBoardEstimate: (value) => String(value ?? '')
+                }
+            }
+        },
+        document: {
+            getElementById: () => null,
+            querySelector: () => null,
+            addEventListener: () => {},
+            body: {
+                contains: () => false
+            }
+        }
+    };
+
+    sources.forEach(({ fileName, source }) => {
+        vm.runInNewContext(source, sandbox, { filename: `renderer/${fileName}` });
+    });
+
+    return sandbox.window.TFTRenderer.createResultsUi({
+        state: {},
+        queryUi: {
+            setResultsSummary: summarySink
+        }
     });
 }
 
@@ -83,5 +134,19 @@ describe('results UI sorting', () => {
             sorted.map((board) => board.units[0]),
             ['C', 'B', 'A']
         );
+    });
+
+    it('renders a variable search-space label when the estimate count is null', () => {
+        const summaries = [];
+        const resultsUi = createResultsUiForSummary((content) => summaries.push(content));
+
+        resultsUi.renderEstimateSummary({
+            count: null,
+            remainingSlots: 6
+        });
+
+        assert.match(summaries.at(-1), /Variable search space/);
+        assert.doesNotMatch(summaries.at(-1), /~-\s*boards/);
+        assert.match(summaries.at(-1), />6</);
     });
 });

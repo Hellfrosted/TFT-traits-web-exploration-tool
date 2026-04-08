@@ -35,8 +35,10 @@
         function renderEstimateSummary(estimate = null) {
             const estimateCount = estimate?.count;
             const remainingSlots = estimate?.remainingSlots;
-            const estimateLabel = Number.isFinite(Number(estimateCount))
-                ? `~${formatBoardEstimate(estimateCount)} boards`
+            const estimateLabel = estimateCount === null
+                ? 'Variable search space'
+                : Number.isFinite(estimateCount)
+                    ? `~${formatBoardEstimate(estimateCount)} boards`
                 : 'Variable / estimating';
             const openSlotsLabel = Number.isFinite(Number(remainingSlots))
                 ? String(remainingSlots)

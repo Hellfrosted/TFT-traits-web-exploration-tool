@@ -73,7 +73,15 @@ function createSandbox(shell, overrides = {}) {
         window: {
             TFTRenderer: {
                 shared: {
-                    resolveShellElements: createResolveShellElements(shell)
+                    resolveShellElements: createResolveShellElements(shell),
+                    formatBoardEstimate: (value) => {
+                        const numericValue = Number(value);
+                        if (!Number.isFinite(numericValue) || numericValue <= 0) {
+                            return '-';
+                        }
+
+                        return String(numericValue);
+                    }
                 }
             }
         }
@@ -168,6 +176,48 @@ describe('renderer search controller', () => {
 
         assert.equal(shell.searchBtn.innerText, 'Compute');
         assert.equal(app.state.activeSearchId, 42);
+    });
+
+    it('shows checked-count progress when the search space estimate is indeterminate', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isCancellingSearch: false,
+                currentResults: [],
+                activeSearchId: null,
+                activeSearchEstimate: { count: null, remainingSlots: 6 },
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                cleanupFns: [],
+                electronBridge: {
+                    onSearchProgress: (handler) => {
+                        app.progressHandler = handler;
+                        return () => {};
+                    }
+                }
+            },
+            queryUi: {
+                renderQuerySummary: () => {},
+                setStatusMessage: () => {},
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+        controller.subscribeProgressUpdates();
+
+        app.progressHandler({ searchId: 9, pct: null, checked: 1250000, total: null });
+
+        assert.equal(app.state.activeSearchId, 9);
+        assert.equal(shell.searchBtn.innerText, 'Searching 1250000 checked');
     });
 
     it('sets a fresh status message when a search returns no results', async () => {
