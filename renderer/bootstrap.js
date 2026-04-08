@@ -1,6 +1,6 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { hasRequiredShellElements } = ns.shared;
+    const { getMissingRequiredShellIds } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
@@ -77,7 +77,11 @@
 
         function initializeUiShell() {
             if (state.listeners.uiInitialized) return true;
-            if (!hasRequiredShellElements()) {
+            const missingIds = getMissingRequiredShellIds();
+            if (missingIds.length > 0) {
+                console.error('[Renderer Shell Incomplete] Missing required shell nodes:', missingIds);
+                app.queryUi.setStatusMessage(`Renderer shell mismatch: missing required shell nodes (${missingIds.join(', ')}).`);
+                publishRendererReadyState(false);
                 return false;
             }
 

@@ -17,8 +17,30 @@
         ? [...window.electronAPI.rendererContract.requiredShellIds]
         : FALLBACK_REQUIRED_SHELL_IDS;
 
+    function getMissingRequiredShellIds(ids = REQUIRED_SHELL_IDS) {
+        return (Array.isArray(ids) ? ids : [])
+            .filter((id) => !document.getElementById(id));
+    }
+
+    function resolveShellElements(ids = REQUIRED_SHELL_IDS) {
+        const elements = {};
+        const missingIds = [];
+
+        (Array.isArray(ids) ? ids : []).forEach((id) => {
+            const element = document.getElementById(id);
+            if (element) {
+                elements[id] = element;
+                return;
+            }
+
+            missingIds.push(id);
+        });
+
+        return { elements, missingIds };
+    }
+
     function hasRequiredShellElements() {
-        return REQUIRED_SHELL_IDS.every((id) => !!document.getElementById(id));
+        return getMissingRequiredShellIds().length === 0;
     }
 
     function formatSnapshotAge(timestamp) {
@@ -92,6 +114,8 @@
 
     ns.shared = {
         REQUIRED_SHELL_IDS,
+        getMissingRequiredShellIds,
+        resolveShellElements,
         hasRequiredShellElements,
         formatSnapshotAge,
         getBoardMetric,

@@ -1,0 +1,142 @@
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+function loadBootstrapFactory(sandbox) {
+    const source = fs.readFileSync(
+        path.join(__dirname, '..', 'renderer', 'bootstrap.js'),
+        'utf8'
+    );
+
+    vm.runInNewContext(source, sandbox, { filename: 'renderer/bootstrap.js' });
+    return sandbox.window.TFTRenderer.createBootstrap;
+}
+
+function createBootstrapHarness(missingIds = ['searchBtn']) {
+    const statusMessages = [];
+    const dispatchedEvents = [];
+    const errorLogs = [];
+    const documentElement = {
+        dataset: {}
+    };
+    const sandbox = {
+        console: {
+            ...console,
+            error: (...args) => errorLogs.push(args)
+        },
+        document: {
+            documentElement,
+            readyState: 'complete',
+            getElementById: () => null,
+            addEventListener: () => {}
+        },
+        window: {
+            TFTRenderer: {
+                shared: {
+                    getMissingRequiredShellIds: () => [...missingIds]
+                }
+            },
+            addEventListener: () => {},
+            dispatchEvent: (event) => dispatchedEvents.push(event)
+        },
+        CustomEvent: function CustomEvent(type, init) {
+            this.type = type;
+            this.detail = init?.detail;
+        },
+        setTimeout: () => 0,
+        showAlert: () => {}
+    };
+
+    const createBootstrap = loadBootstrapFactory(sandbox);
+    let subscribeCalls = 0;
+    let fetchCalls = 0;
+    const app = {
+        state: {
+            listeners: {
+                staticBound: false,
+                draftBound: false,
+                bootScheduled: false,
+                uiInitialized: false,
+                bootStarted: false
+            },
+            flags: {
+                smokeTest: false
+            },
+            hasElectronAPI: true,
+            cleanupFns: []
+        },
+        queryUi: {
+            setStatusMessage: (message) => statusMessages.push(message),
+            setDataStats: () => {},
+            renderQuerySummary: () => {},
+            syncFetchButtonState: () => {},
+            syncSearchButtonState: () => {}
+        },
+        results: {
+            renderEmptySpotlight: () => {},
+            renderEmptySummary: () => {}
+        },
+        search: {
+            subscribeProgressUpdates: () => {
+                subscribeCalls += 1;
+            },
+            handleSearchClick: () => {},
+            requestCancelSearch: async () => {}
+        },
+        data: {
+            fetchData: async () => {
+                fetchCalls += 1;
+            }
+        }
+    };
+
+    return {
+        bootstrap: createBootstrap(app),
+        app,
+        statusMessages,
+        dispatchedEvents,
+        documentElement,
+        errorLogs,
+        getCounts: () => ({
+            subscribeCalls,
+            fetchCalls
+        })
+    };
+}
+
+describe('renderer bootstrap', () => {
+    it('returns false when required shell nodes are missing', () => {
+        const { bootstrap } = createBootstrapHarness(['searchBtn', 'resBody']);
+
+        assert.equal(bootstrap.initializeUiShell(), false);
+    });
+
+    it('sets a visible failure status when the shell is incomplete', () => {
+        const { bootstrap, statusMessages, errorLogs } = createBootstrapHarness(['searchBtn', 'resBody']);
+
+        bootstrap.initializeUiShell();
+
+        assert.equal(
+            statusMessages.at(-1),
+            'Renderer shell mismatch: missing required shell nodes (searchBtn, resBody).'
+        );
+        assert.equal(errorLogs.length, 1);
+    });
+
+    it('keeps the renderer in a non-ready state and skips bootstrap work when the shell is incomplete', () => {
+        const { bootstrap, app, dispatchedEvents, documentElement, getCounts } = createBootstrapHarness(['searchBtn']);
+
+        bootstrap.start();
+
+        assert.equal(documentElement.dataset.tftReady, '0');
+        assert.deepEqual(dispatchedEvents.map((event) => event.detail?.ready), [false, false]);
+        assert.equal(app.state.listeners.staticBound, false);
+        assert.equal(app.state.listeners.bootStarted, false);
+        assert.deepEqual(getCounts(), {
+            subscribeCalls: 1,
+            fetchCalls: 0
+        });
+    });
+});

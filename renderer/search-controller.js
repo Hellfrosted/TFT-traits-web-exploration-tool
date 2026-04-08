@@ -1,8 +1,10 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
+    const { resolveShellElements } = ns.shared;
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
+        let hasReportedShellMismatch = false;
 
         function normalizeProgressPct(progressPct = null) {
             if (!Number.isFinite(progressPct)) {
@@ -33,9 +35,42 @@
             return 'Results pending...';
         }
 
+        function reportShellMismatchOnce(missingIds, contextMessage) {
+            if (!hasReportedShellMismatch) {
+                console.error(`[Renderer Shell Mismatch] ${contextMessage}`, { missingIds });
+                hasReportedShellMismatch = true;
+            }
+
+            app.queryUi.setStatusMessage('Renderer shell mismatch: search controls unavailable.');
+            app.queryUi.renderQuerySummary(state.lastSearchParams || null, 'Shell mismatch');
+        }
+
+        function resolveSearchShell(contextMessage, options = {}) {
+            const { elements, missingIds } = resolveShellElements(['searchBtn', 'cancelBtn', 'resBody']);
+            if (missingIds.length === 0) {
+                return elements;
+            }
+
+            reportShellMismatchOnce(missingIds, contextMessage);
+            if (options.requireStableState) {
+                state.isSearching = false;
+                state.isCancellingSearch = false;
+                state.activeSearchEstimate = null;
+                state.activeSearchId = null;
+                app.queryUi.syncFetchButtonState();
+                app.queryUi.syncSearchButtonState();
+            }
+
+            return null;
+        }
+
         function renderActiveSearchUi(progressPct = null) {
-            const searchBtn = document.getElementById('searchBtn');
-            const tbody = document.getElementById('resBody');
+            const shell = resolveSearchShell('Unable to render active search UI.');
+            if (!shell) {
+                return;
+            }
+
+            const { searchBtn, resBody: tbody } = shell;
             const normalizedPct = normalizeProgressPct(progressPct);
 
             if (searchBtn && state.isSearching) {
@@ -58,20 +93,27 @@
 
         function setCancellingSearch(cancelling) {
             state.isCancellingSearch = cancelling;
-            const cancelBtn = document.getElementById('cancelBtn');
+            const shell = resolveSearchShell('Unable to update cancel search state.');
+            const cancelBtn = shell?.cancelBtn;
             if (cancelBtn) {
                 cancelBtn.disabled = cancelling;
             }
         }
 
         function setSearchState(searching) {
+            const shell = resolveSearchShell('Unable to update search controls.', {
+                requireStableState: true
+            });
+            if (!shell) {
+                return;
+            }
+
             state.isSearching = searching;
             if (searching) {
                 setCancellingSearch(false);
                 state.activeSearchId = null;
             }
-            const searchBtn = document.getElementById('searchBtn');
-            const cancelBtn = document.getElementById('cancelBtn');
+            const { searchBtn, cancelBtn } = shell;
 
             if (searching) {
                 searchBtn.disabled = true;
@@ -98,6 +140,11 @@
 
         async function requestCancelSearch() {
             if (!state.isSearching || state.isCancellingSearch) {
+                return;
+            }
+            if (!resolveSearchShell('Unable to cancel search: required controls missing.', {
+                requireStableState: true
+            })) {
                 return;
             }
             if (!state.electronBridge?.cancelSearch) {
@@ -128,10 +175,17 @@
                 return;
             }
 
+            const shell = resolveSearchShell('Unable to start search: required controls missing.', {
+                requireStableState: true
+            });
+            if (!shell) {
+                return;
+            }
+
             app.queryUi.clampNumericInput('boardSize', 1, 20, 9);
             app.queryUi.clampNumericInput('maxResults', 1, 10000, state.searchLimits.DEFAULT_MAX_RESULTS || 500);
 
-            const tbody = document.getElementById('resBody');
+            const { resBody: tbody } = shell;
             state.currentResults = [];
             state.activeSearchEstimate = null;
 

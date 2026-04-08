@@ -35,27 +35,57 @@ function createCancelButton() {
     };
 }
 
+function createShell(overrides = {}) {
+    return {
+        searchBtn: createSearchButton(),
+        cancelBtn: createCancelButton(),
+        resBody: { innerHTML: '' },
+        ...overrides
+    };
+}
+
+function createResolveShellElements(shell) {
+    return (ids = []) => {
+        const elements = {};
+        const missingIds = [];
+
+        ids.forEach((id) => {
+            if (shell[id]) {
+                elements[id] = shell[id];
+                return;
+            }
+
+            missingIds.push(id);
+        });
+
+        return { elements, missingIds };
+    };
+}
+
+function createSandbox(shell, overrides = {}) {
+    return {
+        console: overrides.console || console,
+        showAlert: overrides.showAlert || (() => {}),
+        showConfirm: overrides.showConfirm || (async () => true),
+        document: {
+            getElementById: (id) => shell[id] || null
+        },
+        window: {
+            TFTRenderer: {
+                shared: {
+                    resolveShellElements: createResolveShellElements(shell)
+                }
+            }
+        }
+    };
+}
+
 describe('renderer search controller', () => {
     it('enters cancelling state immediately and ignores late progress updates', async () => {
         const statusMessages = [];
         const querySummaries = [];
-        const searchBtn = createSearchButton();
-        const cancelBtn = createCancelButton();
-        const resBody = { innerHTML: '' };
-        const sandbox = {
-            console,
-            document: {
-                getElementById: (id) => ({
-                    searchBtn,
-                    cancelBtn,
-                    resBody
-                }[id] || null)
-            },
-            window: {
-                TFTRenderer: {}
-            }
-        };
-
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
@@ -92,30 +122,15 @@ describe('renderer search controller', () => {
         app.progressHandler({ searchId: 10, pct: 73 });
 
         assert.equal(app.state.isCancellingSearch, true);
-        assert.equal(cancelBtn.disabled, true);
+        assert.equal(shell.cancelBtn.disabled, true);
         assert.deepEqual(statusMessages, ['Cancelling search...']);
         assert.deepEqual(querySummaries, ['Cancelling active search...']);
-        assert.equal(searchBtn.innerText, 'Compute');
+        assert.equal(shell.searchBtn.innerText, 'Compute');
     });
 
     it('ignores progress events for non-active search ids', () => {
-        const searchBtn = createSearchButton();
-        const cancelBtn = createCancelButton();
-        const resBody = { innerHTML: '' };
-        const sandbox = {
-            console,
-            document: {
-                getElementById: (id) => ({
-                    searchBtn,
-                    cancelBtn,
-                    resBody
-                }[id] || null)
-            },
-            window: {
-                TFTRenderer: {}
-            }
-        };
-
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
@@ -151,7 +166,7 @@ describe('renderer search controller', () => {
 
         app.progressHandler({ searchId: 7, pct: 88 });
 
-        assert.equal(searchBtn.innerText, 'Compute');
+        assert.equal(shell.searchBtn.innerText, 'Compute');
         assert.equal(app.state.activeSearchId, 42);
     });
 
@@ -159,25 +174,8 @@ describe('renderer search controller', () => {
         const statusMessages = [];
         const querySummaries = [];
         const renderedResults = [];
-        const searchBtn = createSearchButton();
-        const cancelBtn = createCancelButton();
-        const resBody = { innerHTML: '' };
-        const sandbox = {
-            console,
-            showAlert: () => {},
-            showConfirm: async () => true,
-            document: {
-                getElementById: (id) => ({
-                    searchBtn,
-                    cancelBtn,
-                    resBody
-                }[id] || null)
-            },
-            window: {
-                TFTRenderer: {}
-            }
-        };
-
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
@@ -234,25 +232,8 @@ describe('renderer search controller', () => {
 
     it('stale progress from an earlier search does not hijack the active search id', async () => {
         const renderedResults = [];
-        const searchBtn = createSearchButton();
-        const cancelBtn = createCancelButton();
-        const resBody = { innerHTML: '' };
-        const sandbox = {
-            console,
-            showAlert: () => {},
-            showConfirm: async () => true,
-            document: {
-                getElementById: (id) => ({
-                    searchBtn,
-                    cancelBtn,
-                    resBody
-                }[id] || null)
-            },
-            window: {
-                TFTRenderer: {}
-            }
-        };
-
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
         const createSearchController = loadSearchControllerFactory(sandbox);
         let capturedProgressHandler = null;
         let resolveSearchBoards = null;
@@ -303,25 +284,242 @@ describe('renderer search controller', () => {
 
         const searchPromise = controller.handleSearchClick();
 
-        // Yield enough microtasks to let the async flow reach the searchBoards await
         await Promise.resolve();
         await Promise.resolve();
         await Promise.resolve();
 
-        // A stale progress event from search 1 arrives while search 2 is pending
         capturedProgressHandler({ searchId: 1, pct: 99 });
 
-        // Stale event must not establish activeSearchId
         assert.ok(
             app.state.activeSearchId === null || app.state.activeSearchId === undefined,
             'Stale progress from a completed search must not hijack activeSearchId'
         );
 
-        // Resolve search 2 – the response is always authoritative
         resolveSearchBoards({ success: true, cancelled: false, results: [{ units: ['B'] }], searchId: 2 });
         await searchPromise;
 
         assert.ok(renderedResults.length > 0, 'Results for the active search must be rendered');
         assert.deepEqual(renderedResults.at(-1), [{ units: ['B'] }]);
+    });
+
+    it('does not throw during cancel flow when cancelBtn is missing', async () => {
+        const statusMessages = [];
+        const querySummaries = [];
+        let cancelCalls = 0;
+        const errorLogs = [];
+        const shell = createShell({
+            cancelBtn: null
+        });
+        const sandbox = createSandbox(shell, {
+            console: {
+                ...console,
+                error: (...args) => errorLogs.push(args)
+            }
+        });
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isCancellingSearch: false,
+                currentResults: [],
+                activeSearchEstimate: null,
+                activeSearchId: 7,
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                cleanupFns: [],
+                electronBridge: {
+                    cancelSearch: async () => {
+                        cancelCalls += 1;
+                        return { success: true };
+                    }
+                }
+            },
+            queryUi: {
+                renderQuerySummary: (_params, meta) => querySummaries.push(meta),
+                setStatusMessage: (message) => statusMessages.push(message),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+        await assert.doesNotReject(controller.requestCancelSearch());
+
+        assert.equal(cancelCalls, 0);
+        assert.equal(app.state.isSearching, false);
+        assert.equal(app.state.isCancellingSearch, false);
+        assert.equal(statusMessages.at(-1), 'Renderer shell mismatch: search controls unavailable.');
+        assert.equal(querySummaries.at(-1), 'Shell mismatch');
+        assert.equal(errorLogs.length, 1);
+    });
+
+    it('does not throw during state transitions when searchBtn is missing', () => {
+        const statusMessages = [];
+        const querySummaries = [];
+        const errorLogs = [];
+        const shell = createShell({
+            searchBtn: null
+        });
+        const sandbox = createSandbox(shell, {
+            console: {
+                ...console,
+                error: (...args) => errorLogs.push(args)
+            }
+        });
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isCancellingSearch: false,
+                activeSearchEstimate: { count: 10 },
+                activeSearchId: 11,
+                currentResults: [],
+                lastSearchParams: { boardSize: 9, maxResults: 50 }
+            },
+            queryUi: {
+                renderQuerySummary: (_params, meta) => querySummaries.push(meta),
+                setStatusMessage: (message) => statusMessages.push(message),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+
+        assert.doesNotThrow(() => controller.setSearchState(true));
+        assert.doesNotThrow(() => controller.setSearchState(false));
+
+        assert.equal(app.state.isSearching, false);
+        assert.equal(app.state.activeSearchEstimate, null);
+        assert.equal(app.state.activeSearchId, null);
+        assert.equal(statusMessages.at(-1), 'Renderer shell mismatch: search controls unavailable.');
+        assert.equal(querySummaries.at(-1), 'Shell mismatch');
+        assert.equal(errorLogs.length, 1);
+    });
+
+    it('does not throw during pending-results rendering when resBody is missing', () => {
+        const statusMessages = [];
+        const querySummaries = [];
+        const errorLogs = [];
+        const shell = createShell({
+            resBody: null
+        });
+        const sandbox = createSandbox(shell, {
+            console: {
+                ...console,
+                error: (...args) => errorLogs.push(args)
+            }
+        });
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isCancellingSearch: false,
+                currentResults: [],
+                activeSearchEstimate: null,
+                lastSearchParams: { boardSize: 9, maxResults: 50 }
+            },
+            queryUi: {
+                renderQuerySummary: (_params, meta) => querySummaries.push(meta),
+                setStatusMessage: (message) => statusMessages.push(message),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResultsMessageRow: () => '<tr></tr>'
+            }
+        };
+
+        const controller = createSearchController(app);
+
+        assert.doesNotThrow(() => controller.renderActiveSearchUi(50));
+        assert.equal(statusMessages.at(-1), 'Renderer shell mismatch: search controls unavailable.');
+        assert.equal(querySummaries.at(-1), 'Shell mismatch');
+        assert.equal(errorLogs.length, 1);
+    });
+
+    it('blocks bridge calls and emits controlled shell-mismatch UI when required search nodes are missing', async () => {
+        const statusMessages = [];
+        const querySummaries = [];
+        let estimateCalls = 0;
+        let searchCalls = 0;
+        const errorLogs = [];
+        const shell = createShell({
+            searchBtn: null
+        });
+        const sandbox = createSandbox(shell, {
+            console: {
+                ...console,
+                error: (...args) => errorLogs.push(args)
+            }
+        });
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isCancellingSearch: false,
+                isFetchingData: false,
+                currentResults: [],
+                activeSearchEstimate: null,
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                selectors: {
+                    mustInclude: {}
+                },
+                searchLimits: {},
+                activeData: {
+                    dataFingerprint: 'fresh'
+                },
+                electronBridge: {
+                    getSearchEstimate: async () => {
+                        estimateCalls += 1;
+                        return { count: 10, remainingSlots: 2 };
+                    },
+                    searchBoards: async () => {
+                        searchCalls += 1;
+                        return { success: true, cancelled: false, results: [] };
+                    }
+                }
+            },
+            queryUi: {
+                clampNumericInput: () => {},
+                getCurrentSearchParams: () => ({ boardSize: 9, maxResults: 50 }),
+                renderQuerySummary: (_params, meta) => querySummaries.push(meta),
+                setStatusMessage: (message) => statusMessages.push(message),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {}
+            },
+            results: {
+                renderEstimateSummary: () => {},
+                renderSearchingSpotlight: () => {},
+                renderResults: () => {},
+                renderResultsMessageRow: () => '<tr></tr>',
+                getSortedResults: (results) => results,
+                renderEmptySummary: () => {}
+            },
+            history: {
+                updateHistoryList: () => {}
+            }
+        };
+
+        const controller = createSearchController(app);
+        await controller.handleSearchClick();
+
+        assert.equal(estimateCalls, 0);
+        assert.equal(searchCalls, 0);
+        assert.equal(app.state.isSearching, false);
+        assert.equal(statusMessages.at(-1), 'Renderer shell mismatch: search controls unavailable.');
+        assert.equal(querySummaries.at(-1), 'Shell mismatch');
+        assert.equal(errorLogs.length, 1);
     });
 });
