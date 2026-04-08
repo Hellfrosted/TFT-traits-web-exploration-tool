@@ -1,3 +1,4 @@
+const { TextDecoder, TextEncoder } = require('node:util');
 const { DATA_SOURCES, NETWORK } = require('../constants.js');
 
 const RESPONSE_TOO_LARGE_CODE = 'ERR_RESPONSE_TOO_LARGE';

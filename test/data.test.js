@@ -1,5 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const { TextEncoder } = require('node:util');
 const DataEngine = require('../data.js');
 const { NETWORK } = require('../constants.js');
 
@@ -382,6 +383,33 @@ describe('DataEngine._fetchWithRetry', () => {
 
         assert.equal(fetchCalls, 1);
         assert.equal(streamedResponse.getCancelCount(), 1);
+    });
+
+    it('rejects oversized fallback text responses after measuring bytes and does not retry', async () => {
+        let fetchCalls = 0;
+        const fetchOversizedText = async () => {
+            fetchCalls += 1;
+            return {
+                ok: true,
+                headers: createHeaders(),
+                body: null,
+                text: async () => 'abcdefgh'
+            };
+        };
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/too-large-fallback.txt', 'text', fetchOversizedText, {
+                MAX_RETRIES: 3,
+                RETRY_BASE_DELAY_MS: 1,
+                FETCH_TIMEOUT_MS: 50,
+                MAX_RESPONSE_BYTES_BY_TYPE: {
+                    text: 6
+                }
+            }),
+            /Response too large for text/i
+        );
+
+        assert.equal(fetchCalls, 1);
     });
 
     it('keeps normal JSON and text responses working with bounded reads', async () => {
