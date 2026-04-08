@@ -49,13 +49,34 @@ class FakeIpcMain {
     }
 }
 
-function createRuntimeUnderTest() {
+function createMainWindowStub({ url = 'file:///index.html', destroyed = false } = {}) {
+    const webContents = {
+        getURL: () => url
+    };
+
+    return {
+        webContents,
+        isDestroyed: () => destroyed
+    };
+}
+
+function createRuntimeUnderTest(options = {}) {
     const fakeApp = new FakeApp();
     const fakeIpcMain = new FakeIpcMain();
     const fakeProcess = new EventEmitter();
+    const mainWindow = options.mainWindow || createMainWindowStub();
     let ensureCacheDirCalls = 0;
     let createWindowCalls = 0;
     let scheduleSmokeTimeoutCalls = 0;
+    const serviceCalls = {
+        fetchData: 0,
+        getSearchEstimate: 0,
+        searchBoards: 0,
+        cancelSearch: 0,
+        listCacheEntries: 0,
+        deleteCacheEntry: 0,
+        clearAllCache: 0
+    };
 
     const runtime = createMainRuntime({
         electron: {
@@ -99,18 +120,38 @@ function createRuntimeUnderTest() {
             ensureCacheDir: () => {
                 ensureCacheDirCalls += 1;
             },
-            listCacheEntries: async () => [],
-            deleteCacheEntry: async () => {},
-            clearAllCache: async () => 0
+            listCacheEntries: async () => {
+                serviceCalls.listCacheEntries += 1;
+                return [];
+            },
+            deleteCacheEntry: async () => {
+                serviceCalls.deleteCacheEntry += 1;
+            },
+            clearAllCache: async () => {
+                serviceCalls.clearAllCache += 1;
+                return 0;
+            }
         }),
         createDataService: () => ({
-            fetchData: async () => ({ success: true }),
+            fetchData: async () => {
+                serviceCalls.fetchData += 1;
+                return { success: true };
+            },
             getDataCache: () => null
         }),
         createSearchService: () => ({
-            getSearchEstimate: async () => ({ count: 0, remainingSlots: 0 }),
-            searchBoards: async () => ({ success: true, results: [] }),
-            cancelSearch: async () => ({ success: true })
+            getSearchEstimate: async () => {
+                serviceCalls.getSearchEstimate += 1;
+                return { count: 0, remainingSlots: 0 };
+            },
+            searchBoards: async () => {
+                serviceCalls.searchBoards += 1;
+                return { success: true, results: [] };
+            },
+            cancelSearch: async () => {
+                serviceCalls.cancelSearch += 1;
+                return { success: true };
+            }
         }),
         createWindowService: () => ({
             createWindow: () => {
@@ -120,16 +161,37 @@ function createRuntimeUnderTest() {
                 scheduleSmokeTimeoutCalls += 1;
             },
             notifyRendererError: () => {},
-            getMainWindow: () => null
+            getMainWindow: () => mainWindow
         }),
         appRoot: 'C:\\Users\\tester\\dev\\repo'
     });
+
+    function createInvokeEvent(overrides = {}) {
+        const sender = overrides.sender || mainWindow.webContents;
+        const senderUrl = overrides.senderUrl || sender.getURL?.() || mainWindow.webContents.getURL();
+        if (typeof sender.getURL !== 'function') {
+            sender.getURL = () => senderUrl;
+        }
+
+        return {
+            sender,
+            senderFrame: Object.prototype.hasOwnProperty.call(overrides, 'senderFrame')
+                ? overrides.senderFrame
+                : {
+                    isMainFrame: true,
+                    url: senderUrl
+                }
+        };
+    }
 
     return {
         runtime,
         fakeApp,
         fakeIpcMain,
         fakeProcess,
+        mainWindow,
+        serviceCalls,
+        createInvokeEvent,
         getCounts: () => ({
             ensureCacheDirCalls,
             createWindowCalls,
@@ -177,5 +239,71 @@ describe('main runtime', () => {
         assert.equal(fakeProcess.listenerCount('uncaughtException'), 0);
         assert.equal(fakeProcess.listenerCount('unhandledRejection'), 0);
         assert.equal(fakeApp.listenerCount('window-all-closed'), 0);
+    });
+
+    it('allows a trusted main-frame file:// sender to reach the handler', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('get-search-estimate');
+        const result = await handler(createInvokeEvent(), { boardSize: 9 });
+
+        assert.deepEqual(result, { count: 0, remainingSlots: 0 });
+        assert.equal(serviceCalls.getSearchEstimate, 1);
+    });
+
+    it('rejects mismatched webContents senders before they reach the data service', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('fetch-data');
+        const foreignSender = {
+            getURL: () => 'file:///index.html'
+        };
+
+        await assert.rejects(
+            handler(createInvokeEvent({ sender: foreignSender }), 'pbe'),
+            /Unauthorized IPC sender\./
+        );
+
+        assert.equal(serviceCalls.fetchData, 0);
+    });
+
+    it('rejects non-main-frame requests before they reach the search service', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('search-boards');
+
+        await assert.rejects(
+            handler(createInvokeEvent({
+                senderFrame: {
+                    isMainFrame: false,
+                    url: 'file:///index.html'
+                }
+            }), { boardSize: 9 }),
+            /Unauthorized IPC sender\./
+        );
+
+        assert.equal(serviceCalls.searchBoards, 0);
+    });
+
+    it('rejects non-file senders before they reach the cache service', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('list-cache');
+
+        await assert.rejects(
+            handler(createInvokeEvent({
+                senderFrame: {
+                    isMainFrame: true,
+                    url: 'https://example.com'
+                }
+            })),
+            /Unauthorized IPC sender\./
+        );
+
+        assert.equal(serviceCalls.listCacheEntries, 0);
     });
 });

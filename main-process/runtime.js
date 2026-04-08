@@ -120,8 +120,37 @@ function createMainRuntime(options = {}) {
         };
     }
 
+    function assertTrustedIpcSender(event, channel) {
+        const mainWindow = windowService.getMainWindow();
+        const hasLiveMainWindow = !!mainWindow
+            && (typeof mainWindow.isDestroyed !== 'function' || !mainWindow.isDestroyed());
+        const sender = event?.sender;
+        const senderFrame = event?.senderFrame;
+        const senderUrl = typeof senderFrame?.url === 'string' && senderFrame.url
+            ? senderFrame.url
+            : sender?.getURL?.();
+
+        if (
+            !hasLiveMainWindow
+            || sender !== mainWindow.webContents
+            || senderFrame?.isMainFrame !== true
+            || typeof senderUrl !== 'string'
+            || !senderUrl.startsWith('file://')
+        ) {
+            console.warn(`Rejected unauthorized IPC sender for ${channel}.`);
+            throw new Error('Unauthorized IPC sender.');
+        }
+    }
+
+    function handleTrustedIpc(channel, handler) {
+        ipcMain.handle(channel, async (event, ...args) => {
+            assertTrustedIpcSender(event, channel);
+            return await handler(event, ...args);
+        });
+    }
+
     function registerIpcHandlers() {
-        ipcMain.handle(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
+        handleTrustedIpc(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
             try {
                 return await dataService.fetchData(requestedSource);
             } catch (error) {
@@ -129,19 +158,19 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
+        handleTrustedIpc(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
             return await searchService.getSearchEstimate(params);
         });
 
-        ipcMain.handle(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
+        handleTrustedIpc(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
             return await searchService.searchBoards(params);
         });
 
-        ipcMain.handle(IPC_CHANNELS.CANCEL_SEARCH, async () => {
+        handleTrustedIpc(IPC_CHANNELS.CANCEL_SEARCH, async () => {
             return await searchService.cancelSearch();
         });
 
-        ipcMain.handle(IPC_CHANNELS.LIST_CACHE, async () => {
+        handleTrustedIpc(IPC_CHANNELS.LIST_CACHE, async () => {
             try {
                 const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
                 const entries = await cacheService.listCacheEntries(activeDataFingerprint);
@@ -151,7 +180,7 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (_event, key) => {
+        handleTrustedIpc(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (_event, key) => {
             try {
                 await cacheService.deleteCacheEntry(key);
                 return { success: true };
@@ -160,7 +189,7 @@ function createMainRuntime(options = {}) {
             }
         });
 
-        ipcMain.handle(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
+        handleTrustedIpc(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
             try {
                 const deleted = await cacheService.clearAllCache();
                 return { success: true, deleted };
@@ -201,6 +230,8 @@ function createMainRuntime(options = {}) {
         dataService,
         searchService,
         windowService,
+        assertTrustedIpcSender,
+        handleTrustedIpc,
         registerProcessHandlers,
         registerAppLifecycle,
         registerIpcHandlers,
