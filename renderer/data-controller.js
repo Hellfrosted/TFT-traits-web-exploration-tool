@@ -4,6 +4,38 @@
 
     ns.createDataController = function createDataController(app) {
         const { state } = app;
+        let hasReportedMissingSetupDependency = false;
+
+        function reportMissingSetupDependency() {
+            if (hasReportedMissingSetupDependency) {
+                return;
+            }
+
+            hasReportedMissingSetupDependency = true;
+            console.error('[Renderer Dependency Missing] setupMultiSelect is unavailable.');
+            app.queryUi.setStatusMessage('Renderer dependency mismatch: selector controls unavailable.');
+        }
+
+        function getSetupMultiSelect() {
+            const setupMultiSelect = state.dependencies?.setupMultiSelect;
+            if (typeof setupMultiSelect === 'function') {
+                return setupMultiSelect;
+            }
+
+            reportMissingSetupDependency();
+            return null;
+        }
+
+        function showAlert(message, title = 'Attention') {
+            const alertFn = state.dependencies?.showAlert;
+            if (typeof alertFn === 'function') {
+                return alertFn(message, title);
+            }
+
+            console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
+            app.queryUi.setStatusMessage(`Renderer dependency mismatch: unable to show "${title}".`);
+            return Promise.resolve(false);
+        }
 
         function collectUnitTraitLabels(unit) {
             const traitNames = new Set();
@@ -99,6 +131,11 @@
                         pillLabel: unit.displayName || unit.id,
                         dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
                     }));
+                    const setupMultiSelect = getSetupMultiSelect();
+                    if (!setupMultiSelect) {
+                        return;
+                    }
+
                     state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
                     state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
 
@@ -162,7 +199,7 @@
                     if (!state.activeData) {
                         app.queryUi.setDataStats();
                     }
-                    showAlert(res.error, 'Data Fetch Failed');
+                    void showAlert(res.error, 'Data Fetch Failed');
                 }
             } catch (err) {
                 if (requestId !== state.activeDataFetchRequestId) {

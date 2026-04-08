@@ -97,6 +97,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 currentResults: [],
@@ -142,6 +146,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 activeSearchId: 42,
@@ -184,6 +192,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 currentResults: [],
@@ -226,6 +238,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 currentResults: [],
@@ -271,6 +287,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: false,
                 isCancellingSearch: false,
                 isFetchingData: false,
@@ -331,6 +351,10 @@ describe('renderer search controller', () => {
         let resolveSearchBoards = null;
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: false,
                 isCancellingSearch: false,
                 isFetchingData: false,
@@ -411,6 +435,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 currentResults: [],
@@ -465,6 +493,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: false,
                 isCancellingSearch: false,
                 activeSearchEstimate: { count: 10 },
@@ -514,6 +546,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: true,
                 isCancellingSearch: false,
                 currentResults: [],
@@ -559,6 +595,10 @@ describe('renderer search controller', () => {
         const createSearchController = loadSearchControllerFactory(sandbox);
         const app = {
             state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
                 isSearching: false,
                 isCancellingSearch: false,
                 isFetchingData: false,

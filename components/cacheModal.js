@@ -1,121 +1,172 @@
 // --- Cache Management Modal ---
 
-const modalEscapeHtml = window.escapeHtml || ((value) => String(value ?? ''));
-const summarizeHistoryParams = window.summarizeParams || ((params) => JSON.stringify(params || {}));
-const formatHistoryTimestamp = window.formatTimestamp || ((value) => String(value ?? '-'));
-let cacheModal = null;
-let cacheModalBody = null;
+(function initializeCacheModalFactory() {
+    const ns = window.TFTRenderer = window.TFTRenderer || {};
 
-function closeModal() {
-    cacheModal?.classList.remove('active');
-}
+    ns.createCacheModal = function createCacheModal(app) {
+        const { state } = app;
+        const shared = app.shared || ns.shared || {};
+        const escapeHtml = typeof shared.escapeHtml === 'function'
+            ? shared.escapeHtml
+            : (value) => String(value ?? '');
+        const summarizeParams = typeof shared.summarizeParams === 'function'
+            ? shared.summarizeParams
+            : (params) => JSON.stringify(params || {});
+        const formatTimestamp = typeof shared.formatTimestamp === 'function'
+            ? shared.formatTimestamp
+            : (value) => String(value ?? '-');
 
-function refreshHistorySidebar() {
-    window.updateHistoryList?.();
-}
+        let modal = null;
+        let modalBody = null;
 
-async function renderCacheList() {
-    if (!cacheModalBody) return;
-    cacheModalBody.innerHTML = '<p class="cache-empty">Loading...</p>';
-    let res;
-    try {
-        if (!window.electronAPI?.listCache) {
-            throw new Error('Electron preload bridge is unavailable.');
+        function showAlert(message, title = 'Attention') {
+            const alertFn = state.dependencies?.showAlert;
+            if (typeof alertFn === 'function') {
+                return alertFn(message, title);
+            }
+
+            console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
+            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
+            return Promise.resolve(false);
         }
-        res = await window.electronAPI.listCache();
-    } catch (error) {
-        cacheModalBody.innerHTML = `<p class="cache-empty">Failed to load cache: ${modalEscapeHtml(error.message || String(error))}</p>`;
-        return;
-    }
-    if (!res.success || res.entries.length === 0) {
-        const message = res.success
-            ? 'No cached searches found.'
-            : `Failed to load cache: ${modalEscapeHtml(res.error || 'Unknown error')}`;
-        cacheModalBody.innerHTML = `<p class="cache-empty">${message}</p>`;
-        return;
-    }
 
-    let html = `<table class="cache-table">
-        <thead><tr><th>Search Parameters</th><th>Results</th><th>Cached</th><th></th></tr></thead>
-        <tbody>`;
-    
-    for (const entry of res.entries) {
-        const summary = summarizeHistoryParams(entry.params);
-        html += `<tr data-key="${entry.key}">
-            <td class="cache-table-summary-cell" title="${modalEscapeHtml(summary)}">${modalEscapeHtml(summary)}</td>
-            <td>${entry.resultCount}</td>
-            <td class="cache-table-timestamp-cell">${modalEscapeHtml(formatHistoryTimestamp(entry.timestamp))}</td>
-            <td><button class="btn-sm btn-danger cache-delete-btn" data-key="${modalEscapeHtml(entry.key)}">Delete</button></td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
-    cacheModalBody.innerHTML = html;
+        async function showConfirm(message, title = 'Confirmation') {
+            const confirmFn = state.dependencies?.showConfirm;
+            if (typeof confirmFn === 'function') {
+                return await confirmFn(message, title);
+            }
 
-    // Bind delete buttons
-    cacheModalBody.querySelectorAll('.cache-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const key = btn.dataset.key;
-            const result = await window.electronAPI.deleteCacheEntry(key);
-            if (!result?.success) {
-                await showAlert(result?.error || 'Failed to delete cache entry.', 'Cache Error');
+            console.error('[Renderer Dependency Missing] showConfirm is unavailable.', { title, message });
+            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
+            return false;
+        }
+
+        function closeModal() {
+            modal?.classList.remove('active');
+        }
+
+        function refreshHistorySidebar() {
+            app.history?.updateHistoryList?.();
+        }
+
+        async function renderCacheList() {
+            if (!modalBody) return;
+            modalBody.innerHTML = '<p class="cache-empty">Loading...</p>';
+
+            let response;
+            try {
+                if (!state.electronBridge?.listCache) {
+                    throw new Error('Electron preload bridge is unavailable.');
+                }
+                response = await state.electronBridge.listCache();
+            } catch (error) {
+                modalBody.innerHTML = `<p class="cache-empty">Failed to load cache: ${escapeHtml(error.message || String(error))}</p>`;
                 return;
             }
-            refreshHistorySidebar();
-            renderCacheList();
-        });
-    });
-}
 
-function initializeCacheModal() {
-    cacheModal = document.getElementById('cacheModal');
-    cacheModalBody = document.getElementById('cacheModalBody');
-    const closeBtn = document.getElementById('cacheModalClose');
-    const doneBtn = document.getElementById('cacheModalDone');
-    const manageBtn = document.getElementById('manageCacheBtn');
-    const clearAllBtn = document.getElementById('clearAllCacheBtn');
+            if (!response.success || response.entries.length === 0) {
+                const message = response.success
+                    ? 'No cached searches found.'
+                    : `Failed to load cache: ${escapeHtml(response.error || 'Unknown error')}`;
+                modalBody.innerHTML = `<p class="cache-empty">${message}</p>`;
+                return;
+            }
 
-    if (!cacheModal || !cacheModalBody || !closeBtn || !doneBtn || !manageBtn || !clearAllBtn) {
-        console.warn('[Cache Modal] Missing DOM nodes. Cache modal boot skipped.');
-        return;
-    }
+            let html = `<table class="cache-table">
+        <thead><tr><th>Search Parameters</th><th>Results</th><th>Cached</th><th></th></tr></thead>
+        <tbody>`;
 
-    closeBtn.addEventListener('click', closeModal);
-    doneBtn.addEventListener('click', closeModal);
-    cacheModal.addEventListener('click', (e) => {
-        if (e.target === cacheModal) {
-            closeModal();
-        }
-    });
+            for (const entry of response.entries) {
+                const summary = summarizeParams(entry.params);
+                html += `<tr data-key="${entry.key}">
+            <td class="cache-table-summary-cell" title="${escapeHtml(summary)}">${escapeHtml(summary)}</td>
+            <td>${entry.resultCount}</td>
+            <td class="cache-table-timestamp-cell">${escapeHtml(formatTimestamp(entry.timestamp))}</td>
+            <td><button class="btn-sm btn-danger cache-delete-btn" data-key="${escapeHtml(entry.key)}">Delete</button></td>
+        </tr>`;
+            }
+            html += '</tbody></table>';
+            modalBody.innerHTML = html;
 
-    manageBtn.addEventListener('click', () => {
-        cacheModal.classList.add('active');
-        renderCacheList();
-    });
-
-    clearAllBtn.addEventListener('click', async () => {
-        const confirmed = await showConfirm('Are you sure you want to delete all cached search results? This action cannot be undone.', 'Clear All Cache');
-        if (!confirmed) return;
-
-        if (!window.electronAPI?.clearAllCache) {
-            await showAlert('Electron preload bridge is unavailable.', 'Cache Error');
-            return;
+            modalBody.querySelectorAll('.cache-delete-btn').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const key = button.dataset.key;
+                    const result = await state.electronBridge?.deleteCacheEntry?.(key);
+                    if (!result?.success) {
+                        await showAlert(result?.error || 'Failed to delete cache entry.', 'Cache Error');
+                        return;
+                    }
+                    refreshHistorySidebar();
+                    await renderCacheList();
+                });
+            });
         }
 
-        const result = await window.electronAPI.clearAllCache();
-        if (!result?.success) {
-            await showAlert(result?.error || 'Failed to clear cache.', 'Cache Error');
-            return;
+        function bindModalListeners() {
+            const closeButton = document.getElementById('cacheModalClose');
+            const doneButton = document.getElementById('cacheModalDone');
+            const manageButton = document.getElementById('manageCacheBtn');
+            const clearAllButton = document.getElementById('clearAllCacheBtn');
+
+            if (!modal || !modalBody || !closeButton || !doneButton || !manageButton || !clearAllButton) {
+                console.warn('[Cache Modal] Missing DOM nodes. Cache modal boot skipped.');
+                return false;
+            }
+
+            closeButton.addEventListener('click', closeModal);
+            doneButton.addEventListener('click', closeModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            manageButton.addEventListener('click', () => {
+                modal.classList.add('active');
+                void renderCacheList();
+            });
+
+            clearAllButton.addEventListener('click', async () => {
+                const confirmed = await showConfirm(
+                    'Are you sure you want to delete all cached search results? This action cannot be undone.',
+                    'Clear All Cache'
+                );
+                if (!confirmed) {
+                    return;
+                }
+
+                if (!state.electronBridge?.clearAllCache) {
+                    await showAlert('Electron preload bridge is unavailable.', 'Cache Error');
+                    return;
+                }
+
+                const result = await state.electronBridge.clearAllCache();
+                if (!result?.success) {
+                    await showAlert(result?.error || 'Failed to clear cache.', 'Cache Error');
+                    return;
+                }
+
+                refreshHistorySidebar();
+                await renderCacheList();
+            });
+
+            return true;
         }
-        refreshHistorySidebar();
-        renderCacheList();
-    });
-}
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeCacheModal, { once: true });
-} else {
-    initializeCacheModal();
-}
+        function start() {
+            modal = document.getElementById('cacheModal');
+            modalBody = document.getElementById('cacheModalBody');
 
-// Export to window
-window.renderCacheList = renderCacheList;
+            if (!bindModalListeners()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return {
+            start,
+            renderCacheList
+        };
+    };
+})();

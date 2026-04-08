@@ -77,6 +77,10 @@ describe('renderer data controller', () => {
         const app = {
             state: {
                 selectors: {},
+                dependencies: {
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+                    showAlert: (message) => alerts.push(message)
+                },
                 hasElectronAPI: true,
                 electronBridge: {
                     fetchData: async () => ({ success: false, error: 'No network' })
@@ -150,6 +154,10 @@ describe('renderer data controller', () => {
         const app = {
             state: {
                 selectors: {},
+                dependencies: {
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+                    showAlert: () => {}
+                },
                 hasElectronAPI: true,
                 electronBridge: {
                     fetchData: async () => ({
@@ -246,6 +254,100 @@ describe('renderer data controller', () => {
         assert.equal(app.state.activeData.unitMap.has('MissFortune'), true);
     });
 
+    it('fails gracefully when setupMultiSelect dependency is missing', async () => {
+        const statusMessages = [];
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        formatSnapshotAge: () => ''
+                    }
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const app = {
+            state: {
+                selectors: {},
+                dependencies: {
+                    setupMultiSelect: null,
+                    showAlert: () => {}
+                },
+                hasElectronAPI: true,
+                electronBridge: {
+                    fetchData: async () => ({
+                        success: true,
+                        dataSource: 'pbe',
+                        setNumber: '17',
+                        dataFingerprint: 'abc12345',
+                        snapshotFetchedAt: Date.now(),
+                        usedCachedSnapshot: true,
+                        count: 1,
+                        units: [
+                            {
+                                id: 'MissFortune',
+                                displayName: 'Miss Fortune',
+                                variants: [{ id: 'conduit', label: 'Conduit' }]
+                            }
+                        ],
+                        traits: ['Conduit'],
+                        roles: ['Carry'],
+                        traitBreakpoints: { Conduit: [2] },
+                        traitIcons: {},
+                        assetValidation: null,
+                        hashMap: {}
+                    })
+                },
+                activeData: null,
+                lastSearchParams: null
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: () => 'PBE',
+                getCurrentVariantLocks: () => ({}),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {},
+                setStatusMessage: (message) => statusMessages.push(message),
+                summarizeAssetValidation: () => '',
+                setDataStats: () => {},
+                renderQuerySummary: () => {},
+                getAssetCoverageLabel: () => 'N/A',
+                renderVariantLockControls: () => {},
+                applyDefaultRoleFilters: () => {},
+                bindDraftQueryListeners: () => {},
+                refreshDraftQuerySummary: () => {},
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
+            },
+            history: {
+                updateHistoryList: () => {}
+            }
+        };
+
+        const controller = createDataController(app);
+        await assert.doesNotReject(controller.fetchData());
+
+        assert.equal(app.state.activeData.unitMap.has('MissFortune'), true);
+        assert.equal(Object.keys(app.state.selectors).length, 0);
+        assert.equal(statusMessages.at(-1), 'Renderer dependency mismatch: selector controls unavailable.');
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {
@@ -268,6 +370,10 @@ describe('renderer data controller', () => {
         const app = {
             state: {
                 selectors: {},
+                dependencies: {
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+                    showAlert: () => {}
+                },
                 hasElectronAPI: true,
                 currentResults: [{ units: ['OldBoard'] }],
                 currentResultsFingerprint: 'old-fingerprint',
@@ -416,6 +522,10 @@ describe('renderer data controller', () => {
         const app = {
             state: {
                 selectors: {},
+                dependencies: {
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+                    showAlert: () => {}
+                },
                 hasElectronAPI: true,
                 currentResults: [{ units: ['OldBoard'] }],
                 currentResultsFingerprint: 'old-fingerprint',
@@ -565,6 +675,10 @@ describe('renderer data controller', () => {
         const app = {
             state: {
                 selectors: {},
+                dependencies: {
+                    setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
+                    showAlert: () => {}
+                },
                 hasElectronAPI: true,
                 nextDataFetchRequestId: 0,
                 activeDataFetchRequestId: 0,

@@ -5,6 +5,17 @@
     ns.createHistoryUi = function createHistoryUi(app) {
         const { state } = app;
 
+        function showAlert(message, title = 'Attention') {
+            const alertFn = state.dependencies?.showAlert;
+            if (typeof alertFn === 'function') {
+                return alertFn(message, title);
+            }
+
+            console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
+            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
+            return Promise.resolve(false);
+        }
+
         async function updateHistoryList() {
             const listEl = document.getElementById('historyList');
             if (!listEl) return;
@@ -54,7 +65,7 @@
 
         async function loadSearchFromHistory(entry) {
             if (state.isSearching || state.isFetchingData) {
-                showAlert('Wait for current search to finish or cancel it.');
+                void showAlert('Wait for current search to finish or cancel it.');
                 return;
             }
 
@@ -82,8 +93,6 @@
                 }
             }
         }
-
-        window.updateHistoryList = updateHistoryList;
 
         return {
             updateHistoryList,

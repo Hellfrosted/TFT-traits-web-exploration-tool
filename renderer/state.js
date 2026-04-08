@@ -4,6 +4,8 @@
     ns.createState = function createState() {
         const electronBridge = window.electronAPI;
         const roleDefaultsApi = window.roleDefaults || {};
+        const rendererComponents = ns.components || {};
+        const rendererDialog = ns.dialog || {};
 
         return {
             selectors: {},
@@ -23,6 +25,17 @@
             variantLockControls: new Map(),
             electronBridge,
             hasElectronAPI: !!electronBridge,
+            dependencies: {
+                setupMultiSelect: typeof rendererComponents.setupMultiSelect === 'function'
+                    ? rendererComponents.setupMultiSelect
+                    : null,
+                showAlert: typeof rendererDialog.showAlert === 'function'
+                    ? rendererDialog.showAlert
+                    : null,
+                showConfirm: typeof rendererDialog.showConfirm === 'function'
+                    ? rendererDialog.showConfirm
+                    : null
+            },
             searchLimits: electronBridge?.limits || {},
             defaultDataSource: electronBridge?.defaultDataSource || 'pbe',
             flags: {

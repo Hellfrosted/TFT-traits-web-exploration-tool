@@ -5,6 +5,38 @@
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
         let hasReportedShellMismatch = false;
+        let hasReportedMissingDialogDependencies = false;
+
+        function reportMissingDialogDependencies() {
+            if (hasReportedMissingDialogDependencies) {
+                return;
+            }
+
+            hasReportedMissingDialogDependencies = true;
+            console.error('[Renderer Dependency Missing] Dialog helpers are unavailable.');
+            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
+            app.queryUi.renderQuerySummary(state.lastSearchParams || null, 'Dependency mismatch');
+        }
+
+        function showAlert(message, title = 'Attention') {
+            const alertFn = state.dependencies?.showAlert;
+            if (typeof alertFn === 'function') {
+                return alertFn(message, title);
+            }
+
+            reportMissingDialogDependencies();
+            return Promise.resolve(false);
+        }
+
+        async function showConfirm(message, title = 'Confirmation') {
+            const confirmFn = state.dependencies?.showConfirm;
+            if (typeof confirmFn === 'function') {
+                return await confirmFn(message, title);
+            }
+
+            reportMissingDialogDependencies();
+            return false;
+        }
 
         function normalizeSearchProgress(progress = null) {
             if (Number.isFinite(progress)) {
@@ -300,7 +332,7 @@
                     const errorMessage = response.error || 'Search failed unexpectedly.';
                     state.currentResults = [];
                     app.queryUi.setStatusMessage(`Search Error: ${errorMessage}`);
-                    showAlert(errorMessage, 'Search Failed');
+                    void showAlert(errorMessage, 'Search Failed');
                     app.results.renderEmptySummary('Search error');
                     app.queryUi.renderQuerySummary(params, `Error: ${errorMessage}`);
                     tbody.innerHTML = app.results.renderResultsMessageRow(errorMessage, 'results-message-row results-message-row-error');
@@ -339,7 +371,7 @@
             } catch (error) {
                 console.error(error);
                 app.queryUi.setStatusMessage('Search failed unexpectedly.');
-                showAlert(error.message || String(error), 'Search Failed');
+                void showAlert(error.message || String(error), 'Search Failed');
                 app.results.renderEmptySummary('Search error');
                 app.queryUi.renderQuerySummary(state.lastSearchParams, `Unexpected failure: ${error.message || String(error)}`);
                 tbody.innerHTML = app.results.renderResultsMessageRow('Search failed unexpectedly.', 'results-message-row results-message-row-error');

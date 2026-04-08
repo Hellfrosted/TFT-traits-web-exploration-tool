@@ -71,7 +71,7 @@ function loadMultiSelect(sandbox) {
     );
 
     vm.runInNewContext(source, sandbox, { filename: 'components/multiSelect.js' });
-    return sandbox.window.setupMultiSelect;
+    return sandbox.window.TFTRenderer?.components?.setupMultiSelect;
 }
 
 describe('multiSelect component', () => {

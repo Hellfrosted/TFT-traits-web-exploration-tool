@@ -4,6 +4,22 @@
 
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
+        let hasReportedMissingDialogDependency = false;
+
+        function showAlert(message, title = 'Attention') {
+            const alertFn = state.dependencies?.showAlert;
+            if (typeof alertFn === 'function') {
+                return alertFn(message, title);
+            }
+
+            if (!hasReportedMissingDialogDependency) {
+                hasReportedMissingDialogDependency = true;
+                console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
+                app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
+            }
+
+            return Promise.resolve(false);
+        }
 
         function publishRendererReadyState(isReady) {
             const root = document.documentElement;
@@ -77,6 +93,14 @@
 
         function initializeUiShell() {
             if (state.listeners.uiInitialized) return true;
+
+            if (typeof state.dependencies?.showAlert !== 'function') {
+                console.error('[Renderer Dependency Missing] Missing required dialog helper: showAlert.');
+                app.queryUi.setStatusMessage('Renderer dependency mismatch: missing required dialog helper (showAlert).');
+                publishRendererReadyState(false);
+                return false;
+            }
+
             const missingIds = getMissingRequiredShellIds();
             if (missingIds.length > 0) {
                 console.error('[Renderer Shell Incomplete] Missing required shell nodes:', missingIds);
@@ -135,19 +159,19 @@
             window.onerror = (message, source, lineno, colno, error) => {
                 console.error('[Browser Error]', message, source, lineno, error);
                 app.queryUi.setStatusMessage(`Renderer error: ${message}`);
-                showAlert(`Uncaught UI Exception: ${message}`, 'Application Error');
+                void showAlert(`Uncaught UI Exception: ${message}`, 'Application Error');
                 return true;
             };
 
             window.addEventListener('unhandledrejection', (event) => {
                 console.error('[Unhandled Rejection]', event.reason);
                 app.queryUi.setStatusMessage(`Async error: ${event.reason?.message || event.reason}`);
-                showAlert(`Async Exception: ${event.reason}`, 'Application Error');
+                void showAlert(`Async Exception: ${event.reason}`, 'Application Error');
             });
 
             if (state.electronBridge?.onMainProcessError) {
                 const dispose = state.electronBridge.onMainProcessError((data) => {
-                    showAlert(data.message, 'Backend Error');
+                    void showAlert(data.message, 'Backend Error');
                 });
                 if (typeof dispose === 'function') {
                     state.cleanupFns.push(dispose);

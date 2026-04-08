@@ -22,7 +22,6 @@ describe('renderer history UI', () => {
         const resolvedHashMaps = [];
         const sandbox = {
             console,
-            showAlert: () => {},
             document: {
                 getElementById: (id) => {
                     if (id === 'searchBtn') {
@@ -51,6 +50,9 @@ describe('renderer history UI', () => {
             state: {
                 isSearching: false,
                 isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                },
                 activeData: {
                     hashMap: { Carry: 'Carry' }
                 },
@@ -109,7 +111,6 @@ describe('renderer history UI', () => {
         const appliedParams = [];
         const sandbox = {
             console,
-            showAlert: () => {},
             document: {
                 getElementById: (id) => {
                     if (id === 'searchBtn') {
@@ -138,6 +139,9 @@ describe('renderer history UI', () => {
             state: {
                 isSearching: false,
                 isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                },
                 activeData: null,
                 selectors: {}
             },

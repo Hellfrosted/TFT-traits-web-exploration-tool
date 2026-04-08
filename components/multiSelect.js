@@ -1,13 +1,17 @@
 // --- Multi-select Component ---
 
-/**
- * Set up a multi-select dropdown with pill/tag UI for a given container.
- * @param {string} containerId - DOM ID of the `.multi-select-container` wrapper
- * @param {Array} options - Available options (unit objects or trait name strings)
- * @param {boolean} [isUnit=true] - Whether options are unit objects (true) or plain strings (false)
- * @returns {{getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
- */
-function setupMultiSelect(containerId, options, isUnit = true) {
+(function initializeMultiSelectComponent() {
+    const ns = window.TFTRenderer = window.TFTRenderer || {};
+    const componentsNs = ns.components = ns.components || {};
+
+    /**
+     * Set up a multi-select dropdown with pill/tag UI for a given container.
+     * @param {string} containerId - DOM ID of the `.multi-select-container` wrapper
+     * @param {Array} options - Available options (unit objects or trait name strings)
+     * @param {boolean} [isUnit=true] - Whether options are unit objects (true) or plain strings (false)
+     * @returns {{getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
+     */
+    function setupMultiSelect(containerId, options, isUnit = true) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.warn(`MultiSelect container not found: ${containerId}`);
@@ -324,8 +328,9 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         }
     };
 
-    container._multiSelectController = api;
-    return api;
-}
+        container._multiSelectController = api;
+        return api;
+    }
 
-window.setupMultiSelect = setupMultiSelect;
+    componentsNs.setupMultiSelect = setupMultiSelect;
+})();

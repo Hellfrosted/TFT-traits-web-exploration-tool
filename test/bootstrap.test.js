@@ -14,7 +14,8 @@ function loadBootstrapFactory(sandbox) {
     return sandbox.window.TFTRenderer.createBootstrap;
 }
 
-function createBootstrapHarness(missingIds = ['searchBtn']) {
+function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
+    const includeAlertDependency = options.includeAlertDependency ?? true;
     const statusMessages = [];
     const dispatchedEvents = [];
     const errorLogs = [];
@@ -45,8 +46,7 @@ function createBootstrapHarness(missingIds = ['searchBtn']) {
             this.type = type;
             this.detail = init?.detail;
         },
-        setTimeout: () => 0,
-        showAlert: () => {}
+        setTimeout: () => 0
     };
 
     const createBootstrap = loadBootstrapFactory(sandbox);
@@ -60,6 +60,10 @@ function createBootstrapHarness(missingIds = ['searchBtn']) {
                 bootScheduled: false,
                 uiInitialized: false,
                 bootStarted: false
+            },
+            dependencies: {
+                showAlert: includeAlertDependency ? () => {} : null,
+                showConfirm: async () => true
             },
             flags: {
                 smokeTest: false
@@ -138,5 +142,18 @@ describe('renderer bootstrap', () => {
             subscribeCalls: 1,
             fetchCalls: 0
         });
+    });
+
+    it('blocks initialization when required dialog dependencies are missing', () => {
+        const { bootstrap, statusMessages, errorLogs } = createBootstrapHarness([], {
+            includeAlertDependency: false
+        });
+
+        assert.equal(bootstrap.initializeUiShell(), false);
+        assert.equal(
+            statusMessages.at(-1),
+            'Renderer dependency mismatch: missing required dialog helper (showAlert).'
+        );
+        assert.equal(errorLogs.length, 1);
     });
 });
