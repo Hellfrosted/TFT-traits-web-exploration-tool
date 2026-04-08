@@ -213,7 +213,13 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         pillsContainer.innerHTML = '';
         normalizeValues(values).forEach((value) => addPill(value, { emit: false }));
         emitChange();
-        renderDropdown(input.value);
+        const shouldRefreshVisibleDropdown = document.activeElement === input && input.value.trim().length > 0;
+        if (shouldRefreshVisibleDropdown) {
+            renderDropdown(input.value);
+            return;
+        }
+
+        dropdown.classList.add('hidden');
     }
 
     input.addEventListener('focus', () => renderDropdown(input.value), { signal });
