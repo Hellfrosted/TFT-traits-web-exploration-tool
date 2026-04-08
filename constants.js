@@ -17,6 +17,10 @@ const NETWORK = {
     MAX_RETRIES: 3,
     RETRY_BASE_DELAY_MS: 1000,
     FETCH_TIMEOUT_MS: 15000,
+    MAX_RESPONSE_BYTES_BY_TYPE: {
+        json: 20 * 1024 * 1024,
+        text: 5 * 1024 * 1024
+    },
     DATA_CACHE_TTL_MS_BY_SOURCE: {
         [DATA_SOURCES.LIVE]: 13 * 24 * 60 * 60 * 1000
     },

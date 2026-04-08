@@ -3,6 +3,57 @@ const assert = require('node:assert/strict');
 const DataEngine = require('../data.js');
 const { NETWORK } = require('../constants.js');
 
+function createHeaders(headerMap = {}) {
+    const normalized = Object.fromEntries(
+        Object.entries(headerMap).map(([key, value]) => [String(key).toLowerCase(), value])
+    );
+
+    return {
+        get(name) {
+            return normalized[String(name).toLowerCase()] ?? null;
+        }
+    };
+}
+
+function createStreamingResponse(chunks, options = {}) {
+    const encoder = new TextEncoder();
+    const encodedChunks = chunks.map((chunk) => chunk instanceof Uint8Array ? chunk : encoder.encode(chunk));
+    let index = 0;
+    let cancelCount = 0;
+
+    return {
+        response: {
+            ok: true,
+            headers: createHeaders(options.headers),
+            body: {
+                getReader() {
+                    return {
+                        async read() {
+                            if (index >= encodedChunks.length) {
+                                return { done: true, value: undefined };
+                            }
+
+                            const value = encodedChunks[index];
+                            index += 1;
+                            return { done: false, value };
+                        },
+                        async cancel() {
+                            cancelCount += 1;
+                        },
+                        releaseLock() {}
+                    };
+                }
+            },
+            text: async () => {
+                throw new Error('stream response should not fall back to text()');
+            }
+        },
+        getCancelCount() {
+            return cancelCount;
+        }
+    };
+}
+
 function createCustomSetOverrides(unitOverrides = {}) {
     return {
         excludedUnitPatterns: [],
@@ -275,6 +326,87 @@ describe('DataEngine.fetchAndParse', () => {
 });
 
 describe('DataEngine._fetchWithRetry', () => {
+    it('rejects oversized Content-Length values before reading the body', async () => {
+        let fetchCalls = 0;
+        let readerRequested = false;
+        const jsonLimit = NETWORK.MAX_RESPONSE_BYTES_BY_TYPE.json;
+
+        const fetchOversizedHeader = async () => {
+            fetchCalls += 1;
+            return {
+                ok: true,
+                headers: createHeaders({
+                    'content-length': String(jsonLimit + 1)
+                }),
+                body: {
+                    getReader() {
+                        readerRequested = true;
+                        throw new Error('body reader should not be requested');
+                    }
+                },
+                text: async () => {
+                    throw new Error('text() should not be called');
+                }
+            };
+        };
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/too-large.json', 'json', fetchOversizedHeader, NETWORK),
+            /Response too large for json/i
+        );
+
+        assert.equal(fetchCalls, 1);
+        assert.equal(readerRequested, false);
+    });
+
+    it('rejects streamed responses that cross the size limit and does not retry', async () => {
+        let fetchCalls = 0;
+        const streamedResponse = createStreamingResponse(['abcd', 'efgh']);
+
+        const fetchOversizedStream = async () => {
+            fetchCalls += 1;
+            return streamedResponse.response;
+        };
+
+        await assert.rejects(
+            DataEngine._fetchWithRetry('https://example.com/too-large.txt', 'text', fetchOversizedStream, {
+                MAX_RETRIES: 3,
+                RETRY_BASE_DELAY_MS: 1,
+                FETCH_TIMEOUT_MS: 50,
+                MAX_RESPONSE_BYTES_BY_TYPE: {
+                    text: 6
+                }
+            }),
+            /Response too large for text/i
+        );
+
+        assert.equal(fetchCalls, 1);
+        assert.equal(streamedResponse.getCancelCount(), 1);
+    });
+
+    it('keeps normal JSON and text responses working with bounded reads', async () => {
+        const fetchJson = async () => createStreamingResponse(['{"ok":', 'true}'], {
+            headers: {
+                'content-length': '11'
+            }
+        }).response;
+
+        const fetchText = async () => ({
+            ok: true,
+            headers: createHeaders({
+                'content-length': '5'
+            }),
+            body: null,
+            text: async () => 'hello'
+        });
+
+        const jsonResult = await DataEngine._fetchWithRetry('https://example.com/data.json', 'json', fetchJson, NETWORK);
+        const textResult = await DataEngine._fetchWithRetry('https://example.com/data.txt', 'text', fetchText, NETWORK);
+
+        assert.deepEqual(jsonResult, { ok: true });
+        assert.equal(textResult, 'hello');
+    });
+
     it('times out stalled requests and retries per-attempt with AbortController', async () => {
         let fetchCalls = 0;
         const stalledFetch = async (_url, { signal }) => await new Promise((_resolve, reject) => {
@@ -312,8 +444,11 @@ describe('DataEngine._fetchWithRetry', () => {
             }
             return {
                 ok: true,
-                json: async () => ({ ok: true }),
-                text: async () => 'ok'
+                headers: createHeaders({
+                    'content-length': '11'
+                }),
+                body: null,
+                text: async () => '{"ok":true}'
             };
         };
 
