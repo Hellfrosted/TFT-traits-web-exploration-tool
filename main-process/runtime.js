@@ -125,15 +125,27 @@ function createMainRuntime(options = {}) {
         const hasLiveMainWindow = !!mainWindow
             && (typeof mainWindow.isDestroyed !== 'function' || !mainWindow.isDestroyed());
         const sender = event?.sender;
-        const senderFrame = event?.senderFrame;
+        const senderFrame = event?.senderFrame || sender?.mainFrame || null;
+        const expectedWebContents = mainWindow?.webContents;
+        const senderMatchesMainWindow = !!sender
+            && !!expectedWebContents
+            && (
+                sender === expectedWebContents
+                || (
+                    Number.isInteger(sender.id)
+                    && Number.isInteger(expectedWebContents.id)
+                    && sender.id === expectedWebContents.id
+                )
+            );
+        const isMainFrame = senderFrame?.isMainFrame !== false;
         const senderUrl = typeof senderFrame?.url === 'string' && senderFrame.url
             ? senderFrame.url
             : sender?.getURL?.();
 
         if (
             !hasLiveMainWindow
-            || sender !== mainWindow.webContents
-            || senderFrame?.isMainFrame !== true
+            || !senderMatchesMainWindow
+            || !isMainFrame
             || typeof senderUrl !== 'string'
             || !senderUrl.startsWith('file://')
         ) {

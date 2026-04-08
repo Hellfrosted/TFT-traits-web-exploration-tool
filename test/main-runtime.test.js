@@ -51,6 +51,7 @@ class FakeIpcMain {
 
 function createMainWindowStub({ url = 'file:///index.html', destroyed = false } = {}) {
     const webContents = {
+        id: 101,
         getURL: () => url
     };
 
@@ -247,6 +248,29 @@ describe('main runtime', () => {
 
         const handler = fakeIpcMain.handlers.get('get-search-estimate');
         const result = await handler(createInvokeEvent(), { boardSize: 9 });
+
+        assert.deepEqual(result, { count: 0, remainingSlots: 0 });
+        assert.equal(serviceCalls.getSearchEstimate, 1);
+    });
+
+    it('accepts a sender wrapper with the same webContents id when the frame metadata falls back to mainFrame', async () => {
+        const { runtime, fakeIpcMain, serviceCalls } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('get-search-estimate');
+        const sender = {
+            id: 101,
+            getURL: () => 'file:///index.html',
+            mainFrame: {
+                isMainFrame: true,
+                url: 'file:///index.html'
+            }
+        };
+
+        const result = await handler({
+            sender,
+            senderFrame: undefined
+        }, { boardSize: 9 });
 
         assert.deepEqual(result, { count: 0, remainingSlots: 0 });
         assert.equal(serviceCalls.getSearchEstimate, 1);
