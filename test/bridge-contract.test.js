@@ -13,6 +13,7 @@ function loadPreloadBridge() {
         'utf8'
     );
     let exposedApi = null;
+    const invokeCalls = [];
     const sandbox = {
         process: {
             argv: []
@@ -26,7 +27,10 @@ function loadPreloadBridge() {
                         }
                     },
                     ipcRenderer: {
-                        invoke: () => {},
+                        invoke: (...args) => {
+                            invokeCalls.push(args);
+                            return Promise.resolve();
+                        },
                         on: () => {},
                         removeListener: () => {}
                     }
@@ -40,7 +44,10 @@ function loadPreloadBridge() {
     };
 
     vm.runInNewContext(source, sandbox, { filename: 'preload.js' });
-    return exposedApi;
+    return {
+        preloadBridge: exposedApi,
+        invokeCalls
+    };
 }
 
 function toPlainData(value) {
@@ -58,11 +65,20 @@ describe('shared bridge contract', () => {
     });
 
     it('keeps the self-contained preload bridge aligned with the shared contract', () => {
-        const preloadBridge = loadPreloadBridge();
+        const { preloadBridge, invokeCalls } = loadPreloadBridge();
 
         assert.deepEqual(toPlainData(preloadBridge.dataSources), bridgeContract.DATA_SOURCES);
         assert.equal(preloadBridge.defaultDataSource, bridgeContract.DEFAULT_DATA_SOURCE);
         assert.deepEqual(toPlainData(preloadBridge.limits), bridgeContract.LIMITS);
         assert.deepEqual(toPlainData(preloadBridge.rendererContract), bridgeContract.RENDERER_CONTRACT);
+        assert.equal(typeof preloadBridge.normalizeSearchParams, 'function');
+        assert.equal(
+            bridgeContract.RENDERER_CONTRACT.requiredBridgeMethods.includes('normalizeSearchParams'),
+            true
+        );
+
+        preloadBridge.normalizeSearchParams({ boardSize: 9 });
+        assert.equal(invokeCalls.length, 1);
+        assert.deepEqual(invokeCalls[0], [bridgeContract.IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, { boardSize: 9 }]);
     });
 });

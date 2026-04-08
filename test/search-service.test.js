@@ -75,10 +75,20 @@ async function waitForWorker(count = 1) {
 
 function createCacheService({ cachedResults = null, readCacheImpl = null } = {}) {
     const writes = [];
+    const cacheKeyParams = [];
+    const preparedContextParams = [];
     return {
         writes,
-        getCacheKey: () => 'cache-key',
-        getPreparedSearchContext: () => ({ preparedContext: { prepared: true } }),
+        cacheKeyParams,
+        preparedContextParams,
+        getCacheKey: (_dataFingerprint, params) => {
+            cacheKeyParams.push(params);
+            return 'cache-key';
+        },
+        getPreparedSearchContext: (_dataCache, params) => {
+            preparedContextParams.push(params);
+            return { preparedContext: { prepared: true } };
+        },
         readCache: readCacheImpl || (async () => cachedResults),
         writeCache: async (...args) => {
             writes.push(args);
@@ -91,11 +101,21 @@ function createCacheService({ cachedResults = null, readCacheImpl = null } = {})
 function createSearchServiceUnderTest(options = {}) {
     const cacheService = createCacheService(options);
     const progressMessages = [];
+    const getDataCache = options.getDataCache || (() => ({
+        dataFingerprint: 'fingerprint-1',
+        units: []
+    }));
+    const normalizeSearchParams = options.normalizeSearchParams || ((params) => ({ ...params }));
+    const normalizeSearchParamsForData = options.normalizeSearchParamsForData || ((params) => ({ ...params }));
+    const serializeSearchParams = options.serializeSearchParams || ((params) => JSON.stringify(params));
+    const engine = options.engine || {
+        getCombinationCount: () => ({ count: 25, remainingSlots: 2 })
+    };
     const searchService = createSearchService({
-        engine: {
-            getCombinationCount: () => ({ count: 25, remainingSlots: 2 })
-        },
-        normalizeSearchParams: (params) => ({ ...params }),
+        engine,
+        normalizeSearchParams,
+        normalizeSearchParamsForData,
+        serializeSearchParams,
         cacheService,
         Worker: FakeWorker,
         workerPath: 'worker.js',
@@ -110,10 +130,7 @@ function createSearchServiceUnderTest(options = {}) {
                 }
             }
         }),
-        getDataCache: () => ({
-            dataFingerprint: 'fingerprint-1',
-            units: []
-        })
+        getDataCache
     });
 
     return {
@@ -124,6 +141,74 @@ function createSearchServiceUnderTest(options = {}) {
 }
 
 describe('main-process search service', () => {
+    it('uses dataset-aware canonical params for estimates and worker searches', async () => {
+        resetWorkers();
+        const canonicalParams = {
+            boardSize: 9,
+            maxResults: 50,
+            mustInclude: ['KnownUnit'],
+            mustExclude: [],
+            mustIncludeTraits: ['KnownTrait'],
+            mustExcludeTraits: [],
+            tankRoles: ['Tank'],
+            carryRoles: ['Carry'],
+            extraEmblems: [],
+            variantLocks: { KnownUnit: 'known-mode' },
+            onlyActive: true,
+            tierRank: true,
+            includeUnique: false
+        };
+        const { searchService, cacheService } = createSearchServiceUnderTest({
+            normalizeSearchParamsForData: () => canonicalParams
+        });
+
+        const estimate = await searchService.getSearchEstimate({
+            mustInclude: ['UnknownUnit']
+        });
+        assert.deepEqual(estimate, { count: 25, remainingSlots: 2 });
+        assert.deepEqual(cacheService.cacheKeyParams[0], canonicalParams);
+        assert.deepEqual(cacheService.preparedContextParams[0], canonicalParams);
+
+        const pendingSearch = searchService.searchBoards({
+            mustInclude: ['UnknownUnit']
+        });
+        const worker = await waitForWorker();
+        assert.deepEqual(worker.options.workerData.params, canonicalParams);
+        worker.emit('message', {
+            type: 'done',
+            success: true,
+            results: [{ units: ['A'] }]
+        });
+        const searchResponse = await pendingSearch;
+        assert.equal(searchResponse.success, true);
+    });
+
+    it('returns normalized payload metadata for renderer-side query comparison', () => {
+        const canonicalParams = {
+            boardSize: 9,
+            maxResults: 500
+        };
+        const { searchService } = createSearchServiceUnderTest({
+            normalizeSearchParamsForData: () => canonicalParams,
+            serializeSearchParams: () => '{"boardSize":9,"maxResults":500}',
+            getDataCache: () => ({
+                dataFingerprint: 'fingerprint-9',
+                units: []
+            })
+        });
+
+        const payload = searchService.normalizePayload({
+            boardSize: '9',
+            maxResults: '500'
+        });
+
+        assert.deepEqual(payload, {
+            params: canonicalParams,
+            comparisonKey: '{"boardSize":9,"maxResults":500}',
+            dataFingerprint: 'fingerprint-9'
+        });
+    });
+
     it('returns cached results without starting a worker', async () => {
         resetWorkers();
         const { searchService, cacheService } = createSearchServiceUnderTest({

@@ -72,11 +72,13 @@ function createRuntimeUnderTest(options = {}) {
     const serviceCalls = {
         fetchData: 0,
         getSearchEstimate: 0,
+        normalizeSearchParams: 0,
         searchBoards: 0,
         cancelSearch: 0,
         listCacheEntries: 0,
         deleteCacheEntry: 0,
-        clearAllCache: 0
+        clearAllCache: 0,
+        migrateCanonicalParams: 0
     };
 
     const runtime = createMainRuntime({
@@ -93,6 +95,7 @@ function createRuntimeUnderTest(options = {}) {
                 SEARCH_BOARDS: 'search-boards',
                 CANCEL_SEARCH: 'cancel-search',
                 GET_SEARCH_ESTIMATE: 'get-search-estimate',
+                NORMALIZE_SEARCH_PARAMS: 'normalize-search-params',
                 LIST_CACHE: 'list-cache',
                 DELETE_CACHE_ENTRY: 'delete-cache-entry',
                 CLEAR_ALL_CACHE: 'clear-all-cache',
@@ -121,6 +124,9 @@ function createRuntimeUnderTest(options = {}) {
             ensureCacheDir: () => {
                 ensureCacheDirCalls += 1;
             },
+            migrateCanonicalParams: async () => {
+                serviceCalls.migrateCanonicalParams += 1;
+            },
             listCacheEntries: async () => {
                 serviceCalls.listCacheEntries += 1;
                 return [];
@@ -144,6 +150,14 @@ function createRuntimeUnderTest(options = {}) {
             getSearchEstimate: async () => {
                 serviceCalls.getSearchEstimate += 1;
                 return { count: 0, remainingSlots: 0 };
+            },
+            normalizePayload: () => {
+                serviceCalls.normalizeSearchParams += 1;
+                return {
+                    params: { boardSize: 9, maxResults: 500 },
+                    comparisonKey: '{"boardSize":9,"maxResults":500}',
+                    dataFingerprint: 'fingerprint-1'
+                };
             },
             searchBoards: async () => {
                 serviceCalls.searchBoards += 1;
@@ -224,7 +238,7 @@ describe('main runtime', () => {
         await started.readyPromise;
 
         assert.deepEqual(fakeApp.appendedSwitches, ['disable-direct-composition']);
-        assert.equal(fakeIpcMain.handlers.size, 7);
+        assert.equal(fakeIpcMain.handlers.size, 8);
         assert.equal(fakeProcess.listenerCount('uncaughtException'), 1);
         assert.equal(fakeProcess.listenerCount('unhandledRejection'), 1);
         assert.equal(fakeApp.listenerCount('window-all-closed'), 1);
@@ -251,6 +265,21 @@ describe('main runtime', () => {
 
         assert.deepEqual(result, { count: 0, remainingSlots: 0 });
         assert.equal(serviceCalls.getSearchEstimate, 1);
+    });
+
+    it('allows trusted sender normalization requests to reach the shared normalizer handler', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('normalize-search-params');
+        const payload = await handler(createInvokeEvent(), { boardSize: '9', maxResults: '500' });
+
+        assert.deepEqual(payload, {
+            params: { boardSize: 9, maxResults: 500 },
+            comparisonKey: '{"boardSize":9,"maxResults":500}',
+            dataFingerprint: 'fingerprint-1'
+        });
+        assert.equal(serviceCalls.normalizeSearchParams, 1);
     });
 
     it('accepts a sender wrapper with the same webContents id when the frame metadata falls back to mainFrame', async () => {
@@ -329,5 +358,24 @@ describe('main runtime', () => {
         );
 
         assert.equal(serviceCalls.listCacheEntries, 0);
+    });
+
+    it('rejects non-main-frame normalize requests before they reach search normalization', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('normalize-search-params');
+
+        await assert.rejects(
+            handler(createInvokeEvent({
+                senderFrame: {
+                    isMainFrame: false,
+                    url: 'file:///index.html'
+                }
+            }), { boardSize: 9 }),
+            /Unauthorized IPC sender\./
+        );
+
+        assert.equal(serviceCalls.normalizeSearchParams, 0);
     });
 });

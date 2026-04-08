@@ -9,7 +9,14 @@ function createMainRuntime(options = {}) {
     const Worker = options.Worker || require('worker_threads').Worker;
     const dataEngine = options.dataEngine || require('../data.js');
     const engine = options.engine || require('../engine.js');
-    const normalizeSearchParams = options.normalizeSearchParams || require('../searchParams.js').normalizeSearchParams;
+    const searchParamUtils = options.searchParamUtils || require('../searchParams.js');
+    const normalizeSearchParams = options.normalizeSearchParams || searchParamUtils.normalizeSearchParams;
+    const normalizeSearchParamsForData = options.normalizeSearchParamsForData
+        || searchParamUtils.normalizeSearchParamsForData
+        || normalizeSearchParams;
+    const serializeSearchParams = options.serializeSearchParams
+        || searchParamUtils.serializeSearchParams
+        || ((params) => JSON.stringify(normalizeSearchParams(params)));
     const storage = options.storage || require('../storage.js');
     const constants = options.constants || require('../constants.js');
     const createSearchCacheService = options.createSearchCacheService || require('./search-cache-service.js').createSearchCacheService;
@@ -46,7 +53,8 @@ function createMainRuntime(options = {}) {
         fsp,
         crypto,
         limits: LIMITS,
-        searchCacheVersion: SEARCH_CACHE_VERSION
+        searchCacheVersion: SEARCH_CACHE_VERSION,
+        serializeSearchParams
     });
 
     const dataService = createDataService({
@@ -67,6 +75,8 @@ function createMainRuntime(options = {}) {
     const searchService = createSearchService({
         engine,
         normalizeSearchParams,
+        normalizeSearchParamsForData,
+        serializeSearchParams,
         cacheService,
         Worker,
         workerPath: path.join(appRoot, 'worker.js'),
@@ -74,6 +84,53 @@ function createMainRuntime(options = {}) {
         getMainWindow: windowService.getMainWindow,
         getDataCache: dataService.getDataCache
     });
+    const strictlyMigratedFingerprints = new Set();
+
+    async function migrateAllCachedParamsWithBaseNormalization() {
+        if (typeof cacheService.migrateCanonicalParams !== 'function') {
+            return;
+        }
+
+        try {
+            await cacheService.migrateCanonicalParams({
+                canonicalizeByFingerprint: (_dataFingerprint, params) => normalizeSearchParams(params)
+            });
+        } catch (error) {
+            console.warn('Failed to migrate cached search params during startup:', error.message || String(error));
+        }
+    }
+
+    async function migrateFingerprintWithStrictNormalization(dataFingerprint) {
+        if (
+            typeof cacheService.migrateCanonicalParams !== 'function'
+            || typeof dataFingerprint !== 'string'
+            || !dataFingerprint
+            || strictlyMigratedFingerprints.has(dataFingerprint)
+        ) {
+            return;
+        }
+
+        try {
+            await cacheService.migrateCanonicalParams({
+                canonicalizeByFingerprint: (entryFingerprint, params) => {
+                    const baseNormalized = normalizeSearchParams(params);
+                    if (entryFingerprint !== dataFingerprint) {
+                        return baseNormalized;
+                    }
+
+                    const activeDataCache = dataService.getDataCache();
+                    if (!activeDataCache || activeDataCache.dataFingerprint !== dataFingerprint) {
+                        return baseNormalized;
+                    }
+
+                    return normalizeSearchParamsForData(params, activeDataCache);
+                }
+            });
+            strictlyMigratedFingerprints.add(dataFingerprint);
+        } catch (error) {
+            console.warn(`Failed to migrate cached params for fingerprint ${dataFingerprint}:`, error.message || String(error));
+        }
+    }
 
     function handleUncaughtException(error) {
         console.error('[FATAL] Uncaught exception:', error);
@@ -97,6 +154,7 @@ function createMainRuntime(options = {}) {
     async function handleAppReady() {
         try {
             cacheService.ensureCacheDir();
+            await migrateAllCachedParamsWithBaseNormalization();
         } catch (error) {
             console.error('Failed to initialize local app storage:', error.message);
         }
@@ -164,7 +222,11 @@ function createMainRuntime(options = {}) {
     function registerIpcHandlers() {
         handleTrustedIpc(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
             try {
-                return await dataService.fetchData(requestedSource);
+                const response = await dataService.fetchData(requestedSource);
+                if (response?.success && response.dataFingerprint) {
+                    void migrateFingerprintWithStrictNormalization(response.dataFingerprint);
+                }
+                return response;
             } catch (error) {
                 return { success: false, error: error.toString() };
             }
@@ -172,6 +234,19 @@ function createMainRuntime(options = {}) {
 
         handleTrustedIpc(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
             return await searchService.getSearchEstimate(params);
+        });
+
+        handleTrustedIpc(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, async (_event, params) => {
+            if (typeof searchService.normalizePayload === 'function') {
+                return searchService.normalizePayload(params);
+            }
+
+            const fallbackParams = normalizeSearchParams(params);
+            return {
+                params: fallbackParams,
+                comparisonKey: serializeSearchParams(fallbackParams),
+                dataFingerprint: dataService.getDataCache()?.dataFingerprint || null
+            };
         });
 
         handleTrustedIpc(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
@@ -213,6 +288,7 @@ function createMainRuntime(options = {}) {
         return () => {
             ipcMain.removeHandler(IPC_CHANNELS.FETCH_DATA);
             ipcMain.removeHandler(IPC_CHANNELS.GET_SEARCH_ESTIMATE);
+            ipcMain.removeHandler(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS);
             ipcMain.removeHandler(IPC_CHANNELS.SEARCH_BOARDS);
             ipcMain.removeHandler(IPC_CHANNELS.CANCEL_SEARCH);
             ipcMain.removeHandler(IPC_CHANNELS.LIST_CACHE);

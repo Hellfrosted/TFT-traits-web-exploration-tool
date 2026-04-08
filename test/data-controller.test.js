@@ -47,6 +47,15 @@ function createSelector(options = [], isUnit = true) {
     };
 }
 
+function toCanonicalPayload(params = {}) {
+    const stable = JSON.parse(JSON.stringify(params || {}));
+    return {
+        params: stable,
+        comparisonKey: JSON.stringify(stable),
+        dataFingerprint: 'test-fingerprint'
+    };
+}
+
 describe('renderer data controller', () => {
     it('retains the previously loaded dataset when a fetch fails', async () => {
         const statusMessages = [];
@@ -106,7 +115,8 @@ describe('renderer data controller', () => {
                     onlyActive: true,
                     tierRank: true,
                     includeUnique: false
-                })
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
             },
             history: {
                 updateHistoryList: () => {}
@@ -221,7 +231,8 @@ describe('renderer data controller', () => {
                     onlyActive: true,
                     tierRank: true,
                     includeUnique: false
-                })
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
             },
             history: {
                 updateHistoryList: () => {}
@@ -361,7 +372,8 @@ describe('renderer data controller', () => {
                     onlyActive: true,
                     tierRank: true,
                     includeUnique: false
-                })
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
             },
             results: {
                 renderEmptySummary: (message) => renderedMessages.push(message),
@@ -508,7 +520,8 @@ describe('renderer data controller', () => {
                     onlyActive: true,
                     tierRank: true,
                     includeUnique: false
-                })
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
             },
             results: {
                 renderEmptySummary: (message) => renderedMessages.push(message),
@@ -619,7 +632,8 @@ describe('renderer data controller', () => {
                     onlyActive: true,
                     tierRank: true,
                     includeUnique: false
-                })
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
             },
             results: {
                 renderEmptySummary: () => {},

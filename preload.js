@@ -14,6 +14,7 @@ const IPC_CHANNELS = bridgeContract?.IPC_CHANNELS || {
     SEARCH_BOARDS: 'search-boards',
     CANCEL_SEARCH: 'cancel-search',
     GET_SEARCH_ESTIMATE: 'get-search-estimate',
+    NORMALIZE_SEARCH_PARAMS: 'normalize-search-params',
     LIST_CACHE: 'list-cache',
     DELETE_CACHE_ENTRY: 'delete-cache-entry',
     CLEAR_ALL_CACHE: 'clear-all-cache',
@@ -44,7 +45,8 @@ const RENDERER_CONTRACT = bridgeContract?.RENDERER_CONTRACT || {
         'listCache',
         'deleteCacheEntry',
         'clearAllCache',
-        'getSearchEstimate'
+        'getSearchEstimate',
+        'normalizeSearchParams'
     ],
     requiredShellIds: [
         'dataSourceSelect',
@@ -77,6 +79,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteCacheEntry: (key) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_CACHE_ENTRY, key),
     clearAllCache: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_ALL_CACHE),
     getSearchEstimate: (params) => ipcRenderer.invoke(IPC_CHANNELS.GET_SEARCH_ESTIMATE, params),
+    normalizeSearchParams: (params) => ipcRenderer.invoke(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, params),
 
     onSearchProgress: (callback) => {
         const listener = (_event, data) => callback(data);

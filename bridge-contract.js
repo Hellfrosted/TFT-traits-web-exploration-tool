@@ -3,6 +3,7 @@ const IPC_CHANNELS = {
     SEARCH_BOARDS: 'search-boards',
     CANCEL_SEARCH: 'cancel-search',
     GET_SEARCH_ESTIMATE: 'get-search-estimate',
+    NORMALIZE_SEARCH_PARAMS: 'normalize-search-params',
     LIST_CACHE: 'list-cache',
     DELETE_CACHE_ENTRY: 'delete-cache-entry',
     CLEAR_ALL_CACHE: 'clear-all-cache',
@@ -35,7 +36,8 @@ const RENDERER_CONTRACT = {
         'listCache',
         'deleteCacheEntry',
         'clearAllCache',
-        'getSearchEstimate'
+        'getSearchEstimate',
+        'normalizeSearchParams'
     ],
     requiredShellIds: [
         'dataSourceSelect',

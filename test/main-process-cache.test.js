@@ -14,6 +14,10 @@ const {
     resolveDataFallbackPath
 } = require('../storage.js');
 const { LIMITS } = require('../constants.js');
+const {
+    normalizeSearchParams,
+    normalizeSearchParamsForData
+} = require('../searchParams.js');
 
 function makeTempDir(prefix) {
     return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -162,6 +166,195 @@ describe('main-process cache service', () => {
             assert.equal(deletedCount, 2);
             const afterClear = await service.listCacheEntries('keep-fingerprint');
             assert.deepEqual(afterClear, []);
+        } finally {
+            fs.rmSync(sandboxRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('migrates legacy cache entries to canonical params and canonical hash keys', async () => {
+        const sandboxRoot = makeTempDir('tft-cache-service-');
+
+        try {
+            const userDataPath = path.join(sandboxRoot, 'userData');
+            fs.mkdirSync(userDataPath, { recursive: true });
+            const service = createService(userDataPath);
+            const storagePaths = getStoragePaths({ userDataPath });
+            ensureStorageDirs(storagePaths);
+            const legacyKey = 'cccccccccccccccccccccccccccccccc';
+            const legacyPath = resolveCacheEntryPath(storagePaths, legacyKey);
+            await fsp.writeFile(legacyPath, JSON.stringify({
+                searchVersion: 4,
+                dataFingerprint: 'fp-legacy',
+                params: {
+                    boardSize: '9',
+                    maxResults: '500',
+                    mustInclude: [{ id: 'Annie' }, 'Annie', '  Annie  '],
+                    variantLocks: {
+                        Annie: { value: 'arcane' }
+                    },
+                    onlyActive: 'yes',
+                    tierRank: 'true',
+                    includeUnique: 'false'
+                },
+                results: [{ units: ['Annie'] }],
+                timestamp: 100
+            }), 'utf-8');
+
+            await service.migrateCanonicalParams({
+                canonicalizeByFingerprint: (_fingerprint, params) => normalizeSearchParams(params)
+            });
+
+            const canonicalParams = normalizeSearchParams({
+                boardSize: '9',
+                maxResults: '500',
+                mustInclude: [{ id: 'Annie' }, 'Annie', '  Annie  '],
+                variantLocks: {
+                    Annie: { value: 'arcane' }
+                },
+                onlyActive: 'yes',
+                tierRank: 'true',
+                includeUnique: 'false'
+            });
+            const canonicalKey = service.getCacheKey('fp-legacy', canonicalParams);
+            const entries = await service.listCacheEntries('fp-legacy');
+
+            assert.equal(entries.length, 1);
+            assert.equal(entries[0].key, canonicalKey);
+            assert.deepEqual(entries[0].params, canonicalParams);
+            assert.equal(fs.existsSync(legacyPath), canonicalKey === legacyKey);
+        } finally {
+            fs.rmSync(sandboxRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('deduplicates rehashed collisions during migration by keeping the newest timestamp', async () => {
+        const sandboxRoot = makeTempDir('tft-cache-service-');
+
+        try {
+            const userDataPath = path.join(sandboxRoot, 'userData');
+            fs.mkdirSync(userDataPath, { recursive: true });
+            const service = createService(userDataPath);
+            const storagePaths = getStoragePaths({ userDataPath });
+            ensureStorageDirs(storagePaths);
+            const legacyKeyA = 'dddddddddddddddddddddddddddddddd';
+            const legacyKeyB = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+            await fsp.writeFile(resolveCacheEntryPath(storagePaths, legacyKeyA), JSON.stringify({
+                searchVersion: 4,
+                dataFingerprint: 'fp-collision',
+                params: {
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: ['B', 'A']
+                },
+                results: [{ units: ['old'] }],
+                timestamp: 100
+            }), 'utf-8');
+            await fsp.writeFile(resolveCacheEntryPath(storagePaths, legacyKeyB), JSON.stringify({
+                searchVersion: 4,
+                dataFingerprint: 'fp-collision',
+                params: {
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: ['A', 'B']
+                },
+                results: [{ units: ['new'] }],
+                timestamp: 200
+            }), 'utf-8');
+
+            await service.migrateCanonicalParams({
+                canonicalizeByFingerprint: (_fingerprint, params) => normalizeSearchParams(params)
+            });
+
+            const canonicalParams = normalizeSearchParams({
+                boardSize: 9,
+                maxResults: 500,
+                mustInclude: ['A', 'B']
+            });
+            const canonicalKey = service.getCacheKey('fp-collision', canonicalParams);
+            const migrated = await service.readCache(canonicalKey, 'fp-collision');
+
+            assert.deepEqual(migrated, [{ units: ['new'] }]);
+            const entries = await service.listCacheEntries('fp-collision');
+            assert.equal(entries.length, 1);
+            assert.equal(entries[0].key, canonicalKey);
+            assert.equal(entries[0].timestamp, 200);
+        } finally {
+            fs.rmSync(sandboxRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('supports strict per-fingerprint normalization during migration', async () => {
+        const sandboxRoot = makeTempDir('tft-cache-service-');
+
+        try {
+            const userDataPath = path.join(sandboxRoot, 'userData');
+            fs.mkdirSync(userDataPath, { recursive: true });
+            const service = createService(userDataPath);
+            const storagePaths = getStoragePaths({ userDataPath });
+            ensureStorageDirs(storagePaths);
+            const fp1Key = 'ffffffffffffffffffffffffffffffff';
+            const fp2Key = 'abababababababababababababababab';
+
+            await fsp.writeFile(resolveCacheEntryPath(storagePaths, fp1Key), JSON.stringify({
+                searchVersion: 4,
+                dataFingerprint: 'fp-1',
+                params: {
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: ['Known', 'Unknown'],
+                    mustIncludeTraits: ['TraitA', 'TraitB'],
+                    tankRoles: ['Tank', 'UnknownRole'],
+                    variantLocks: {
+                        Known: 'variant-a',
+                        Unknown: 'variant-z'
+                    }
+                },
+                results: [{ units: ['Known'] }],
+                timestamp: 100
+            }), 'utf-8');
+            await fsp.writeFile(resolveCacheEntryPath(storagePaths, fp2Key), JSON.stringify({
+                searchVersion: 4,
+                dataFingerprint: 'fp-2',
+                params: {
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: ['Known', 'Unknown']
+                },
+                results: [{ units: ['Known', 'Unknown'] }],
+                timestamp: 100
+            }), 'utf-8');
+
+            const strictDataCache = {
+                units: [
+                    {
+                        id: 'Known',
+                        variants: [{ id: 'variant-a' }]
+                    }
+                ],
+                traits: ['TraitA'],
+                roles: ['Tank']
+            };
+
+            await service.migrateCanonicalParams({
+                canonicalizeByFingerprint: (fingerprint, params) => (
+                    fingerprint === 'fp-1'
+                        ? normalizeSearchParamsForData(params, strictDataCache)
+                        : normalizeSearchParams(params)
+                )
+            });
+
+            const fp1Entries = await service.listCacheEntries('fp-1');
+            const fp2Entries = await service.listCacheEntries('fp-2');
+            assert.equal(fp1Entries.length, 1);
+            assert.equal(fp2Entries.length, 1);
+
+            assert.deepEqual(fp1Entries[0].params.mustInclude, ['Known']);
+            assert.deepEqual(fp1Entries[0].params.mustIncludeTraits, ['TraitA']);
+            assert.deepEqual(fp1Entries[0].params.tankRoles, ['Tank']);
+            assert.deepEqual(fp1Entries[0].params.variantLocks, { Known: 'variant-a' });
+
+            assert.deepEqual(fp2Entries[0].params.mustInclude, ['Known', 'Unknown']);
         } finally {
             fs.rmSync(sandboxRoot, { recursive: true, force: true });
         }

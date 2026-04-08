@@ -23,7 +23,7 @@
                 };
             }
 
-            const pct = Number.isFinite(progress.pct)
+            let pct = Number.isFinite(progress.pct)
                 ? Math.max(0, Math.min(100, Math.round(progress.pct)))
                 : null;
             const checked = Number.isFinite(progress.checked) && progress.checked >= 0
@@ -32,6 +32,10 @@
             const total = Number.isFinite(progress.total) && progress.total >= 0
                 ? progress.total
                 : null;
+
+            if (pct === null && Number.isFinite(checked) && Number.isFinite(total) && total > 0) {
+                pct = Math.max(0, Math.min(100, Math.round((checked / total) * 100)));
+            }
 
             return { pct, checked, total };
         }
@@ -241,7 +245,11 @@
             }
 
             try {
-                const params = app.queryUi.getCurrentSearchParams();
+                const rawParams = app.queryUi.getCurrentSearchParams();
+                const normalizePayload = typeof app.queryUi.normalizeSearchParams === 'function'
+                    ? await app.queryUi.normalizeSearchParams(rawParams)
+                    : { params: rawParams };
+                const params = normalizePayload?.params || rawParams;
                 state.lastSearchParams = params;
                 renderActiveSearchUi();
 

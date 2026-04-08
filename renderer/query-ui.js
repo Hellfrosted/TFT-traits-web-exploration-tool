@@ -6,6 +6,7 @@
         const { state } = app;
         const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
         const getDefaultBoardSize = () => 9;
+        let nextDraftEstimateRequestId = 0;
 
         function setResultsSummary(content) {
             const summary = document.getElementById('resultsSummary');
@@ -256,6 +257,65 @@
             `);
         }
 
+        async function refreshDraftEstimate() {
+            if (!state.activeData || state.isSearching || state.isFetchingData) {
+                return;
+            }
+
+            if (!state.electronBridge?.getSearchEstimate) {
+                return;
+            }
+
+            const requestId = ++nextDraftEstimateRequestId;
+            const normalizePayload = await normalizeSearchParams();
+            if (requestId !== nextDraftEstimateRequestId) {
+                return;
+            }
+            const params = normalizePayload.params;
+
+            try {
+                const estimate = await state.electronBridge.getSearchEstimate(params);
+                if (requestId !== nextDraftEstimateRequestId) {
+                    return;
+                }
+                if (!state.activeData || state.isSearching || state.isFetchingData) {
+                    return;
+                }
+
+                state.activeSearchEstimate = estimate;
+                app.results.renderEstimateSummary(estimate);
+            } catch (error) {
+                if (requestId !== nextDraftEstimateRequestId) {
+                    return;
+                }
+
+                console.error('[Draft Estimate Failed]', error);
+            }
+        }
+
+        async function normalizeSearchParams(params = getCurrentSearchParams()) {
+            if (state.electronBridge?.normalizeSearchParams) {
+                try {
+                    const payload = await state.electronBridge.normalizeSearchParams(params);
+                    if (payload && payload.params) {
+                        return {
+                            params: payload.params,
+                            comparisonKey: typeof payload.comparisonKey === 'string' ? payload.comparisonKey : null,
+                            dataFingerprint: typeof payload.dataFingerprint === 'string' ? payload.dataFingerprint : null
+                        };
+                    }
+                } catch (error) {
+                    console.error('[Query Normalization Failed]', error);
+                }
+            }
+
+            return {
+                params,
+                comparisonKey: null,
+                dataFingerprint: null
+            };
+        }
+
         function getCurrentSearchParams() {
             return {
                 boardSize: parseInt(document.getElementById('boardSize').value, 10) || getDefaultBoardSize(),
@@ -357,6 +417,7 @@
                 ? `${signalCount} active constraints`
                 : 'Idle';
             renderQuerySummary(params, meta);
+            void refreshDraftEstimate();
         }
 
         function bindDraftQueryListeners() {
@@ -396,9 +457,11 @@
             syncSearchButtonState,
             renderQuerySummary,
             getCurrentSearchParams,
+            normalizeSearchParams,
             getDefaultSearchParams,
             applySearchParams,
             clampNumericInput,
+            refreshDraftEstimate,
             refreshDraftQuerySummary,
             bindDraftQueryListeners
         };

@@ -4,10 +4,6 @@
 
     ns.createDataController = function createDataController(app) {
         const { state } = app;
-        const MIN_BOARD_SIZE = 1;
-        const MAX_BOARD_SIZE = 20;
-        const MIN_RESULTS = 1;
-        const MAX_RESULTS = 10000;
 
         function collectUnitTraitLabels(unit) {
             const traitNames = new Set();
@@ -30,104 +26,6 @@
             (unit?.variants || []).forEach((variant) => addTraitNames(variant));
 
             return [...traitNames].sort((left, right) => left.localeCompare(right));
-        }
-
-        function normalizeList(values, allowedValues = null) {
-            if (!Array.isArray(values)) return [];
-            const seen = new Set();
-            const normalized = [];
-            values.forEach((value) => {
-                const candidate = String(value ?? '').trim();
-                if (!candidate || seen.has(candidate)) return;
-                if (allowedValues && !allowedValues.has(candidate)) return;
-                seen.add(candidate);
-                normalized.push(candidate);
-            });
-            return normalized;
-        }
-
-        function normalizeVariantLocks(variantLocks = {}, variantByUnit = new Map()) {
-            if (!variantLocks || typeof variantLocks !== 'object' || Array.isArray(variantLocks)) {
-                return {};
-            }
-
-            const normalized = {};
-            Object.keys(variantLocks).sort((left, right) => left.localeCompare(right)).forEach((unitId) => {
-                const lockValue = String(variantLocks[unitId] ?? '').trim();
-                if (!lockValue) return;
-                const allowedVariants = variantByUnit.get(unitId);
-                if (!allowedVariants || !allowedVariants.has(lockValue)) {
-                    return;
-                }
-                normalized[unitId] = lockValue;
-            });
-            return normalized;
-        }
-
-        function clampInteger(value, fallback, min, max) {
-            const parsed = Number.parseInt(value, 10);
-            if (!Number.isFinite(parsed)) {
-                return fallback;
-            }
-            return Math.min(Math.max(parsed, min), max);
-        }
-
-        function normalizeSearchParamsForActiveData(params = {}) {
-            const defaults = app.queryUi.getDefaultSearchParams();
-            const activeUnits = new Set(state.activeData?.unitMap ? [...state.activeData.unitMap.keys()] : []);
-            const activeTraits = new Set(state.activeData?.traits || []);
-            const activeRoles = new Set(state.activeData?.roles || []);
-            const variantByUnit = new Map();
-            if (state.activeData?.unitMap) {
-                state.activeData.unitMap.forEach((unit) => {
-                    if (!Array.isArray(unit?.variants) || unit.variants.length === 0) return;
-                    variantByUnit.set(
-                        unit.id,
-                        new Set(unit.variants.map((variant) => String(variant?.id ?? '').trim()).filter(Boolean))
-                    );
-                });
-            }
-
-            return {
-                boardSize: clampInteger(params.boardSize, defaults.boardSize, MIN_BOARD_SIZE, MAX_BOARD_SIZE),
-                maxResults: clampInteger(params.maxResults, defaults.maxResults, MIN_RESULTS, MAX_RESULTS),
-                mustInclude: normalizeList(params.mustInclude, activeUnits),
-                mustExclude: normalizeList(params.mustExclude, activeUnits),
-                mustIncludeTraits: normalizeList(params.mustIncludeTraits, activeTraits),
-                mustExcludeTraits: normalizeList(params.mustExcludeTraits, activeTraits),
-                tankRoles: normalizeList(params.tankRoles, activeRoles),
-                carryRoles: normalizeList(params.carryRoles, activeRoles),
-                extraEmblems: normalizeList(params.extraEmblems, activeTraits),
-                variantLocks: normalizeVariantLocks(params.variantLocks, variantByUnit),
-                onlyActive: !!params.onlyActive,
-                tierRank: !!params.tierRank,
-                includeUnique: !!params.includeUnique
-            };
-        }
-
-        function serializeQueryForComparison(params = {}) {
-            const normalized = {
-                boardSize: Number.parseInt(params.boardSize, 10) || 0,
-                maxResults: Number.parseInt(params.maxResults, 10) || 0,
-                mustInclude: normalizeList(params.mustInclude).sort(),
-                mustExclude: normalizeList(params.mustExclude).sort(),
-                mustIncludeTraits: normalizeList(params.mustIncludeTraits).sort(),
-                mustExcludeTraits: normalizeList(params.mustExcludeTraits).sort(),
-                tankRoles: normalizeList(params.tankRoles).sort(),
-                carryRoles: normalizeList(params.carryRoles).sort(),
-                extraEmblems: normalizeList(params.extraEmblems).sort(),
-                variantLocks: {}
-            };
-            Object.keys(params.variantLocks || {}).sort((left, right) => left.localeCompare(right)).forEach((unitId) => {
-                const value = String(params.variantLocks[unitId] ?? '').trim();
-                if (value) {
-                    normalized.variantLocks[unitId] = value;
-                }
-            });
-            normalized.onlyActive = !!params.onlyActive;
-            normalized.tierRank = !!params.tierRank;
-            normalized.includeUnique = !!params.includeUnique;
-            return JSON.stringify(normalized);
         }
 
         async function fetchData() {
@@ -219,10 +117,18 @@
 
                     Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
                     app.queryUi.applyDefaultRoleFilters();
-                    const replayedQuery = normalizeSearchParamsForActiveData(previousEffectiveQuery);
+                    const replayedPayload = typeof app.queryUi.normalizeSearchParams === 'function'
+                        ? await app.queryUi.normalizeSearchParams(previousEffectiveQuery)
+                        : { params: previousEffectiveQuery, comparisonKey: null };
+                    const replayedQuery = replayedPayload?.params || previousEffectiveQuery;
                     app.queryUi.applySearchParams(replayedQuery);
-                    const effectiveQuery = normalizeSearchParamsForActiveData(app.queryUi.getCurrentSearchParams());
-                    const queryChanged = serializeQueryForComparison(previousEffectiveQuery) !== serializeQueryForComparison(effectiveQuery);
+                    const effectivePayload = typeof app.queryUi.normalizeSearchParams === 'function'
+                        ? await app.queryUi.normalizeSearchParams(app.queryUi.getCurrentSearchParams())
+                        : { params: app.queryUi.getCurrentSearchParams(), comparisonKey: null };
+                    const effectiveQuery = effectivePayload?.params || app.queryUi.getCurrentSearchParams();
+                    const queryChanged = typeof replayedPayload?.comparisonKey === 'string' && typeof effectivePayload?.comparisonKey === 'string'
+                        ? replayedPayload.comparisonKey !== effectivePayload.comparisonKey
+                        : true;
 
                     app.queryUi.bindDraftQueryListeners();
                     if (state.lastSearchParams) {

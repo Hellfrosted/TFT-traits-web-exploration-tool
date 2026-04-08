@@ -12,6 +12,8 @@ function createSearchResponse({
 function createSearchService({
     engine,
     normalizeSearchParams,
+    normalizeSearchParamsForData,
+    serializeSearchParams,
     cacheService,
     Worker,
     workerPath,
@@ -19,13 +21,39 @@ function createSearchService({
     getMainWindow,
     getDataCache
 }) {
+    const normalizeForData = typeof normalizeSearchParamsForData === 'function'
+        ? normalizeSearchParamsForData
+        : normalizeSearchParams;
+    const serializeForComparison = typeof serializeSearchParams === 'function'
+        ? serializeSearchParams
+        : (params) => JSON.stringify(normalizeSearchParams(params));
     let activeSearch = null;
     let nextSearchId = 1;
+
+    function normalizeForActiveData(params) {
+        const dataCache = getDataCache();
+        if (!dataCache) {
+            return normalizeSearchParams(params);
+        }
+        return normalizeForData(params, dataCache);
+    }
+
+    function normalizePayload(params) {
+        const dataCache = getDataCache();
+        const normalized = dataCache
+            ? normalizeForData(params, dataCache)
+            : normalizeSearchParams(params);
+        return {
+            params: normalized,
+            comparisonKey: serializeForComparison(normalized),
+            dataFingerprint: dataCache?.dataFingerprint || null
+        };
+    }
 
     async function getSearchEstimate(params) {
         const dataCache = getDataCache();
         if (!dataCache) return { count: 0, remainingSlots: 0 };
-        const normalizedParams = normalizeSearchParams(params);
+        const normalizedParams = normalizeForActiveData(params);
         const estimateKey = cacheService.getCacheKey(dataCache.dataFingerprint, normalizedParams);
         const cachedEstimate = cacheService.getCachedEstimate(estimateKey);
         if (cachedEstimate) {
@@ -53,7 +81,7 @@ function createSearchService({
             });
         }
 
-        const normalizedParams = normalizeSearchParams(params);
+        const normalizedParams = normalizeForActiveData(params);
         const searchDataCache = dataCache;
         const searchFingerprint = searchDataCache.dataFingerprint;
         const cacheKey = cacheService.getCacheKey(searchFingerprint, normalizedParams);
@@ -264,6 +292,8 @@ function createSearchService({
         getSearchEstimate,
         searchBoards,
         cancelSearch,
+        normalizeForActiveData,
+        normalizePayload,
         hasActiveSearch
     };
 }

@@ -52,7 +52,7 @@
             });
         }
 
-        function loadSearchFromHistory(entry) {
+        async function loadSearchFromHistory(entry) {
             if (state.isSearching || state.isFetchingData) {
                 showAlert('Wait for current search to finish or cancel it.');
                 return;
@@ -61,15 +61,26 @@
             const { params } = entry;
             if (!params) return;
 
-            app.queryUi.applySearchParams(params);
+            try {
+                const normalizePayload = typeof app.queryUi.normalizeSearchParams === 'function'
+                    ? await app.queryUi.normalizeSearchParams(params)
+                    : { params };
+                const canonicalParams = normalizePayload?.params || params;
+                app.queryUi.applySearchParams(canonicalParams);
 
-            if (state.activeData?.hashMap) {
-                state.selectors.tankRoles?.resolvePills(state.activeData.hashMap);
-                state.selectors.carryRoles?.resolvePills(state.activeData.hashMap);
+                if (state.activeData?.hashMap) {
+                    state.selectors.tankRoles?.resolvePills(state.activeData.hashMap);
+                    state.selectors.carryRoles?.resolvePills(state.activeData.hashMap);
+                }
+
+                app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
+                document.getElementById('searchBtn')?.click();
+            } catch (error) {
+                console.error('[History Replay Failed]', error);
+                if (typeof app.queryUi.setStatusMessage === 'function') {
+                    app.queryUi.setStatusMessage(`Failed to replay cached query: ${error.message || String(error)}`);
+                }
             }
-
-            app.queryUi.renderQuerySummary(params, 'Loaded a recent search. Replaying query now.');
-            document.getElementById('searchBtn').click();
         }
 
         window.updateHistoryList = updateHistoryList;

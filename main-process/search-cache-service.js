@@ -1,4 +1,5 @@
 const path = require('path');
+const { serializeSearchParams: defaultSerializeSearchParams } = require('../searchParams.js');
 
 function createSearchCacheService({
     storagePaths,
@@ -9,7 +10,8 @@ function createSearchCacheService({
     fsp,
     crypto,
     limits,
-    searchCacheVersion
+    searchCacheVersion,
+    serializeSearchParams = defaultSerializeSearchParams
 }) {
     const searchResultMemoryCache = new Map();
     const searchEstimateMemoryCache = new Map();
@@ -24,22 +26,10 @@ function createSearchCacheService({
         const normalized = JSON.stringify({
             searchVersion: searchCacheVersion,
             dataFingerprint,
-            boardSize: params.boardSize,
-            maxResults: params.maxResults ?? limits.DEFAULT_MAX_RESULTS,
-            mustInclude: [...(params.mustInclude || [])].sort(),
-            mustExclude: [...(params.mustExclude || [])].sort(),
-            mustIncludeTraits: [...(params.mustIncludeTraits || [])].sort(),
-            mustExcludeTraits: [...(params.mustExcludeTraits || [])].sort(),
-            tankRoles: [...(params.tankRoles || [])].sort(),
-            carryRoles: [...(params.carryRoles || [])].sort(),
-            extraEmblems: [...(params.extraEmblems || [])].sort(),
-            variantLocks: Object.keys(params.variantLocks || {}).sort().map((unitId) => [
-                unitId,
-                params.variantLocks[unitId]
-            ]),
-            onlyActive: !!params.onlyActive,
-            tierRank: !!params.tierRank,
-            includeUnique: !!params.includeUnique
+            params: serializeSearchParams({
+                maxResults: limits.DEFAULT_MAX_RESULTS,
+                ...params
+            })
         });
         return crypto.createHash('md5').update(normalized).digest('hex');
     }
@@ -70,6 +60,20 @@ function createSearchCacheService({
     function setCachedEstimate(key, estimate) {
         searchEstimateMemoryCache.set(key, estimate);
         return estimate;
+    }
+
+    async function writeCachePayload(filePath, payload) {
+        const tempPath = `${filePath}.${process.pid || 'cache'}.${Date.now()}.tmp`;
+        await fsp.writeFile(tempPath, payload, 'utf-8');
+        try {
+            await fsp.rename(tempPath, filePath);
+        } catch (renameError) {
+            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
+                throw renameError;
+            }
+            await fsp.unlink(filePath).catch(() => {});
+            await fsp.rename(tempPath, filePath);
+        }
     }
 
     async function readCache(key, dataFingerprint) {
@@ -117,7 +121,6 @@ function createSearchCacheService({
         });
         try {
             const filePath = resolveCacheEntryPath(storagePaths, key);
-            const tempPath = `${filePath}.${process.pid || 'cache'}.${Date.now()}.tmp`;
             const payload = JSON.stringify({
                 searchVersion: searchCacheVersion,
                 dataFingerprint,
@@ -125,19 +128,103 @@ function createSearchCacheService({
                 results,
                 timestamp: Date.now()
             });
-            await fsp.writeFile(tempPath, payload, 'utf-8');
-            try {
-                await fsp.rename(tempPath, filePath);
-            } catch (renameError) {
-                if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
-                    throw renameError;
-                }
-                await fsp.unlink(filePath).catch(() => {});
-                await fsp.rename(tempPath, filePath);
-            }
+            await writeCachePayload(filePath, payload);
         } catch (error) {
             console.error('Failed to write cache:', error.message);
         }
+    }
+
+    async function migrateCanonicalParams({ canonicalizeByFingerprint } = {}) {
+        ensureCacheDir();
+        const files = (await fsp.readdir(cacheDir)).filter((file) => file.endsWith('.json'));
+        if (files.length === 0) {
+            return {
+                rewritten: 0,
+                removed: 0
+            };
+        }
+
+        const stagedByKey = new Map();
+        const processedPaths = [];
+
+        for (const file of files) {
+            const filePath = path.join(cacheDir, file);
+            let parsed;
+
+            try {
+                const raw = await fsp.readFile(filePath, 'utf-8');
+                parsed = JSON.parse(raw);
+            } catch (error) {
+                console.warn(`Skipping corrupt cache file during migration ${file}:`, error.message);
+                continue;
+            }
+
+            if ((parsed?.searchVersion ?? 1) !== searchCacheVersion || !parsed?.params) {
+                continue;
+            }
+
+            processedPaths.push(filePath);
+            const dataFingerprint = typeof parsed.dataFingerprint === 'string' ? parsed.dataFingerprint : null;
+            let canonicalParams = parsed.params;
+            if (typeof canonicalizeByFingerprint === 'function') {
+                try {
+                    canonicalParams = canonicalizeByFingerprint(dataFingerprint, parsed.params);
+                } catch (error) {
+                    console.warn(`Failed to canonicalize params for cache file ${file}:`, error.message || String(error));
+                    canonicalParams = parsed.params;
+                }
+            }
+            if (!canonicalParams || typeof canonicalParams !== 'object') {
+                canonicalParams = parsed.params;
+            }
+            const key = getCacheKey(dataFingerprint, canonicalParams);
+            const timestamp = Number.isFinite(parsed.timestamp) ? parsed.timestamp : 0;
+            const stagedPayload = {
+                searchVersion: searchCacheVersion,
+                dataFingerprint,
+                params: canonicalParams,
+                results: Array.isArray(parsed.results) ? parsed.results : [],
+                timestamp: Number.isFinite(parsed.timestamp) ? parsed.timestamp : null
+            };
+
+            const existing = stagedByKey.get(key);
+            if (!existing || timestamp >= existing.timestamp) {
+                stagedByKey.set(key, {
+                    key,
+                    timestamp,
+                    payload: stagedPayload
+                });
+            }
+        }
+
+        if (processedPaths.length === 0) {
+            return {
+                rewritten: 0,
+                removed: 0
+            };
+        }
+
+        const winnerPaths = new Set();
+        for (const staged of stagedByKey.values()) {
+            const outputPath = resolveCacheEntryPath(storagePaths, staged.key);
+            winnerPaths.add(outputPath);
+            await writeCachePayload(outputPath, JSON.stringify(staged.payload));
+        }
+
+        let removed = 0;
+        for (const existingPath of processedPaths) {
+            if (winnerPaths.has(existingPath)) {
+                continue;
+            }
+            await fsp.unlink(existingPath).catch(() => {});
+            removed += 1;
+        }
+
+        clearSearchMemoryCaches();
+        return {
+            rewritten: stagedByKey.size,
+            removed
+        };
     }
 
     async function writeDataFallback(source, rawData) {
@@ -247,6 +334,7 @@ function createSearchCacheService({
         writeCache,
         writeDataFallback,
         readDataFallback,
+        migrateCanonicalParams,
         pruneCache,
         listCacheEntries,
         deleteCacheEntry,

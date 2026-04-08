@@ -87,4 +87,211 @@ describe('renderer query UI', () => {
         assert.match(summaryNode.innerHTML, /Include 1 units/);
         assert.match(summaryNode.innerHTML, /Force 1 traits/);
     });
+
+    it('refreshes the draft estimate when query constraints change', async () => {
+        const controlsBody = createEventTarget();
+        const summaryNode = { innerHTML: '' };
+        const resultsSummaries = [];
+        let estimateCalls = 0;
+        const estimateParams = [];
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => {
+                    if (id === 'resultsQuerySummary') return summaryNode;
+                    if (id === 'boardSize') return { value: '9', addEventListener: () => {} };
+                    if (id === 'maxResults') return { value: '50', addEventListener: () => {} };
+                    if (id === 'onlyActiveToggle') return { checked: true, addEventListener: () => {} };
+                    if (id === 'tierRankToggle') return { checked: true, addEventListener: () => {} };
+                    if (id === 'includeUniqueToggle') return { checked: false, addEventListener: () => {} };
+                    return null;
+                },
+                querySelector: (selector) => selector === '.controls-body' ? controlsBody : null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const app = {
+            state: {
+                activeData: { ready: true },
+                isSearching: false,
+                isFetchingData: false,
+                searchLimits: {},
+                electronBridge: {
+                    normalizeSearchParams: async () => ({
+                        params: {
+                            boardSize: 9,
+                            maxResults: 50,
+                            mustInclude: ['CanonicalUnit'],
+                            mustExclude: [],
+                            mustIncludeTraits: [],
+                            mustExcludeTraits: [],
+                            extraEmblems: [],
+                            variantLocks: {},
+                            tankRoles: [],
+                            carryRoles: [],
+                            onlyActive: true,
+                            tierRank: true,
+                            includeUnique: false
+                        },
+                        comparisonKey: 'canonical-key',
+                        dataFingerprint: 'fingerprint-1'
+                    }),
+                    getSearchEstimate: async (params) => {
+                        estimateCalls += 1;
+                        estimateParams.push(params);
+                        return { count: 1234, remainingSlots: 6 };
+                    }
+                },
+                selectors: {
+                    mustInclude: { getValues: () => ['A'] },
+                    mustExclude: { getValues: () => [] },
+                    mustIncludeTraits: { getValues: () => [] },
+                    mustExcludeTraits: { getValues: () => [] },
+                    extraEmblems: { getValues: () => [] },
+                    tankRoles: { getValues: () => [] },
+                    carryRoles: { getValues: () => [] }
+                },
+                variantLockControls: new Map(),
+                listeners: {
+                    draftBound: false
+                }
+            },
+            results: {
+                renderEstimateSummary: (estimate) => resultsSummaries.push(estimate)
+            }
+        };
+
+        const queryUi = createQueryUi(app);
+        queryUi.bindDraftQueryListeners();
+        controlsBody.dispatchEvent({ type: 'multiselectchange' });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        assert.equal(estimateCalls, 1);
+        assert.deepEqual(estimateParams[0], {
+            boardSize: 9,
+            maxResults: 50,
+            mustInclude: ['CanonicalUnit'],
+            mustExclude: [],
+            mustIncludeTraits: [],
+            mustExcludeTraits: [],
+            extraEmblems: [],
+            variantLocks: {},
+            tankRoles: [],
+            carryRoles: [],
+            onlyActive: true,
+            tierRank: true,
+            includeUnique: false
+        });
+        assert.deepEqual(resultsSummaries.at(-1), { count: 1234, remainingSlots: 6 });
+    });
+
+    it('keeps stale draft-estimate responses from overriding newer canonicalized requests', async () => {
+        const summaryNode = { innerHTML: '' };
+        const renderedEstimates = [];
+        let estimateCallCount = 0;
+        let normalizeCallCount = 0;
+        let resolveFirstNormalize;
+        const firstNormalizePromise = new Promise((resolve) => {
+            resolveFirstNormalize = resolve;
+        });
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => {
+                    if (id === 'resultsQuerySummary') return summaryNode;
+                    if (id === 'boardSize') return { value: '9', addEventListener: () => {} };
+                    if (id === 'maxResults') return { value: '50', addEventListener: () => {} };
+                    if (id === 'onlyActiveToggle') return { checked: true, addEventListener: () => {} };
+                    if (id === 'tierRankToggle') return { checked: true, addEventListener: () => {} };
+                    if (id === 'includeUniqueToggle') return { checked: false, addEventListener: () => {} };
+                    return null;
+                },
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const app = {
+            state: {
+                activeData: { ready: true },
+                isSearching: false,
+                isFetchingData: false,
+                searchLimits: {},
+                electronBridge: {
+                    normalizeSearchParams: async (params) => {
+                        normalizeCallCount += 1;
+                        if (normalizeCallCount === 1) {
+                            await firstNormalizePromise;
+                            return {
+                                params: {
+                                    ...params,
+                                    mustInclude: ['First']
+                                },
+                                comparisonKey: 'first',
+                                dataFingerprint: 'fp'
+                            };
+                        }
+
+                        return {
+                            params: {
+                                ...params,
+                                mustInclude: ['Second']
+                            },
+                            comparisonKey: 'second',
+                            dataFingerprint: 'fp'
+                        };
+                    },
+                    getSearchEstimate: async (params) => {
+                        estimateCallCount += 1;
+                        return {
+                            count: params.mustInclude[0] === 'Second' ? 200 : 100,
+                            remainingSlots: 4
+                        };
+                    }
+                },
+                selectors: {
+                    mustInclude: { getValues: () => ['Raw'] },
+                    mustExclude: { getValues: () => [] },
+                    mustIncludeTraits: { getValues: () => [] },
+                    mustExcludeTraits: { getValues: () => [] },
+                    extraEmblems: { getValues: () => [] },
+                    tankRoles: { getValues: () => [] },
+                    carryRoles: { getValues: () => [] }
+                },
+                variantLockControls: new Map(),
+                listeners: {
+                    draftBound: false
+                }
+            },
+            results: {
+                renderEstimateSummary: (estimate) => renderedEstimates.push(estimate)
+            }
+        };
+
+        const queryUi = createQueryUi(app);
+        const first = queryUi.refreshDraftEstimate();
+        const second = queryUi.refreshDraftEstimate();
+        await Promise.resolve();
+        resolveFirstNormalize();
+        await first;
+        await second;
+
+        assert.equal(estimateCallCount, 1);
+        assert.deepEqual(renderedEstimates, [{ count: 200, remainingSlots: 4 }]);
+    });
 });
