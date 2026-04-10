@@ -368,17 +368,20 @@
             };
         }
 
-        function getCurrentSearchParams() {
-            const {
-                boardSize,
-                maxResults,
-                onlyActiveToggle,
-                tierRankToggle,
-                includeUniqueToggle
-            } = resolveQueryControls();
+        function readQueryControlValues(controls) {
             return {
-                boardSize: parseInt(boardSize?.value, 10) || getDefaultBoardSize(),
-                maxResults: parseInt(maxResults?.value, 10) || getDefaultMaxResults(),
+                boardSize: parseInt(controls.boardSize?.value, 10) || getDefaultBoardSize(),
+                maxResults: parseInt(controls.maxResults?.value, 10) || getDefaultMaxResults(),
+                onlyActive: !!controls.onlyActiveToggle?.checked,
+                tierRank: !!controls.tierRankToggle?.checked,
+                includeUnique: !!controls.includeUniqueToggle?.checked
+            };
+        }
+
+        function getCurrentSearchParams() {
+            const controls = resolveQueryControls();
+            return {
+                ...readQueryControlValues(controls),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
                 mustExclude: state.selectors.mustExclude?.getValues() || [],
                 mustIncludeTraits: state.selectors.mustIncludeTraits?.getValues() || [],
@@ -386,10 +389,7 @@
                 extraEmblems: state.selectors.extraEmblems?.getValues() || [],
                 variantLocks: getCurrentVariantLocks(),
                 tankRoles: state.selectors.tankRoles?.getValues() || [],
-                carryRoles: state.selectors.carryRoles?.getValues() || [],
-                onlyActive: !!onlyActiveToggle?.checked,
-                tierRank: !!tierRankToggle?.checked,
-                includeUnique: !!includeUniqueToggle?.checked
+                carryRoles: state.selectors.carryRoles?.getValues() || []
             };
         }
 
@@ -411,49 +411,49 @@
             };
         }
 
-        function applySearchParams(params = {}) {
-            const defaults = getDefaultSearchParams();
-            const nextParams = {
-                ...defaults,
-                ...params
-            };
-            const {
-                boardSize,
-                maxResults,
-                onlyActiveToggle,
-                tierRankToggle,
-                includeUniqueToggle
-            } = resolveQueryControls();
+        function applyQueryControlValues(controls, params) {
+            if (controls.boardSize) controls.boardSize.value = params.boardSize || getDefaultBoardSize();
+            if (controls.maxResults) controls.maxResults.value = params.maxResults || getDefaultMaxResults();
+            if (controls.onlyActiveToggle) controls.onlyActiveToggle.checked = !!params.onlyActive;
+            if (controls.tierRankToggle) controls.tierRankToggle.checked = !!params.tierRank;
+            if (controls.includeUniqueToggle) controls.includeUniqueToggle.checked = !!params.includeUnique;
+        }
 
-            if (boardSize) boardSize.value = nextParams.boardSize || getDefaultBoardSize();
-            if (maxResults) maxResults.value = nextParams.maxResults || getDefaultMaxResults();
-            if (onlyActiveToggle) onlyActiveToggle.checked = !!nextParams.onlyActive;
-            if (tierRankToggle) tierRankToggle.checked = !!nextParams.tierRank;
-            if (includeUniqueToggle) includeUniqueToggle.checked = !!nextParams.includeUnique;
-
-            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(nextParams.mustInclude || []);
-            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(nextParams.mustExclude || []);
-            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues(nextParams.mustIncludeTraits || []);
-            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues(nextParams.mustExcludeTraits || []);
-            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues(nextParams.extraEmblems || []);
+        function applySelectorSearchParams(params) {
+            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(params.mustInclude || []);
+            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(params.mustExclude || []);
+            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues(params.mustIncludeTraits || []);
+            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues(params.mustExcludeTraits || []);
+            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues(params.extraEmblems || []);
 
             if (state.selectors.tankRoles) {
-                if (Array.isArray(nextParams.tankRoles)) {
-                    state.selectors.tankRoles.setValues(nextParams.tankRoles);
+                if (Array.isArray(params.tankRoles)) {
+                    state.selectors.tankRoles.setValues(params.tankRoles);
                 } else {
                     applyDefaultRoleFilters(true);
                 }
             }
 
             if (state.selectors.carryRoles) {
-                if (Array.isArray(nextParams.carryRoles)) {
-                    state.selectors.carryRoles.setValues(nextParams.carryRoles);
+                if (Array.isArray(params.carryRoles)) {
+                    state.selectors.carryRoles.setValues(params.carryRoles);
                 } else {
                     applyDefaultRoleFilters(true);
                 }
             }
 
-            applyVariantLocks(nextParams.variantLocks || {});
+            applyVariantLocks(params.variantLocks || {});
+        }
+
+        function applySearchParams(params = {}) {
+            const defaults = getDefaultSearchParams();
+            const nextParams = {
+                ...defaults,
+                ...params
+            };
+            const controls = resolveQueryControls();
+            applyQueryControlValues(controls, nextParams);
+            applySelectorSearchParams(nextParams);
         }
 
         function clampNumericInput(id, min, max, fallback) {
