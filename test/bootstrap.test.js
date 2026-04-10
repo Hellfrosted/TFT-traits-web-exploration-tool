@@ -63,6 +63,7 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
                         elements: {},
                         missingIds: [...missingIds]
                     }),
+                    setResultsBodyMessage: () => false,
                     reportRendererIssue
                 }
             },

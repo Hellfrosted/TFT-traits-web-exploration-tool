@@ -96,6 +96,15 @@
         };
     }
 
+    function setResultsBodyMessage(app, tbody, message, className = 'results-message-row') {
+        if (!tbody || typeof app?.results?.renderResultsMessageRow !== 'function') {
+            return false;
+        }
+
+        tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+        return true;
+    }
+
     function hasRequiredShellElements() {
         return getMissingRequiredShellIds().length === 0;
     }
@@ -175,6 +184,7 @@
         resolveShellElements,
         reportRendererIssue,
         createDialogInvoker,
+        setResultsBodyMessage,
         hasRequiredShellElements,
         formatSnapshotAge,
         getBoardMetric,

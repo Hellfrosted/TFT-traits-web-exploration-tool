@@ -1,6 +1,6 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { resolveShellElements, formatBoardEstimate, reportRendererIssue, createDialogInvoker } = ns.shared;
+    const { resolveShellElements, formatBoardEstimate, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
@@ -158,7 +158,7 @@
         }
 
         function renderSearchResultsRow(tbody, message, className = 'results-message-row results-message-row-error') {
-            tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+            setResultsBodyMessage(app, tbody, message, className);
         }
 
         function renderActiveSearchUi(progress = null) {
@@ -184,7 +184,7 @@
             app.results.renderSearchingSpotlight();
 
             if (tbody && state.currentResults.length === 0) {
-                tbody.innerHTML = app.results.renderResultsMessageRow(buildSearchTableMessage());
+                setResultsBodyMessage(app, tbody, buildSearchTableMessage());
             }
         }
 

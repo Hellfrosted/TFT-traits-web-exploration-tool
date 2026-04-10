@@ -86,6 +86,14 @@ function createSandbox(shell, overrides = {}) {
             TFTRenderer: {
                 shared: {
                     resolveShellElements: createResolveShellElements(shell),
+                    setResultsBodyMessage(app, tbody, message, className = 'results-message-row') {
+                        if (!tbody || typeof app?.results?.renderResultsMessageRow !== 'function') {
+                            return false;
+                        }
+
+                        tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+                        return true;
+                    },
                     reportRendererIssue(app, reporterState, issueKey, options = {}) {
                         if (reporterState && issueKey) {
                             if (reporterState[issueKey]) {

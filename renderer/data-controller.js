@@ -1,6 +1,6 @@
 (function initializeDataControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { formatSnapshotAge, resolveShellElements, reportRendererIssue, createDialogInvoker } = ns.shared;
+    const { formatSnapshotAge, resolveShellElements, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
 
     ns.createDataController = function createDataController(app) {
         const { state } = app;
@@ -193,12 +193,12 @@
             app.results.renderEmptySummary('Data refreshed');
             app.results.renderEmptySpotlight('Query controls changed after refresh. Re-run the query to compute aligned results.');
             const { elements } = resolveShellElements(['resBody']);
-            if (elements.resBody) {
-                elements.resBody.innerHTML = app.results.renderResultsMessageRow(
-                    'Data refresh normalized the active query. Re-run the query to compute aligned results.',
-                    'results-message-row results-message-row-muted'
-                );
-            }
+            setResultsBodyMessage(
+                app,
+                elements.resBody,
+                'Data refresh normalized the active query. Re-run the query to compute aligned results.',
+                'results-message-row results-message-row-muted'
+            );
             app.queryUi.renderQuerySummary(effectiveQuery, `Loaded ${setLabel}. Query normalized; re-run.`);
         }
 

@@ -1,6 +1,6 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { getMissingRequiredShellIds, resolveShellElements, reportRendererIssue, createDialogInvoker } = ns.shared;
+    const { getMissingRequiredShellIds, resolveShellElements, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
@@ -58,9 +58,7 @@
             app.results.renderEmptySpotlight();
             app.queryUi.renderQuerySummary(null, 'Filters reset. Build a fresh query and compute when ready.');
             const { elements } = resolveShellElements(['resBody']);
-            if (elements.resBody) {
-                elements.resBody.innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
-            }
+            setResultsBodyMessage(app, elements.resBody, 'Awaiting execution...', 'table-awaiting');
             app.queryUi.setStatusMessage(state.activeData
                 ? `Loaded ${state.activeData.unitMap.size} parsed champions and ready for a new query.`
                 : 'Status: Unloaded');

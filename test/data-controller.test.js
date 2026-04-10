@@ -63,6 +63,7 @@ function createShared(overrides = {}) {
             elements: {},
             missingIds: []
         }),
+        setResultsBodyMessage: () => false,
         reportRendererIssue(app, reporterState, issueKey, options = {}) {
             if (reporterState && issueKey) {
                 if (reporterState[issueKey]) {
