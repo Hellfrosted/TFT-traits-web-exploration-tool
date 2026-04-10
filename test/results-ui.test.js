@@ -26,7 +26,12 @@ function createResultsUiForSortMode(sortMode) {
                     escapeHtml: (value) => String(value ?? ''),
                     renderIconImage: () => '',
                     getBoardMetric: (board) => board.synergyScore ?? board.traitsCount ?? 0,
-                    formatBoardEstimate: (value) => String(value ?? '')
+                    formatBoardEstimate: (value) => String(value ?? ''),
+                    resolveShellElements: () => ({
+                        elements: {},
+                        missingIds: []
+                    }),
+                    setResultsBodyMessage: () => false
                 }
             }
         },
@@ -79,7 +84,12 @@ function createResultsUiForSummary(summarySink) {
                     escapeHtml: (value) => String(value ?? ''),
                     renderIconImage: () => '',
                     getBoardMetric: (board) => board.synergyScore ?? board.traitsCount ?? 0,
-                    formatBoardEstimate: (value) => String(value ?? '')
+                    formatBoardEstimate: (value) => String(value ?? ''),
+                    resolveShellElements: () => ({
+                        elements: {},
+                        missingIds: []
+                    }),
+                    setResultsBodyMessage: () => false
                 }
             }
         },
@@ -150,3 +160,4 @@ describe('results UI sorting', () => {
         assert.match(summaries.at(-1), />6</);
     });
 });
+

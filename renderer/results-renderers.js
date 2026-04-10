@@ -1,6 +1,6 @@
 (function initializeResultsRenderersFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, formatBoardEstimate } = ns.shared;
+    const { escapeHtml, formatBoardEstimate, resolveShellElements, setResultsBodyMessage } = ns.shared;
 
     ns.createResultsRenderers = function createResultsRenderers(app, model, tooltipController) {
         const { state } = app;
@@ -9,6 +9,10 @@
             while (node.firstChild) {
                 node.removeChild(node.firstChild);
             }
+        }
+
+        function resolveResultsShell() {
+            return resolveShellElements(['boardSpotlight', 'resBody']).elements;
         }
 
         function renderEmptySummary(message) {
@@ -65,7 +69,7 @@
         }
 
         function renderEmptySpotlight(message = 'No selection') {
-            const spotlight = document.getElementById('boardSpotlight');
+            const { boardSpotlight: spotlight } = resolveResultsShell();
             if (!spotlight) return;
 
             spotlight.className = 'board-spotlight empty';
@@ -145,7 +149,7 @@
                 return;
             }
 
-            const spotlight = document.getElementById('boardSpotlight');
+            const { boardSpotlight: spotlight } = resolveResultsShell();
             if (!spotlight) return;
             const traits = model.buildBoardTraitSummary(board, { showInactive: true });
             const valueScore = (model.getBoardMetric(board) / Math.max(board.totalCost, 1)).toFixed(2);
@@ -224,7 +228,7 @@
         }
 
         function renderResults(results) {
-            const tbody = document.getElementById('resBody');
+            const { resBody: tbody } = resolveResultsShell();
             if (!tbody) return;
             tooltipController.hideTraitTooltip();
             clearNode(tbody);
@@ -232,14 +236,14 @@
 
             if (!results || results.length === 0) {
                 renderEmptySummary('No results');
-                tbody.innerHTML = renderResultsMessageRow('No results found for these constraints.', 'results-message-row results-message-row-error');
+                setResultsBodyMessage(app, tbody, 'No results found for these constraints.', 'results-message-row results-message-row-error');
                 renderEmptySpotlight('No boards matched the current filters. Relax constraints or widen the search.');
                 return;
             }
 
             if (results[0].error) {
                 renderEmptySummary('Search error');
-                tbody.innerHTML = renderResultsMessageRow(results[0].error, 'results-message-row results-message-row-error');
+                setResultsBodyMessage(app, tbody, results[0].error, 'results-message-row results-message-row-error');
                 renderEmptySpotlight('Search failed before a board could be inspected.');
                 return;
             }
