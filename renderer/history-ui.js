@@ -25,11 +25,60 @@
                 return Promise.resolve(false);
             };
 
+        function resolveHistoryShell() {
+            return {
+                historyList: document.getElementById('historyList'),
+                searchBtn: document.getElementById('searchBtn')
+            };
+        }
+
+        function renderHistoryEmptyState(listEl, message) {
+            listEl.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
+        }
+
+        function createHistoryMeta(entry) {
+            const meta = document.createElement('div');
+            meta.className = 'history-meta';
+
+            const resultCount = document.createElement('span');
+            resultCount.textContent = `${entry.resultCount} results`;
+
+            const timestamp = document.createElement('span');
+            timestamp.textContent = formatTimestamp(entry.timestamp);
+
+            meta.appendChild(resultCount);
+            meta.appendChild(timestamp);
+            return meta;
+        }
+
+        function createHistoryItem(entry) {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+
+            const paramsStr = summarizeParams(entry.params);
+            const title = entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search';
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'history-title';
+            titleEl.textContent = title;
+
+            const paramsEl = document.createElement('div');
+            paramsEl.className = 'history-params';
+            paramsEl.title = paramsStr;
+            paramsEl.textContent = paramsStr;
+
+            item.appendChild(titleEl);
+            item.appendChild(paramsEl);
+            item.appendChild(createHistoryMeta(entry));
+            item.addEventListener('click', () => loadSearchFromHistory(entry));
+            return item;
+        }
+
         async function updateHistoryList() {
-            const listEl = document.getElementById('historyList');
+            const { historyList: listEl } = resolveHistoryShell();
             if (!listEl) return;
             if (!state.electronBridge?.listCache) {
-                listEl.innerHTML = '<div class="history-empty">History unavailable</div>';
+                renderHistoryEmptyState(listEl, 'History unavailable');
                 return;
             }
 
@@ -37,14 +86,15 @@
             try {
                 res = await state.electronBridge.listCache();
             } catch (error) {
-                listEl.innerHTML = `<div class="history-empty">History unavailable: ${escapeHtml(error.message || String(error))}</div>`;
+                renderHistoryEmptyState(listEl, `History unavailable: ${error.message || String(error)}`);
                 return;
             }
 
             if (!res.success || res.entries.length === 0) {
-                listEl.innerHTML = res.success
-                    ? '<div class="history-empty">No history</div>'
-                    : `<div class="history-empty">History unavailable: ${escapeHtml(res.error || 'Unknown error')}</div>`;
+                renderHistoryEmptyState(
+                    listEl,
+                    res.success ? 'No history' : `History unavailable: ${res.error || 'Unknown error'}`
+                );
                 return;
             }
 
@@ -52,23 +102,7 @@
             listEl.innerHTML = '';
 
             recent.forEach((entry) => {
-                const item = document.createElement('div');
-                item.className = 'history-item';
-
-                const paramsStr = summarizeParams(entry.params);
-                const title = entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search';
-
-                item.innerHTML = `
-                    <div class="history-title">${escapeHtml(title)}</div>
-                    <div class="history-params" title="${escapeHtml(paramsStr)}">${escapeHtml(paramsStr)}</div>
-                    <div class="history-meta">
-                        <span>${entry.resultCount} results</span>
-                        <span>${escapeHtml(formatTimestamp(entry.timestamp))}</span>
-                    </div>
-                `;
-
-                item.addEventListener('click', () => loadSearchFromHistory(entry));
-                listEl.appendChild(item);
+                listEl.appendChild(createHistoryItem(entry));
             });
         }
 
@@ -94,7 +128,8 @@
                 }
 
                 app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
-                document.getElementById('searchBtn')?.click();
+                const { searchBtn } = resolveHistoryShell();
+                searchBtn?.click();
             } catch (error) {
                 console.error('[History Replay Failed]', error);
                 if (typeof app.queryUi.setStatusMessage === 'function') {

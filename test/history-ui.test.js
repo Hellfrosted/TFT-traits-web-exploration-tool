@@ -38,7 +38,153 @@ function createShared(overrides = {}) {
     };
 }
 
+function createDomElement(tagName) {
+    const listeners = new Map();
+    const element = {
+        tagName,
+        children: [],
+        className: '',
+        textContent: '',
+        title: '',
+        appendChild(child) {
+            this.children.push(child);
+            return child;
+        },
+        addEventListener(eventName, handler) {
+            if (!listeners.has(eventName)) {
+                listeners.set(eventName, []);
+            }
+            listeners.get(eventName).push(handler);
+        },
+        dispatchEvent(event) {
+            const handlers = listeners.get(event.type) || [];
+            handlers.forEach((handler) => handler(event));
+        }
+    };
+
+    let innerHtmlValue = '';
+    Object.defineProperty(element, 'innerHTML', {
+        get() {
+            return innerHtmlValue;
+        },
+        set(value) {
+            innerHtmlValue = value;
+            this.children = [];
+        }
+    });
+
+    return element;
+}
+
 describe('renderer history UI', () => {
+    it('renders an unavailable state when cache history is not accessible', async () => {
+        const historyList = createDomElement('div');
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => id === 'historyList' ? historyList : null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                electronBridge: {},
+                dependencies: {
+                    showAlert: () => {}
+                }
+            },
+            queryUi: {}
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.updateHistoryList();
+
+        assert.match(historyList.innerHTML, /History unavailable/);
+    });
+
+    it('renders recent history entries and replays the selected search', async () => {
+        const historyList = createDomElement('div');
+        let searchClicks = 0;
+        const appliedParams = [];
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => {
+                    if (id === 'historyList') return historyList;
+                    if (id === 'searchBtn') {
+                        return {
+                            click: () => {
+                                searchClicks += 1;
+                            }
+                        };
+                    }
+                    return null;
+                },
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared({
+                        summarizeParams: (params) => `Inc: ${params.mustInclude.join(', ')}`,
+                        formatTimestamp: () => '12:00'
+                    })
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                },
+                electronBridge: {
+                    listCache: async () => ({
+                        success: true,
+                        entries: Array.from({ length: 6 }, (_, index) => ({
+                            params: {
+                                boardSize: 9 - index,
+                                mustInclude: [`Unit${index}`]
+                            },
+                            resultCount: index + 1,
+                            timestamp: 1000 + index
+                        }))
+                    })
+                },
+                activeData: null,
+                selectors: {}
+            },
+            queryUi: {
+                applySearchParams: (params) => appliedParams.push(params),
+                renderQuerySummary: () => {}
+            }
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.updateHistoryList();
+
+        assert.equal(historyList.children.length, 5);
+        assert.equal(historyList.children[0].children[0].textContent, 'Level 9');
+        assert.equal(historyList.children[0].children[1].textContent, 'Inc: Unit0');
+
+        historyList.children[0].dispatchEvent({ type: 'click' });
+
+        assert.deepEqual(appliedParams, [{
+            boardSize: 9,
+            mustInclude: ['Unit0']
+        }]);
+        assert.equal(searchClicks, 1);
+    });
+
     it('normalizes replayed params before applying and launching a replay search', async () => {
         let searchClicks = 0;
         const appliedParams = [];
