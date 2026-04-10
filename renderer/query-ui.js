@@ -254,23 +254,62 @@
         function syncFetchButtonState() {
             const { fetchBtn } = resolveSummaryShell();
             if (!fetchBtn) return;
-            const shouldDisable = state.isSearching || state.isFetchingData;
-            fetchBtn.disabled = shouldDisable;
-            fetchBtn.style.opacity = shouldDisable ? '0.5' : '1';
+            const uiState = getFetchButtonUiState({
+                isSearching: state.isSearching,
+                isFetchingData: state.isFetchingData
+            });
+            applyFetchButtonUi(fetchBtn, uiState);
         }
 
         function syncSearchButtonState() {
             const { searchBtn } = resolveSummaryShell();
             if (!searchBtn) return;
 
-            const shouldDisable = state.isSearching || state.isFetchingData || !state.activeData;
-            searchBtn.disabled = shouldDisable;
-            searchBtn.classList.toggle('disabled', shouldDisable);
+            const uiState = getSearchButtonUiState({
+                isSearching: state.isSearching,
+                isFetchingData: state.isFetchingData,
+                hasActiveData: !!state.activeData
+            });
+            applySearchButtonUi(searchBtn, uiState);
+        }
 
-            if (!state.isSearching) {
-                searchBtn.innerText = state.isFetchingData
-                    ? 'Loading data...'
-                    : 'Compute';
+        function getFetchButtonUiState({
+            isSearching = false,
+            isFetchingData = false
+        } = {}) {
+            const disabled = isSearching || isFetchingData;
+            return {
+                disabled,
+                opacity: disabled ? '0.5' : '1'
+            };
+        }
+
+        function applyFetchButtonUi(button, uiState) {
+            button.disabled = !!uiState?.disabled;
+            button.style.opacity = uiState?.opacity || '1';
+        }
+
+        function getSearchButtonUiState({
+            isSearching = false,
+            isFetchingData = false,
+            hasActiveData = false
+        } = {}) {
+            const disabled = isSearching || isFetchingData || !hasActiveData;
+            return {
+                disabled,
+                classDisabled: disabled,
+                text: isSearching
+                    ? null
+                    : (isFetchingData ? 'Loading data...' : 'Compute')
+            };
+        }
+
+        function applySearchButtonUi(button, uiState) {
+            button.disabled = !!uiState?.disabled;
+            button.classList.toggle('disabled', !!uiState?.classDisabled);
+
+            if (uiState?.text !== null && uiState?.text !== undefined) {
+                button.innerText = uiState.text;
             }
         }
 
@@ -561,7 +600,13 @@
             clampNumericInput,
             refreshDraftEstimate,
             refreshDraftQuerySummary,
-            bindDraftQueryListeners
+            bindDraftQueryListeners,
+            __test: {
+                getFetchButtonUiState,
+                applyFetchButtonUi,
+                getSearchButtonUiState,
+                applySearchButtonUi
+            }
         };
     };
 })();

@@ -45,6 +45,25 @@ function createClassList(initial = []) {
     return {
         add: (value) => values.add(value),
         remove: (value) => values.delete(value),
+        toggle(value, force) {
+            if (force === true) {
+                values.add(value);
+                return true;
+            }
+
+            if (force === false) {
+                values.delete(value);
+                return false;
+            }
+
+            if (values.has(value)) {
+                values.delete(value);
+                return false;
+            }
+
+            values.add(value);
+            return true;
+        },
         contains: (value) => values.has(value)
     };
 }
@@ -277,6 +296,149 @@ describe('renderer query UI', () => {
         assert.match(dataStatsNode.innerHTML, />7</);
         assert.match(dataStatsNode.innerHTML, /Splashes/);
         assert.match(dataStatsNode.innerHTML, />58\/61</);
+    });
+
+    it('calculates fetch and search button UI states through extracted helpers', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: () => null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        const toPlainObject = (value) => JSON.parse(JSON.stringify(value));
+
+        assert.deepEqual(toPlainObject(queryUi.__test.getFetchButtonUiState({
+            isSearching: false,
+            isFetchingData: false
+        })), {
+            disabled: false,
+            opacity: '1'
+        });
+        assert.deepEqual(toPlainObject(queryUi.__test.getFetchButtonUiState({
+            isSearching: true,
+            isFetchingData: false
+        })), {
+            disabled: true,
+            opacity: '0.5'
+        });
+        assert.deepEqual(toPlainObject(queryUi.__test.getSearchButtonUiState({
+            isSearching: false,
+            isFetchingData: true,
+            hasActiveData: true
+        })), {
+            disabled: true,
+            classDisabled: true,
+            text: 'Loading data...'
+        });
+        assert.deepEqual(toPlainObject(queryUi.__test.getSearchButtonUiState({
+            isSearching: true,
+            isFetchingData: false,
+            hasActiveData: true
+        })), {
+            disabled: true,
+            classDisabled: true,
+            text: null
+        });
+    });
+
+    it('syncs the fetch button DOM state through the extracted applicator', () => {
+        const fetchButton = {
+            disabled: false,
+            style: {
+                opacity: ''
+            }
+        };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => id === 'fetchBtn' ? fetchButton : null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                isSearching: false,
+                isFetchingData: true,
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.syncFetchButtonState();
+
+        assert.equal(fetchButton.disabled, true);
+        assert.equal(fetchButton.style.opacity, '0.5');
+    });
+
+    it('syncs the search button DOM state without clobbering active search text', () => {
+        const searchButton = {
+            disabled: false,
+            innerText: 'Searching...',
+            classList: createClassList()
+        };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => id === 'searchBtn' ? searchButton : null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                activeData: { ready: true },
+                isSearching: true,
+                isFetchingData: false,
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.syncSearchButtonState();
+
+        assert.equal(searchButton.disabled, true);
+        assert.equal(searchButton.classList.contains('disabled'), true);
+        assert.equal(searchButton.innerText, 'Searching...');
     });
 
     it('refreshes the draft estimate when query constraints change', async () => {
