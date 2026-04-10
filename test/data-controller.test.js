@@ -632,6 +632,72 @@ describe('renderer data controller', () => {
         assert.deepEqual(successState.activeData.roles, ['Carry']);
     });
 
+    it('derives fetch request context through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const currentDraftParams = { boardSize: 8, maxResults: 100 };
+        const previousSearchParams = { boardSize: 9, maxResults: 50 };
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {},
+                nextDataFetchRequestId: 4,
+                activeData: {
+                    dataFingerprint: 'fp-1'
+                },
+                currentResults: [{ units: ['Board'] }],
+                lastSearchParams: previousSearchParams
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: (source) => source === 'latest' ? 'Live' : 'PBE',
+                getCurrentSearchParams: () => currentDraftParams,
+                getCurrentVariantLocks: () => ({ MissFortune: 'conduit' })
+            },
+            history: {}
+        });
+
+        const visibleResultsContext = JSON.parse(JSON.stringify(controller.__test.getFetchRequestContext()));
+        assert.deepEqual(visibleResultsContext, {
+            source: 'pbe',
+            sourceLabel: 'PBE',
+            preservedVariantLocks: { MissFortune: 'conduit' },
+            hadVisibleResults: true,
+            preservedDraftParams: currentDraftParams,
+            previousEffectiveQuery: previousSearchParams,
+            requestId: 5,
+            previousFingerprint: 'fp-1'
+        });
+
+        const draftOnlyContext = JSON.parse(JSON.stringify(controller.__test.getFetchRequestContext({
+            source: 'latest',
+            nextDataFetchRequestId: 0,
+            activeData: null,
+            currentResults: [],
+            currentDraftParams,
+            currentVariantLocks: {},
+            lastSearchParams: previousSearchParams
+        })));
+        assert.deepEqual(draftOnlyContext, {
+            source: 'latest',
+            sourceLabel: 'Live',
+            preservedVariantLocks: {},
+            hadVisibleResults: false,
+            preservedDraftParams: currentDraftParams,
+            previousEffectiveQuery: currentDraftParams,
+            requestId: 1,
+            previousFingerprint: null
+        });
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {

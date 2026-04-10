@@ -301,6 +301,30 @@
             };
         }
 
+        function getFetchRequestContext({
+            source = app.queryUi.getSelectedDataSource(),
+            nextDataFetchRequestId = state.nextDataFetchRequestId,
+            activeData = state.activeData,
+            currentResults = state.currentResults,
+            currentDraftParams = app.queryUi.getCurrentSearchParams(),
+            currentVariantLocks = app.queryUi.getCurrentVariantLocks(),
+            lastSearchParams = state.lastSearchParams
+        } = {}) {
+            const hadVisibleResults = Array.isArray(currentResults) && currentResults.length > 0;
+            return {
+                source,
+                sourceLabel: app.queryUi.getDataSourceLabel(source),
+                preservedVariantLocks: currentVariantLocks,
+                hadVisibleResults,
+                preservedDraftParams: currentDraftParams,
+                previousEffectiveQuery: hadVisibleResults && lastSearchParams
+                    ? lastSearchParams
+                    : currentDraftParams,
+                requestId: (Number.isFinite(nextDataFetchRequestId) ? nextDataFetchRequestId : 0) + 1,
+                previousFingerprint: activeData?.dataFingerprint || null
+            };
+        }
+
         async function restoreQueryState(previousEffectiveQuery, {
             hadVisibleResults,
             dataChanged,
@@ -333,18 +357,18 @@
         }
 
         async function fetchData() {
-            const source = app.queryUi.getSelectedDataSource();
-            const sourceLabel = app.queryUi.getDataSourceLabel(source);
-            const preservedVariantLocks = app.queryUi.getCurrentVariantLocks();
-            const hadVisibleResults = Array.isArray(state.currentResults) && state.currentResults.length > 0;
-            const preservedDraftParams = app.queryUi.getCurrentSearchParams();
-            const previousEffectiveQuery = hadVisibleResults && state.lastSearchParams
-                ? state.lastSearchParams
-                : preservedDraftParams;
-            const requestId = (Number.isFinite(state.nextDataFetchRequestId) ? state.nextDataFetchRequestId : 0) + 1;
+            const requestContext = getFetchRequestContext();
+            const {
+                source,
+                sourceLabel,
+                preservedVariantLocks,
+                hadVisibleResults,
+                previousEffectiveQuery,
+                requestId,
+                previousFingerprint
+            } = requestContext;
             state.nextDataFetchRequestId = requestId;
             state.activeDataFetchRequestId = requestId;
-            const previousFingerprint = state.activeData?.dataFingerprint || null;
             state.isFetchingData = true;
             syncFetchUi(sourceLabel);
 
@@ -407,7 +431,8 @@
                 getFetchFailureUiState,
                 getLoadedDataUiState,
                 getSelectorSetupConfigs,
-                getSuccessfulFetchState
+                getSuccessfulFetchState,
+                getFetchRequestContext
             }
         };
     };
