@@ -153,6 +153,93 @@ describe('renderer query UI', () => {
         assert.match(summaryNode.innerHTML, /Force 1 traits/);
     });
 
+    it('renders query summary chips and active-state meta for populated params', () => {
+        const summaryNode = { innerHTML: '' };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => id === 'resultsQuerySummary' ? summaryNode : null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.renderQuerySummary({
+            boardSize: 9,
+            maxResults: 50,
+            mustInclude: ['A'],
+            mustExclude: ['B'],
+            mustIncludeTraits: ['Bruiser'],
+            mustExcludeTraits: ['Sniper'],
+            extraEmblems: ['Emblem'],
+            variantLocks: { MissFortune: 'conduit' },
+            includeUnique: true,
+            onlyActive: false,
+            tierRank: false
+        }, 'Loaded Set 17');
+
+        assert.match(summaryNode.innerHTML, /query-summary-meta query-summary-meta-active/);
+        assert.match(summaryNode.innerHTML, /Include 1 units/);
+        assert.match(summaryNode.innerHTML, /Exclude 1 units/);
+        assert.match(summaryNode.innerHTML, /Force 1 traits/);
+        assert.match(summaryNode.innerHTML, /Ban 1 traits/);
+        assert.match(summaryNode.innerHTML, /1 emblems/);
+        assert.match(summaryNode.innerHTML, /1 locked modes/);
+        assert.match(summaryNode.innerHTML, /Unique traits on/);
+        assert.match(summaryNode.innerHTML, /Inactive traits counted/);
+        assert.match(summaryNode.innerHTML, /Flat trait ranking/);
+    });
+
+    it('renders summary meta without chips when params are absent', () => {
+        const summaryNode = { innerHTML: '' };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => id === 'resultsQuerySummary' ? summaryNode : null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.renderQuerySummary(null, 'Search cancelled');
+
+        assert.match(summaryNode.innerHTML, /query-summary-meta query-summary-meta-warning/);
+        assert.doesNotMatch(summaryNode.innerHTML, /query-chip-list/);
+        assert.match(summaryNode.innerHTML, /Search cancelled/);
+    });
+
     it('refreshes the draft estimate when query constraints change', async () => {
         const controlsBody = createEventTarget();
         const summaryNode = { innerHTML: '' };

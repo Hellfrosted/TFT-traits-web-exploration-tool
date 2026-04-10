@@ -263,7 +263,7 @@
             }
         }
 
-        function getQueryMetaClass(meta) {
+        function getQuerySummaryMetaClass(meta) {
             const text = String(meta ?? '').toLowerCase();
             if (text.includes('error') || text.includes('failed')) return 'query-summary-meta query-summary-meta-error';
             if (text.includes('cancel')) return 'query-summary-meta query-summary-meta-warning';
@@ -273,18 +273,7 @@
             return 'query-summary-meta';
         }
 
-        function renderQuerySummary(params = null, meta = 'Idle') {
-            const metaClass = getQueryMetaClass(meta);
-            if (!params) {
-                setQuerySummary(`
-                    <div class="query-summary-heading">
-                        <span class="query-summary-label">Query</span>
-                        <span class="${metaClass}">${escapeHtml(meta)}</span>
-                    </div>
-                `);
-                return;
-            }
-
+        function buildQuerySummaryChips(params) {
             const chips = [
                 `Level ${params.boardSize}`,
                 `Max ${params.maxResults}`
@@ -300,13 +289,31 @@
             if (!params.onlyActive) chips.push('Inactive traits counted');
             if (!params.tierRank) chips.push('Flat trait ranking');
 
-            setQuerySummary(`
+            return chips;
+        }
+
+        function buildQuerySummaryMarkup({ chips = [], meta = 'Idle', metaClass = 'query-summary-meta' } = {}) {
+            const chipMarkup = Array.isArray(chips) && chips.length > 0
+                ? `<div class="query-chip-list">${chips.map((chip) => `<span class="query-chip">${escapeHtml(chip)}</span>`).join('')}</div>`
+                : '';
+
+            return `
                 <div class="query-summary-heading">
                     <span class="query-summary-label">Query</span>
                     <span class="${metaClass}">${escapeHtml(meta)}</span>
                 </div>
-                <div class="query-chip-list">${chips.map((chip) => `<span class="query-chip">${escapeHtml(chip)}</span>`).join('')}</div>
-            `);
+                ${chipMarkup}
+            `;
+        }
+
+        function renderQuerySummary(params = null, meta = 'Idle') {
+            const metaClass = getQuerySummaryMetaClass(meta);
+            const chips = params ? buildQuerySummaryChips(params) : [];
+            setQuerySummary(buildQuerySummaryMarkup({
+                chips,
+                meta,
+                metaClass
+            }));
         }
 
         async function refreshDraftEstimate() {
