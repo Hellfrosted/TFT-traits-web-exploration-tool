@@ -35,6 +35,33 @@ function createCancelButton() {
     };
 }
 
+function createTrackedClassList(initial = []) {
+    const values = new Set(initial);
+    return {
+        add: (value) => values.add(value),
+        remove: (value) => values.delete(value),
+        toggle: (value, force) => {
+            if (force === undefined) {
+                if (values.has(value)) {
+                    values.delete(value);
+                    return false;
+                }
+                values.add(value);
+                return true;
+            }
+
+            if (force) {
+                values.add(value);
+                return true;
+            }
+
+            values.delete(value);
+            return false;
+        },
+        contains: (value) => values.has(value)
+    };
+}
+
 function createShell(overrides = {}) {
     return {
         searchBtn: createSearchButton(),
@@ -381,6 +408,62 @@ describe('renderer search controller', () => {
                 shouldUpdateHistory: false
             }
         );
+    });
+
+    it('derives and applies active search control UI through the extracted helper', () => {
+        const shell = {
+            searchBtn: {
+                disabled: false,
+                innerText: 'Compute',
+                classList: createTrackedClassList()
+            },
+            cancelBtn: {
+                disabled: true,
+                style: {
+                    display: 'none'
+                }
+            }
+        };
+        const sandbox = createSandbox(createShell());
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                isSearching: true,
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        const activeUiState = JSON.parse(JSON.stringify(
+            controller.__test.getSearchControlUiState(true, 'Searching 42%')
+        ));
+        assert.deepEqual(activeUiState, {
+            searchDisabled: true,
+            searchClassDisabled: true,
+            searchText: 'Searching 42%',
+            cancelDisplay: 'block',
+            cancelDisabled: false
+        });
+
+        controller.__test.applySearchControlUi(shell, activeUiState);
+        assert.equal(shell.searchBtn.disabled, true);
+        assert.equal(shell.searchBtn.classList.contains('disabled'), true);
+        assert.equal(shell.searchBtn.innerText, 'Searching 42%');
+        assert.equal(shell.cancelBtn.style.display, 'block');
+        assert.equal(shell.cancelBtn.disabled, false);
+
+        const idleUiState = JSON.parse(JSON.stringify(controller.__test.getSearchControlUiState(false)));
+        assert.deepEqual(idleUiState, {
+            cancelDisplay: 'none'
+        });
+
+        controller.__test.applySearchControlUi(shell, idleUiState);
+        assert.equal(shell.cancelBtn.style.display, 'none');
     });
 
     it('sets a fresh status message when a search returns no results', async () => {

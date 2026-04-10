@@ -179,6 +179,42 @@
             setResultsBodyMessage(app, tbody, message, className);
         }
 
+        function getSearchControlUiState(searching, searchLabel = buildSearchButtonLabel()) {
+            if (searching) {
+                return {
+                    searchDisabled: true,
+                    searchClassDisabled: true,
+                    searchText: searchLabel,
+                    cancelDisplay: 'block',
+                    cancelDisabled: false
+                };
+            }
+
+            return {
+                cancelDisplay: 'none'
+            };
+        }
+
+        function applySearchControlUi(shell, uiState = {}) {
+            const { searchBtn, cancelBtn } = shell || {};
+
+            if (searchBtn && uiState.searchDisabled !== undefined) {
+                searchBtn.disabled = !!uiState.searchDisabled;
+            }
+            if (searchBtn && uiState.searchClassDisabled !== undefined) {
+                searchBtn.classList.toggle('disabled', !!uiState.searchClassDisabled);
+            }
+            if (searchBtn && uiState.searchText !== undefined && uiState.searchText !== null) {
+                searchBtn.innerText = uiState.searchText;
+            }
+            if (cancelBtn && uiState.cancelDisplay !== undefined) {
+                cancelBtn.style.display = uiState.cancelDisplay;
+            }
+            if (cancelBtn && uiState.cancelDisabled !== undefined) {
+                cancelBtn.disabled = !!uiState.cancelDisabled;
+            }
+        }
+
         function renderActiveSearchUi(progress = null) {
             const shell = resolveSearchShell('Unable to render active search UI.');
             if (!shell) {
@@ -229,18 +265,13 @@
                 state.activeSearchId = null;
                 state.activeSearchProgress = null;
             }
-            const { searchBtn, cancelBtn } = shell;
 
             if (searching) {
-                searchBtn.disabled = true;
-                searchBtn.classList.add('disabled');
-                searchBtn.innerText = buildSearchButtonLabel();
-                cancelBtn.style.display = 'block';
-                cancelBtn.disabled = false;
+                applySearchControlUi(shell, getSearchControlUiState(searching, buildSearchButtonLabel()));
             } else {
                 setCancellingSearch(false);
                 app.queryUi.syncSearchButtonState();
-                cancelBtn.style.display = 'none';
+                applySearchControlUi(shell, getSearchControlUiState(false));
                 state.activeSearchEstimate = null;
                 state.activeSearchProgress = null;
                 if (state.activeSearchId !== null && state.activeSearchId !== undefined) {
@@ -522,7 +553,9 @@
             subscribeProgressUpdates,
             __test: {
                 resolveProgressSearchId,
-                getSearchResultsUiState
+                getSearchResultsUiState,
+                getSearchControlUiState,
+                applySearchControlUi
             }
         };
     };
