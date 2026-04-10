@@ -1,42 +1,54 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { resolveShellElements, formatBoardEstimate } = ns.shared;
+    const { resolveShellElements, formatBoardEstimate, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
-        let hasReportedShellMismatch = false;
-        let hasReportedMissingDialogDependencies = false;
+        const reporterState = {
+            shellMismatch: false,
+            missingDialogDependencies: false
+        };
 
         function reportMissingDialogDependencies() {
-            if (hasReportedMissingDialogDependencies) {
-                return;
-            }
-
-            hasReportedMissingDialogDependencies = true;
-            console.error('[Renderer Dependency Missing] Dialog helpers are unavailable.');
-            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
-            app.queryUi.renderQuerySummary(state.lastSearchParams || null, 'Dependency mismatch');
+            reportRendererIssue(app, reporterState, 'missingDialogDependencies', {
+                consoleMessage: '[Renderer Dependency Missing] Dialog helpers are unavailable.',
+                statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.',
+                querySummary: {
+                    params: state.lastSearchParams || null,
+                    meta: 'Dependency mismatch'
+                }
+            });
         }
 
-        function showAlert(message, title = 'Attention') {
-            const alertFn = state.dependencies?.showAlert;
-            if (typeof alertFn === 'function') {
-                return alertFn(message, title);
-            }
+        const showAlert = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, reporterState, {
+                methodName: 'showAlert',
+                issueKey: 'missingDialogDependencies'
+            })
+            : function fallbackShowAlert(message, title = 'Attention') {
+                const alertFn = state.dependencies?.showAlert;
+                if (typeof alertFn === 'function') {
+                    return alertFn(message, title);
+                }
 
-            reportMissingDialogDependencies();
-            return Promise.resolve(false);
-        }
+                reportMissingDialogDependencies();
+                return Promise.resolve(false);
+            };
 
-        async function showConfirm(message, title = 'Confirmation') {
-            const confirmFn = state.dependencies?.showConfirm;
-            if (typeof confirmFn === 'function') {
-                return await confirmFn(message, title);
-            }
+        const showConfirm = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, reporterState, {
+                methodName: 'showConfirm',
+                issueKey: 'missingDialogDependencies'
+            })
+            : async function fallbackShowConfirm(message, title = 'Confirmation') {
+                const confirmFn = state.dependencies?.showConfirm;
+                if (typeof confirmFn === 'function') {
+                    return await confirmFn(message, title);
+                }
 
-            reportMissingDialogDependencies();
-            return false;
-        }
+                reportMissingDialogDependencies();
+                return false;
+            };
 
         function normalizeSearchProgress(progress = null) {
             if (Number.isFinite(progress)) {
@@ -111,13 +123,15 @@
         }
 
         function reportShellMismatchOnce(missingIds, contextMessage) {
-            if (!hasReportedShellMismatch) {
-                console.error(`[Renderer Shell Mismatch] ${contextMessage}`, { missingIds });
-                hasReportedShellMismatch = true;
-            }
-
-            app.queryUi.setStatusMessage('Renderer shell mismatch: search controls unavailable.');
-            app.queryUi.renderQuerySummary(state.lastSearchParams || null, 'Shell mismatch');
+            reportRendererIssue(app, reporterState, 'shellMismatch', {
+                consoleMessage: `[Renderer Shell Mismatch] ${contextMessage}`,
+                consoleDetail: { missingIds },
+                statusMessage: 'Renderer shell mismatch: search controls unavailable.',
+                querySummary: {
+                    params: state.lastSearchParams || null,
+                    meta: 'Shell mismatch'
+                }
+            });
         }
 
         function resolveSearchShell(contextMessage, options = {}) {

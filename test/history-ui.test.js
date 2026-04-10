@@ -14,6 +14,30 @@ function loadHistoryUiFactory(sandbox) {
     return sandbox.window.TFTRenderer.createHistoryUi;
 }
 
+function createShared(overrides = {}) {
+    return {
+        escapeHtml: (value) => String(value ?? ''),
+        summarizeParams: () => '',
+        formatTimestamp: () => '',
+        reportRendererIssue(app, reporterState, issueKey, options = {}) {
+            if (reporterState && issueKey) {
+                if (reporterState[issueKey]) {
+                    return false;
+                }
+                reporterState[issueKey] = true;
+            }
+
+            app.queryUi?.setStatusMessage?.(options.statusMessage || '');
+            if (options.querySummary) {
+                app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
+            }
+
+            return true;
+        },
+        ...overrides
+    };
+}
+
 describe('renderer history UI', () => {
     it('normalizes replayed params before applying and launching a replay search', async () => {
         let searchClicks = 0;
@@ -36,11 +60,7 @@ describe('renderer history UI', () => {
             },
             window: {
                 TFTRenderer: {
-                    shared: {
-                        escapeHtml: (value) => String(value ?? ''),
-                        summarizeParams: () => '',
-                        formatTimestamp: () => ''
-                    }
+                    shared: createShared()
                 }
             }
         };
@@ -125,11 +145,7 @@ describe('renderer history UI', () => {
             },
             window: {
                 TFTRenderer: {
-                    shared: {
-                        escapeHtml: (value) => String(value ?? ''),
-                        summarizeParams: () => '',
-                        formatTimestamp: () => ''
-                    }
+                    shared: createShared()
                 }
             }
         };

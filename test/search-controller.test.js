@@ -63,8 +63,9 @@ function createResolveShellElements(shell) {
 }
 
 function createSandbox(shell, overrides = {}) {
+    const consoleApi = overrides.console || console;
     return {
-        console: overrides.console || console,
+        console: consoleApi,
         showAlert: overrides.showAlert || (() => {}),
         showConfirm: overrides.showConfirm || (async () => true),
         document: {
@@ -74,6 +75,26 @@ function createSandbox(shell, overrides = {}) {
             TFTRenderer: {
                 shared: {
                     resolveShellElements: createResolveShellElements(shell),
+                    reportRendererIssue(app, reporterState, issueKey, options = {}) {
+                        if (reporterState && issueKey) {
+                            if (reporterState[issueKey]) {
+                                return false;
+                            }
+                            reporterState[issueKey] = true;
+                        }
+
+                        if (options.consoleDetail !== null && options.consoleDetail !== undefined) {
+                            consoleApi.error(options.consoleMessage, options.consoleDetail);
+                        } else {
+                            consoleApi.error(options.consoleMessage);
+                        }
+                        app.queryUi?.setStatusMessage?.(options.statusMessage || '');
+                        if (options.querySummary) {
+                            app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
+                        }
+
+                        return true;
+                    },
                     formatBoardEstimate: (value) => {
                         const numericValue = Number(value);
                         if (!Number.isFinite(numericValue) || numericValue <= 0) {

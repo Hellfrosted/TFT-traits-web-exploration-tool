@@ -1,25 +1,30 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { getMissingRequiredShellIds } = ns.shared;
+    const { getMissingRequiredShellIds, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
-        let hasReportedMissingDialogDependency = false;
+        const reporterState = {
+            missingDialogDependency: false
+        };
+        const showAlert = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, reporterState, {
+                methodName: 'showAlert'
+            })
+            : function fallbackShowAlert(message, title = 'Attention') {
+                const alertFn = state.dependencies?.showAlert;
+                if (typeof alertFn === 'function') {
+                    return alertFn(message, title);
+                }
 
-        function showAlert(message, title = 'Attention') {
-            const alertFn = state.dependencies?.showAlert;
-            if (typeof alertFn === 'function') {
-                return alertFn(message, title);
-            }
+                reportRendererIssue(app, reporterState, 'missingDialogDependency', {
+                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
+                    consoleDetail: { title, message },
+                    statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.'
+                });
 
-            if (!hasReportedMissingDialogDependency) {
-                hasReportedMissingDialogDependency = true;
-                console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
-                app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
-            }
-
-            return Promise.resolve(false);
-        }
+                return Promise.resolve(false);
+            };
 
         function publishRendererReadyState(isReady) {
             const root = document.documentElement;
@@ -95,16 +100,21 @@
             if (state.listeners.uiInitialized) return true;
 
             if (typeof state.dependencies?.showAlert !== 'function') {
-                console.error('[Renderer Dependency Missing] Missing required dialog helper: showAlert.');
-                app.queryUi.setStatusMessage('Renderer dependency mismatch: missing required dialog helper (showAlert).');
+                reportRendererIssue(app, null, null, {
+                    consoleMessage: '[Renderer Dependency Missing] Missing required dialog helper: showAlert.',
+                    statusMessage: 'Renderer dependency mismatch: missing required dialog helper (showAlert).'
+                });
                 publishRendererReadyState(false);
                 return false;
             }
 
             const missingIds = getMissingRequiredShellIds();
             if (missingIds.length > 0) {
-                console.error('[Renderer Shell Incomplete] Missing required shell nodes:', missingIds);
-                app.queryUi.setStatusMessage(`Renderer shell mismatch: missing required shell nodes (${missingIds.join(', ')}).`);
+                reportRendererIssue(app, null, null, {
+                    consoleMessage: '[Renderer Shell Incomplete] Missing required shell nodes:',
+                    consoleDetail: missingIds,
+                    statusMessage: `Renderer shell mismatch: missing required shell nodes (${missingIds.join(', ')}).`
+                });
                 publishRendererReadyState(false);
                 return false;
             }

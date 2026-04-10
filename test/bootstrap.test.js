@@ -14,6 +14,28 @@ function loadBootstrapFactory(sandbox) {
     return sandbox.window.TFTRenderer.createBootstrap;
 }
 
+function reportRendererIssue(app, reporterState, issueKey, options = {}) {
+    if (reporterState && issueKey) {
+        if (reporterState[issueKey]) {
+            return false;
+        }
+        reporterState[issueKey] = true;
+    }
+
+    const consoleMethod = app.__testConsoleError || (() => {});
+    if (options.consoleDetail !== null && options.consoleDetail !== undefined) {
+        consoleMethod(options.consoleMessage, options.consoleDetail);
+    } else {
+        consoleMethod(options.consoleMessage);
+    }
+    app.queryUi?.setStatusMessage?.(options.statusMessage || '');
+    if (options.querySummary) {
+        app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
+    }
+
+    return true;
+}
+
 function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
     const includeAlertDependency = options.includeAlertDependency ?? true;
     const statusMessages = [];
@@ -36,7 +58,8 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
         window: {
             TFTRenderer: {
                 shared: {
-                    getMissingRequiredShellIds: () => [...missingIds]
+                    getMissingRequiredShellIds: () => [...missingIds],
+                    reportRendererIssue
                 }
             },
             addEventListener: () => {},
@@ -53,6 +76,7 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
     let subscribeCalls = 0;
     let fetchCalls = 0;
     const app = {
+        __testConsoleError: (...args) => errorLogs.push(args),
         state: {
             listeners: {
                 staticBound: false,

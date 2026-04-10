@@ -1,19 +1,18 @@
 (function initializeDataControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { formatSnapshotAge } = ns.shared;
+    const { formatSnapshotAge, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createDataController = function createDataController(app) {
         const { state } = app;
-        let hasReportedMissingSetupDependency = false;
+        const reporterState = {
+            missingSetupDependency: false
+        };
 
         function reportMissingSetupDependency() {
-            if (hasReportedMissingSetupDependency) {
-                return;
-            }
-
-            hasReportedMissingSetupDependency = true;
-            console.error('[Renderer Dependency Missing] setupMultiSelect is unavailable.');
-            app.queryUi.setStatusMessage('Renderer dependency mismatch: selector controls unavailable.');
+            reportRendererIssue(app, reporterState, 'missingSetupDependency', {
+                consoleMessage: '[Renderer Dependency Missing] setupMultiSelect is unavailable.',
+                statusMessage: 'Renderer dependency mismatch: selector controls unavailable.'
+            });
         }
 
         function getSetupMultiSelect() {
@@ -26,16 +25,24 @@
             return null;
         }
 
-        function showAlert(message, title = 'Attention') {
-            const alertFn = state.dependencies?.showAlert;
-            if (typeof alertFn === 'function') {
-                return alertFn(message, title);
-            }
+        const showAlert = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, null, {
+                methodName: 'showAlert',
+                statusMessage: ({ title }) => `Renderer dependency mismatch: unable to show "${title}".`
+            })
+            : function fallbackShowAlert(message, title = 'Attention') {
+                const alertFn = state.dependencies?.showAlert;
+                if (typeof alertFn === 'function') {
+                    return alertFn(message, title);
+                }
 
-            console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
-            app.queryUi.setStatusMessage(`Renderer dependency mismatch: unable to show "${title}".`);
-            return Promise.resolve(false);
-        }
+                reportRendererIssue(app, null, null, {
+                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
+                    consoleDetail: { title, message },
+                    statusMessage: `Renderer dependency mismatch: unable to show "${title}".`
+                });
+                return Promise.resolve(false);
+            };
 
         function collectUnitTraitLabels(unit) {
             const traitNames = new Set();

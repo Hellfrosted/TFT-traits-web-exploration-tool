@@ -56,6 +56,28 @@ function toCanonicalPayload(params = {}) {
     };
 }
 
+function createShared(overrides = {}) {
+    return {
+        formatSnapshotAge: () => '',
+        reportRendererIssue(app, reporterState, issueKey, options = {}) {
+            if (reporterState && issueKey) {
+                if (reporterState[issueKey]) {
+                    return false;
+                }
+                reporterState[issueKey] = true;
+            }
+
+            app.queryUi?.setStatusMessage?.(options.statusMessage || '');
+            if (options.querySummary) {
+                app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
+            }
+
+            return true;
+        },
+        ...overrides
+    };
+}
+
 describe('renderer data controller', () => {
     it('retains the previously loaded dataset when a fetch fails', async () => {
         const statusMessages = [];
@@ -66,9 +88,7 @@ describe('renderer data controller', () => {
             setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
-                    shared: {
-                        formatSnapshotAge: () => ''
-                    }
+                    shared: createShared()
                 }
             }
         };
@@ -143,9 +163,9 @@ describe('renderer data controller', () => {
             setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
-                    shared: {
+                    shared: createShared({
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    })
                 }
             }
         };
@@ -260,9 +280,7 @@ describe('renderer data controller', () => {
             console,
             window: {
                 TFTRenderer: {
-                    shared: {
-                        formatSnapshotAge: () => ''
-                    }
+                    shared: createShared()
                 }
             }
         };
@@ -359,9 +377,9 @@ describe('renderer data controller', () => {
             setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
-                    shared: {
+                    shared: createShared({
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    })
                 }
             }
         };
@@ -511,9 +529,9 @@ describe('renderer data controller', () => {
             setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
-                    shared: {
+                    shared: createShared({
                         formatSnapshotAge: () => 'freshly cached'
-                    }
+                    })
                 }
             }
         };
@@ -664,9 +682,7 @@ describe('renderer data controller', () => {
             setupMultiSelect: (_id, options, isUnit) => createSelector(options, isUnit),
             window: {
                 TFTRenderer: {
-                    shared: {
-                        formatSnapshotAge: () => ''
-                    }
+                    shared: createShared()
                 }
             }
         };

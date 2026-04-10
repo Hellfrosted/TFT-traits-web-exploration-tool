@@ -39,6 +39,63 @@
         return { elements, missingIds };
     }
 
+    function reportRendererIssue(app, reporterState, issueKey, {
+        consoleMessage,
+        consoleDetail = null,
+        statusMessage = '',
+        querySummary = null
+    } = {}) {
+        if (reporterState && issueKey) {
+            if (reporterState[issueKey]) {
+                return false;
+            }
+            reporterState[issueKey] = true;
+        }
+
+        if (consoleDetail !== null && consoleDetail !== undefined) {
+            console.error(consoleMessage, consoleDetail);
+        } else {
+            console.error(consoleMessage);
+        }
+
+        if (statusMessage && typeof app?.queryUi?.setStatusMessage === 'function') {
+            app.queryUi.setStatusMessage(statusMessage);
+        }
+
+        if (querySummary && typeof app?.queryUi?.renderQuerySummary === 'function') {
+            app.queryUi.renderQuerySummary(querySummary.params ?? null, querySummary.meta ?? '');
+        }
+
+        return true;
+    }
+
+    function createDialogInvoker(app, reporterState, {
+        methodName,
+        issueKey = 'missingDialogDependency',
+        consoleMessage = `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+        statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+        fallbackValue = false
+    } = {}) {
+        return (...args) => {
+            const dialogFn = app?.state?.dependencies?.[methodName];
+            if (typeof dialogFn === 'function') {
+                return dialogFn(...args);
+            }
+
+            const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+            const resolvedStatusMessage = typeof statusMessage === 'function'
+                ? statusMessage({ methodName, title, message })
+                : statusMessage;
+            reportRendererIssue(app, reporterState, issueKey, {
+                consoleMessage,
+                consoleDetail: { title, message },
+                statusMessage: resolvedStatusMessage
+            });
+
+            return Promise.resolve(fallbackValue);
+        };
+    }
+
     function hasRequiredShellElements() {
         return getMissingRequiredShellIds().length === 0;
     }
@@ -116,6 +173,8 @@
         REQUIRED_SHELL_IDS,
         getMissingRequiredShellIds,
         resolveShellElements,
+        reportRendererIssue,
+        createDialogInvoker,
         hasRequiredShellElements,
         formatSnapshotAge,
         getBoardMetric,

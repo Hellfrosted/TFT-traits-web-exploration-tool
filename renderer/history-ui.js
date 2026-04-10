@@ -1,20 +1,29 @@
 (function initializeHistoryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, summarizeParams, formatTimestamp } = ns.shared;
+    const { escapeHtml, summarizeParams, formatTimestamp, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createHistoryUi = function createHistoryUi(app) {
         const { state } = app;
+        const reporterState = {
+            missingDialogDependency: false
+        };
+        const showAlert = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, reporterState, {
+                methodName: 'showAlert'
+            })
+            : function fallbackShowAlert(message, title = 'Attention') {
+                const alertFn = state.dependencies?.showAlert;
+                if (typeof alertFn === 'function') {
+                    return alertFn(message, title);
+                }
 
-        function showAlert(message, title = 'Attention') {
-            const alertFn = state.dependencies?.showAlert;
-            if (typeof alertFn === 'function') {
-                return alertFn(message, title);
-            }
-
-            console.error('[Renderer Dependency Missing] showAlert is unavailable.', { title, message });
-            app.queryUi.setStatusMessage('Renderer dependency mismatch: dialog controls unavailable.');
-            return Promise.resolve(false);
-        }
+                reportRendererIssue(app, reporterState, 'missingDialogDependency', {
+                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
+                    consoleDetail: { title, message },
+                    statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.'
+                });
+                return Promise.resolve(false);
+            };
 
         async function updateHistoryList() {
             const listEl = document.getElementById('historyList');
