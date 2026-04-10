@@ -584,6 +584,54 @@ describe('renderer data controller', () => {
         );
     });
 
+    it('derives successful fetch state through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared({
+                        formatSnapshotAge: () => 'freshly cached'
+                    })
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {}
+            },
+            queryUi: {
+                getDataSourceLabel: () => 'PBE'
+            },
+            history: {}
+        });
+
+        const successState = controller.__test.getSuccessfulFetchState({
+            dataSource: 'pbe',
+            setNumber: '17',
+            dataFingerprint: 'new-fingerprint',
+            snapshotFetchedAt: Date.now(),
+            usedCachedSnapshot: true,
+            units: [{ id: 'MissFortune', displayName: 'Miss Fortune', variants: [] }],
+            traits: ['Conduit'],
+            roles: ['Carry'],
+            traitBreakpoints: { Conduit: [2] },
+            traitIcons: { Conduit: '/icons/conduit.png' },
+            assetValidation: null,
+            hashMap: { MissFortune: 'Miss Fortune' }
+        }, 'pbe', 'old-fingerprint');
+
+        assert.equal(successState.setLabel, 'PBE Set 17');
+        assert.equal(successState.cacheSummary, ' Using cached snapshot (freshly cached).');
+        assert.equal(successState.dataChanged, true);
+        assert.equal(successState.activeData.dataSource, 'pbe');
+        assert.equal(successState.activeData.dataFingerprint, 'new-fingerprint');
+        assert.equal(successState.activeData.unitMap.has('MissFortune'), true);
+        assert.deepEqual(successState.activeData.roles, ['Carry']);
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {

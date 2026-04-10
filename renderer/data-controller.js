@@ -291,6 +291,16 @@
             }
         }
 
+        function getSuccessfulFetchState(res, fallbackSource, previousFingerprint = null) {
+            const activeData = buildActiveData(res, fallbackSource);
+            return {
+                setLabel: getSetLabel(res, fallbackSource),
+                cacheSummary: getCacheSummary(res),
+                activeData,
+                dataChanged: !!(previousFingerprint && previousFingerprint !== activeData.dataFingerprint)
+            };
+        }
+
         async function restoreQueryState(previousEffectiveQuery, {
             hadVisibleResults,
             dataChanged,
@@ -348,19 +358,17 @@
                     return;
                 }
                 if (res.success) {
-                    const setLabel = getSetLabel(res, source);
-                    const cacheSummary = getCacheSummary(res);
-                    state.activeData = buildActiveData(res, source);
-                    const dataChanged = previousFingerprint && previousFingerprint !== state.activeData.dataFingerprint;
+                    const successState = getSuccessfulFetchState(res, source, previousFingerprint);
+                    state.activeData = successState.activeData;
 
-                    renderLoadedDataStatus(res, setLabel, cacheSummary);
+                    renderLoadedDataStatus(res, successState.setLabel, successState.cacheSummary);
                     if (!initializeSelectors(res, preservedVariantLocks)) {
                         return;
                     }
                     await restoreQueryState(previousEffectiveQuery, {
                         hadVisibleResults,
-                        dataChanged,
-                        setLabel
+                        dataChanged: successState.dataChanged,
+                        setLabel: successState.setLabel
                     });
                     app.history.updateHistoryList();
                 } else {
@@ -398,7 +406,8 @@
                 getRefreshQueryRestoreState,
                 getFetchFailureUiState,
                 getLoadedDataUiState,
-                getSelectorSetupConfigs
+                getSelectorSetupConfigs,
+                getSuccessfulFetchState
             }
         };
     };
