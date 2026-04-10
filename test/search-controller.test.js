@@ -341,6 +341,48 @@ describe('renderer search controller', () => {
         assert.equal(controller.__test.resolveProgressSearchId({ searchId: 10 }, 11, 7), null);
     });
 
+    it('derives search result UI state through the extracted outcome helper', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getSearchResultsUiState([{ score: 10 }], true, '1.2'))),
+            {
+                statusMessage: 'Found 1 results (from cache in 1.2s)',
+                querySummaryMeta: '1 cached boards in 1.2s',
+                shouldUpdateHistory: true
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getSearchResultsUiState([{ error: 'boom' }], false, '0.4'))),
+            {
+                statusMessage: 'Search Error: boom',
+                querySummaryMeta: 'Error: boom',
+                shouldUpdateHistory: false
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getSearchResultsUiState([], false, '0.4'))),
+            {
+                statusMessage: 'No matching boards found.',
+                querySummaryMeta: 'No matching boards',
+                shouldUpdateHistory: false
+            }
+        );
+    });
+
     it('sets a fresh status message when a search returns no results', async () => {
         const statusMessages = [];
         const querySummaries = [];

@@ -324,31 +324,48 @@
             renderSearchResultsRow(tbody, errorMessage);
         }
 
+        function getSearchResultsUiState(results, fromCache = false, elapsed = '0.0') {
+            const hasResults = Array.isArray(results) && results.length > 0 && !results[0].error;
+            if (hasResults) {
+                return {
+                    statusMessage: fromCache
+                        ? `Found ${results.length} results (from cache in ${elapsed}s)`
+                        : `Found ${results.length} results (computed in ${elapsed}s)`,
+                    querySummaryMeta: fromCache
+                        ? `${results.length} cached boards in ${elapsed}s`
+                        : `${results.length} boards in ${elapsed}s`,
+                    shouldUpdateHistory: true
+                };
+            }
+
+            if (results && results[0] && results[0].error) {
+                return {
+                    statusMessage: `Search Error: ${results[0].error}`,
+                    querySummaryMeta: `Error: ${results[0].error}`,
+                    shouldUpdateHistory: false
+                };
+            }
+
+            return {
+                statusMessage: 'No matching boards found.',
+                querySummaryMeta: 'No matching boards',
+                shouldUpdateHistory: false
+            };
+        }
+
         function applySearchResults(response, params, elapsed) {
             const results = response.results;
             const fromCache = response.fromCache;
+            const uiState = getSearchResultsUiState(results, fromCache, elapsed);
 
             state.currentResults = results && results.length > 0 && !results[0].error ? results : [];
             state.currentResultsFingerprint = state.activeData?.dataFingerprint || null;
 
-            if (state.currentResults.length > 0) {
-                const statusInfo = fromCache
-                    ? `Found ${results.length} results (from cache in ${elapsed}s)`
-                    : `Found ${results.length} results (computed in ${elapsed}s)`;
-                app.queryUi.setStatusMessage(statusInfo);
-                app.queryUi.renderQuerySummary(
-                    params,
-                    fromCache
-                        ? `${results.length} cached boards in ${elapsed}s`
-                        : `${results.length} boards in ${elapsed}s`
-                );
+            app.queryUi.setStatusMessage(uiState.statusMessage);
+            app.queryUi.renderQuerySummary(params, uiState.querySummaryMeta);
+
+            if (uiState.shouldUpdateHistory) {
                 app.history.updateHistoryList();
-            } else if (results && results[0] && results[0].error) {
-                app.queryUi.setStatusMessage(`Search Error: ${results[0].error}`);
-                app.queryUi.renderQuerySummary(params, `Error: ${results[0].error}`);
-            } else {
-                app.queryUi.setStatusMessage('No matching boards found.');
-                app.queryUi.renderQuerySummary(params, 'No matching boards');
             }
 
             const sorted = state.currentResults.length > 0 ? app.results.getSortedResults(state.currentResults) : results;
@@ -504,7 +521,8 @@
             handleSearchClick,
             subscribeProgressUpdates,
             __test: {
-                resolveProgressSearchId
+                resolveProgressSearchId,
+                getSearchResultsUiState
             }
         };
     };
