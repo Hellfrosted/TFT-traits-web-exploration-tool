@@ -318,6 +318,29 @@ describe('renderer search controller', () => {
         assert.equal(shell.searchBtn.innerText, 'Searching 1250000 checked');
     });
 
+    it('resolves progress search ids through the extracted stale-progress helper', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        assert.equal(controller.__test.resolveProgressSearchId(null, null, null), null);
+        assert.equal(controller.__test.resolveProgressSearchId({ searchId: 5 }, null, 7), null);
+        assert.equal(controller.__test.resolveProgressSearchId({ searchId: 9 }, null, 7), 9);
+        assert.equal(controller.__test.resolveProgressSearchId({ searchId: 11 }, 11, 7), 11);
+        assert.equal(controller.__test.resolveProgressSearchId({ searchId: 10 }, 11, 7), null);
+    });
+
     it('sets a fresh status message when a search returns no results', async () => {
         const statusMessages = [];
         const querySummaries = [];

@@ -122,6 +122,24 @@
             return 'Results pending...';
         }
 
+        function resolveProgressSearchId(data, activeSearchId = null, lastCompletedSearchId = null) {
+            if (!data || data.searchId === null || data.searchId === undefined) {
+                return null;
+            }
+
+            if (activeSearchId === null || activeSearchId === undefined) {
+                if (lastCompletedSearchId !== null && lastCompletedSearchId !== undefined && data.searchId <= lastCompletedSearchId) {
+                    return null;
+                }
+
+                return data.searchId;
+            }
+
+            return data.searchId === activeSearchId
+                ? activeSearchId
+                : null;
+        }
+
         function reportShellMismatchOnce(missingIds, contextMessage) {
             reportRendererIssue(app, reporterState, 'shellMismatch', {
                 consoleMessage: `[Renderer Shell Mismatch] ${contextMessage}`,
@@ -453,19 +471,15 @@
                 if (!state.isSearching || state.isCancellingSearch) {
                     return;
                 }
-                if (!data || data.searchId === null || data.searchId === undefined) {
+                const resolvedSearchId = resolveProgressSearchId(
+                    data,
+                    state.activeSearchId,
+                    state.lastCompletedSearchId
+                );
+                if (resolvedSearchId === null || resolvedSearchId === undefined) {
                     return;
                 }
-                if (state.activeSearchId === null || state.activeSearchId === undefined) {
-                    const lwm = state.lastCompletedSearchId;
-                    if (lwm !== null && lwm !== undefined && data.searchId <= lwm) {
-                        return;
-                    }
-                    state.activeSearchId = data.searchId;
-                }
-                if (data.searchId !== state.activeSearchId) {
-                    return;
-                }
+                state.activeSearchId = resolvedSearchId;
                 state.activeSearchProgress = {
                     pct: data.pct,
                     checked: data.checked,
@@ -488,7 +502,10 @@
             setSearchState,
             requestCancelSearch,
             handleSearchClick,
-            subscribeProgressUpdates
+            subscribeProgressUpdates,
+            __test: {
+                resolveProgressSearchId
+            }
         };
     };
 })();
