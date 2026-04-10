@@ -466,6 +466,57 @@ describe('renderer search controller', () => {
         assert.equal(shell.cancelBtn.style.display, 'none');
     });
 
+    it('derives active search UI payloads through the extracted helper', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                isSearching: true,
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getActiveSearchUiState({
+                isSearching: true,
+                progress: { pct: 25 },
+                fallbackProgress: { pct: 5 },
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                currentResults: []
+            }))),
+            {
+                searchLabel: 'Searching 25%',
+                querySummaryParams: { boardSize: 9, maxResults: 50 },
+                querySummaryMeta: 'Active query',
+                shouldRenderPendingRow: true,
+                pendingRowMessage: 'Results pending...'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getActiveSearchUiState({
+                isSearching: false,
+                progress: null,
+                fallbackProgress: null,
+                lastSearchParams: null,
+                currentResults: [{ units: ['A'] }]
+            }))),
+            {
+                searchLabel: null,
+                querySummaryParams: null,
+                querySummaryMeta: 'Active query',
+                shouldRenderPendingRow: false,
+                pendingRowMessage: 'Results pending...'
+            }
+        );
+    });
+
     it('derives interrupted search UI payloads through the extracted helper', () => {
         const shell = createShell();
         const sandbox = createSandbox(shell);

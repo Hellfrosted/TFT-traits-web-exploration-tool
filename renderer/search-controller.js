@@ -215,6 +215,23 @@
             }
         }
 
+        function getActiveSearchUiState({
+            isSearching = false,
+            progress = null,
+            fallbackProgress = null,
+            lastSearchParams = null,
+            currentResults = []
+        } = {}) {
+            const activeProgress = progress ?? fallbackProgress ?? null;
+            return {
+                searchLabel: isSearching ? buildSearchButtonLabel(activeProgress) : null,
+                querySummaryParams: lastSearchParams || null,
+                querySummaryMeta: buildSearchMeta(),
+                shouldRenderPendingRow: !Array.isArray(currentResults) || currentResults.length === 0,
+                pendingRowMessage: buildSearchTableMessage()
+            };
+        }
+
         function renderActiveSearchUi(progress = null) {
             const shell = resolveSearchShell('Unable to render active search UI.');
             if (!shell) {
@@ -222,23 +239,25 @@
             }
 
             const { searchBtn, resBody: tbody } = shell;
-            const activeProgress = progress ?? state.activeSearchProgress ?? null;
+            const uiState = getActiveSearchUiState({
+                isSearching: state.isSearching,
+                progress,
+                fallbackProgress: state.activeSearchProgress,
+                lastSearchParams: state.lastSearchParams,
+                currentResults: state.currentResults
+            });
 
-            if (searchBtn && state.isSearching) {
-                searchBtn.innerText = buildSearchButtonLabel(activeProgress);
+            if (searchBtn && uiState.searchLabel) {
+                searchBtn.innerText = uiState.searchLabel;
             }
 
-            if (state.lastSearchParams) {
-                app.queryUi.renderQuerySummary(state.lastSearchParams, buildSearchMeta());
-            } else {
-                app.queryUi.renderQuerySummary(null, buildSearchMeta());
-            }
+            app.queryUi.renderQuerySummary(uiState.querySummaryParams, uiState.querySummaryMeta);
 
             app.results.renderEstimateSummary(state.activeSearchEstimate);
             app.results.renderSearchingSpotlight();
 
-            if (tbody && state.currentResults.length === 0) {
-                setResultsBodyMessage(app, tbody, buildSearchTableMessage());
+            if (tbody && uiState.shouldRenderPendingRow) {
+                setResultsBodyMessage(app, tbody, uiState.pendingRowMessage);
             }
         }
 
@@ -645,7 +664,8 @@
                 getSearchResultsUiState,
                 getSearchControlUiState,
                 applySearchControlUi,
-                getInterruptedSearchUiState
+                getInterruptedSearchUiState,
+                getActiveSearchUiState
             }
         };
     };
