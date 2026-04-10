@@ -471,11 +471,7 @@
             void refreshDraftEstimate();
         }
 
-        function bindDraftQueryListeners() {
-            if (state.listeners.draftBound) return;
-            state.listeners.draftBound = true;
-            const controls = resolveQueryControls();
-
+        function bindNumericDraftListeners(controls) {
             ['boardSize', 'maxResults'].forEach((id) => {
                 const input = controls[id];
                 if (!input) return;
@@ -485,12 +481,25 @@
                     refreshDraftQuerySummary();
                 });
             });
+        }
 
+        function bindToggleDraftListeners(controls) {
             ['onlyActiveToggle', 'tierRankToggle', 'includeUniqueToggle'].forEach((id) => {
                 controls[id]?.addEventListener('change', refreshDraftQuerySummary);
             });
+        }
 
+        function bindMultiselectDraftListener() {
             document.querySelector('.controls-body')?.addEventListener('multiselectchange', refreshDraftQuerySummary);
+        }
+
+        function bindDraftQueryListeners() {
+            if (state.listeners.draftBound) return;
+            state.listeners.draftBound = true;
+            const controls = resolveQueryControls();
+            bindNumericDraftListeners(controls);
+            bindToggleDraftListeners(controls);
+            bindMultiselectDraftListener();
         }
 
         return {
