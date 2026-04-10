@@ -105,19 +105,34 @@
             return source === 'latest' ? 'Live' : 'PBE';
         }
 
+        function getDefaultRoleFilterValues() {
+            if (!state.activeData?.roles) return null;
+
+            return {
+                tankRoles: state.resolveDefaultTankRoles(state.activeData.roles),
+                carryRoles: state.resolveDefaultCarryRoles(state.activeData.roles)
+            };
+        }
+
+        function setSelectorValues(selector, values = []) {
+            if (selector) {
+                selector.setValues(values);
+            }
+        }
+
+        function applyDefaultRoleSelectorValues(selector, values, force = false) {
+            if (!selector) return;
+            if (force || selector.getValues().length === 0) {
+                selector.setValues(values);
+            }
+        }
+
         function applyDefaultRoleFilters(force = false) {
-            if (!state.activeData?.roles) return;
+            const defaultRoleValues = getDefaultRoleFilterValues();
+            if (!defaultRoleValues) return;
 
-            const defaultTankRoles = state.resolveDefaultTankRoles(state.activeData.roles);
-            const defaultCarryRoles = state.resolveDefaultCarryRoles(state.activeData.roles);
-
-            if (state.selectors.tankRoles && (force || state.selectors.tankRoles.getValues().length === 0)) {
-                state.selectors.tankRoles.setValues(defaultTankRoles);
-            }
-
-            if (state.selectors.carryRoles && (force || state.selectors.carryRoles.getValues().length === 0)) {
-                state.selectors.carryRoles.setValues(defaultCarryRoles);
-            }
+            applyDefaultRoleSelectorValues(state.selectors.tankRoles, defaultRoleValues.tankRoles, force);
+            applyDefaultRoleSelectorValues(state.selectors.carryRoles, defaultRoleValues.carryRoles, force);
         }
 
         function getVariantCapableUnits() {
@@ -476,28 +491,29 @@
             if (controls.includeUniqueToggle) controls.includeUniqueToggle.checked = !!params.includeUnique;
         }
 
+        function applyRoleSelectorSearchParams(selector, values, defaultValues = null) {
+            if (!selector) return;
+
+            if (Array.isArray(values)) {
+                selector.setValues(values);
+                return;
+            }
+
+            if (defaultValues) {
+                selector.setValues(defaultValues);
+            }
+        }
+
         function applySelectorSearchParams(params) {
-            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(params.mustInclude || []);
-            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(params.mustExclude || []);
-            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues(params.mustIncludeTraits || []);
-            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues(params.mustExcludeTraits || []);
-            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues(params.extraEmblems || []);
+            setSelectorValues(state.selectors.mustInclude, params.mustInclude || []);
+            setSelectorValues(state.selectors.mustExclude, params.mustExclude || []);
+            setSelectorValues(state.selectors.mustIncludeTraits, params.mustIncludeTraits || []);
+            setSelectorValues(state.selectors.mustExcludeTraits, params.mustExcludeTraits || []);
+            setSelectorValues(state.selectors.extraEmblems, params.extraEmblems || []);
 
-            if (state.selectors.tankRoles) {
-                if (Array.isArray(params.tankRoles)) {
-                    state.selectors.tankRoles.setValues(params.tankRoles);
-                } else {
-                    applyDefaultRoleFilters(true);
-                }
-            }
-
-            if (state.selectors.carryRoles) {
-                if (Array.isArray(params.carryRoles)) {
-                    state.selectors.carryRoles.setValues(params.carryRoles);
-                } else {
-                    applyDefaultRoleFilters(true);
-                }
-            }
+            const defaultRoleValues = getDefaultRoleFilterValues();
+            applyRoleSelectorSearchParams(state.selectors.tankRoles, params.tankRoles, defaultRoleValues?.tankRoles);
+            applyRoleSelectorSearchParams(state.selectors.carryRoles, params.carryRoles, defaultRoleValues?.carryRoles);
 
             applyVariantLocks(params.variantLocks || {});
         }

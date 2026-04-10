@@ -40,6 +40,16 @@ function createDeferred() {
     return { promise, resolve, reject };
 }
 
+function createSelector(initialValues = []) {
+    let values = [...initialValues];
+    return {
+        getValues: () => [...values],
+        setValues(nextValues) {
+            values = [...nextValues];
+        }
+    };
+}
+
 function createClassList(initial = []) {
     const values = new Set(initial);
     return {
@@ -439,6 +449,125 @@ describe('renderer query UI', () => {
         assert.equal(searchButton.disabled, true);
         assert.equal(searchButton.classList.contains('disabled'), true);
         assert.equal(searchButton.innerText, 'Searching...');
+    });
+
+    it('applies derived default role filters without overwriting non-empty selectors unless forced', () => {
+        const tankRoles = createSelector([]);
+        const carryRoles = createSelector(['ExistingCarry']);
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: () => null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                activeData: {
+                    roles: ['Bruiser', 'Sentinel', 'Sniper', 'Sorcerer']
+                },
+                resolveDefaultTankRoles: () => ['Bruiser', 'Sentinel'],
+                resolveDefaultCarryRoles: () => ['Sniper', 'Sorcerer'],
+                searchLimits: {},
+                selectors: {
+                    tankRoles,
+                    carryRoles
+                },
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.applyDefaultRoleFilters(false);
+        assert.deepEqual(tankRoles.getValues(), ['Bruiser', 'Sentinel']);
+        assert.deepEqual(carryRoles.getValues(), ['ExistingCarry']);
+
+        queryUi.applyDefaultRoleFilters(true);
+        assert.deepEqual(carryRoles.getValues(), ['Sniper', 'Sorcerer']);
+    });
+
+    it('applies explicit role params and falls back to derived defaults when role params are absent', () => {
+        const tankRoles = createSelector(['OldTank']);
+        const carryRoles = createSelector(['OldCarry']);
+        const mustInclude = createSelector(['OldUnit']);
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => {
+                    if (id === 'boardSize') return { value: '9' };
+                    if (id === 'maxResults') return { value: '50' };
+                    if (id === 'onlyActiveToggle') return { checked: true };
+                    if (id === 'tierRankToggle') return { checked: true };
+                    if (id === 'includeUniqueToggle') return { checked: false };
+                    return null;
+                },
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const app = {
+            state: {
+                activeData: {
+                    roles: ['Bruiser', 'Sentinel', 'Sniper', 'Sorcerer']
+                },
+                resolveDefaultTankRoles: () => ['Bruiser', 'Sentinel'],
+                resolveDefaultCarryRoles: () => ['Sniper', 'Sorcerer'],
+                searchLimits: {
+                    DEFAULT_MAX_RESULTS: 500
+                },
+                selectors: {
+                    mustInclude,
+                    mustExclude: createSelector(),
+                    mustIncludeTraits: createSelector(),
+                    mustExcludeTraits: createSelector(),
+                    extraEmblems: createSelector(),
+                    tankRoles,
+                    carryRoles
+                },
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        };
+
+        const queryUi = createQueryUi(app);
+        queryUi.applySearchParams({
+            boardSize: 10,
+            maxResults: 123,
+            mustInclude: ['Aurora'],
+            tankRoles: ['Warden'],
+            carryRoles: ['Invoker']
+        });
+
+        assert.deepEqual(mustInclude.getValues(), ['Aurora']);
+        assert.deepEqual(tankRoles.getValues(), ['Warden']);
+        assert.deepEqual(carryRoles.getValues(), ['Invoker']);
+
+        queryUi.applySearchParams({
+            boardSize: 8,
+            maxResults: 75,
+            mustInclude: ['Mordekaiser']
+        });
+
+        assert.deepEqual(mustInclude.getValues(), ['Mordekaiser']);
+        assert.deepEqual(tankRoles.getValues(), ['Bruiser', 'Sentinel']);
+        assert.deepEqual(carryRoles.getValues(), ['Sniper', 'Sorcerer']);
     });
 
     it('refreshes the draft estimate when query constraints change', async () => {
