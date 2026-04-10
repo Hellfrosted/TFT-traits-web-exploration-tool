@@ -116,19 +116,27 @@
         }
 
         function renderLoadedDataStatus(res, setLabel, cacheSummary) {
+            const uiState = getLoadedDataUiState(res, setLabel, cacheSummary);
+            app.queryUi.setStatusMessage(uiState.statusMessage);
+            app.queryUi.setDataStats(...uiState.dataStats);
+            app.queryUi.renderQuerySummary(null, uiState.querySummaryMeta);
+        }
+
+        function getLoadedDataUiState(res, setLabel, cacheSummary = '') {
             const fingerprintShort = res.dataFingerprint ? res.dataFingerprint.slice(0, 8) : 'unknown';
             const assetSummary = app.queryUi.summarizeAssetValidation(res.assetValidation);
-
-            app.queryUi.setStatusMessage(assetSummary
-                ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}${cacheSummary}`
-                : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).${cacheSummary}`);
-            app.queryUi.setDataStats(
-                res.units.length,
-                res.traits.length,
-                res.roles.length,
-                app.queryUi.getAssetCoverageLabel(res.assetValidation)
-            );
-            app.queryUi.renderQuerySummary(null, `Loaded ${setLabel}`);
+            return {
+                statusMessage: assetSummary
+                    ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}${cacheSummary}`
+                    : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).${cacheSummary}`,
+                dataStats: [
+                    res.units.length,
+                    res.traits.length,
+                    res.roles.length,
+                    app.queryUi.getAssetCoverageLabel(res.assetValidation)
+                ],
+                querySummaryMeta: `Loaded ${setLabel}`
+            };
         }
 
         function createUnitOptions(units) {
@@ -375,7 +383,8 @@
             fetchData,
             __test: {
                 getRefreshQueryRestoreState,
-                getFetchFailureUiState
+                getFetchFailureUiState,
+                getLoadedDataUiState
             }
         };
     };

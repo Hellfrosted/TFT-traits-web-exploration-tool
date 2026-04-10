@@ -484,6 +484,64 @@ describe('renderer data controller', () => {
         );
     });
 
+    it('derives loaded data ui state through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {}
+            },
+            queryUi: {
+                summarizeAssetValidation: (assetValidation) => assetValidation?.summary || '',
+                getAssetCoverageLabel: (assetValidation) => assetValidation?.coverage || 'N/A'
+            },
+            history: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getLoadedDataUiState({
+                count: 61,
+                dataFingerprint: 'abc12345ffff',
+                units: Array.from({ length: 61 }, (_, index) => ({ id: `U${index}` })),
+                traits: Array.from({ length: 28 }, (_, index) => `T${index}`),
+                roles: Array.from({ length: 7 }, (_, index) => `R${index}`),
+                assetValidation: {
+                    summary: '58/61 champion splashes matched',
+                    coverage: '58/61'
+                }
+            }, 'PBE Set 17', ' Using cached snapshot.'))),
+            {
+                statusMessage: 'Loaded 61 parsed champions from PBE Set 17 (abc12345). 58/61 champion splashes matched Using cached snapshot.',
+                dataStats: [61, 28, 7, '58/61'],
+                querySummaryMeta: 'Loaded PBE Set 17'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getLoadedDataUiState({
+                count: 10,
+                dataFingerprint: null,
+                units: Array.from({ length: 10 }, (_, index) => ({ id: `U${index}` })),
+                traits: ['A'],
+                roles: ['Carry'],
+                assetValidation: null
+            }, 'Live latest detected set', ''))),
+            {
+                statusMessage: 'Loaded 10 parsed champions from Live latest detected set (unknown).',
+                dataStats: [10, 1, 1, 'N/A'],
+                querySummaryMeta: 'Loaded Live latest detected set'
+            }
+        );
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {
