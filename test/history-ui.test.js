@@ -177,6 +177,7 @@ describe('renderer history UI', () => {
         assert.equal(historyList.children[0].children[1].textContent, 'Inc: Unit0');
 
         historyList.children[0].dispatchEvent({ type: 'click' });
+        await Promise.resolve();
 
         assert.deepEqual(appliedParams, [{
             boardSize: 9,
@@ -321,5 +322,64 @@ describe('renderer history UI', () => {
         }));
         assert.deepEqual(appliedParams, [{ boardSize: 7 }]);
         assert.equal(searchClicks, 1);
+    });
+
+    it('shows a busy-state alert instead of replaying while search work is active', async () => {
+        let searchClicks = 0;
+        const appliedParams = [];
+        const alerts = [];
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => {
+                    if (id === 'searchBtn') {
+                        return {
+                            click: () => {
+                                searchClicks += 1;
+                            }
+                        };
+                    }
+                    return null;
+                }
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: true,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: (message, title) => {
+                        alerts.push({ message, title });
+                    }
+                },
+                activeData: null,
+                selectors: {}
+            },
+            queryUi: {
+                applySearchParams: (params) => appliedParams.push(params),
+                renderQuerySummary: () => {}
+            }
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.loadSearchFromHistory({
+            params: {
+                boardSize: 7
+            }
+        });
+
+        assert.deepEqual(alerts, [{
+            message: 'Wait for current search to finish or cancel it.',
+            title: 'Attention'
+        }]);
+        assert.deepEqual(appliedParams, []);
+        assert.equal(searchClicks, 0);
     });
 });

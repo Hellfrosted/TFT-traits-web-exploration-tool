@@ -106,6 +106,32 @@
             });
         }
 
+        async function resolveReplayParams(params) {
+            if (typeof app.queryUi.normalizeSearchParams !== 'function') {
+                return params;
+            }
+
+            const normalizePayload = await app.queryUi.normalizeSearchParams(params);
+            return normalizePayload?.params || params;
+        }
+
+        function resolveReplayRolePills() {
+            if (!state.activeData?.hashMap) {
+                return;
+            }
+
+            state.selectors.tankRoles?.resolvePills(state.activeData.hashMap);
+            state.selectors.carryRoles?.resolvePills(state.activeData.hashMap);
+        }
+
+        function replayHistorySearch(canonicalParams) {
+            app.queryUi.applySearchParams(canonicalParams);
+            resolveReplayRolePills();
+            app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
+            const { searchBtn } = resolveHistoryShell();
+            searchBtn?.click();
+        }
+
         async function loadSearchFromHistory(entry) {
             if (state.isSearching || state.isFetchingData) {
                 void showAlert('Wait for current search to finish or cancel it.');
@@ -116,20 +142,8 @@
             if (!params) return;
 
             try {
-                const normalizePayload = typeof app.queryUi.normalizeSearchParams === 'function'
-                    ? await app.queryUi.normalizeSearchParams(params)
-                    : { params };
-                const canonicalParams = normalizePayload?.params || params;
-                app.queryUi.applySearchParams(canonicalParams);
-
-                if (state.activeData?.hashMap) {
-                    state.selectors.tankRoles?.resolvePills(state.activeData.hashMap);
-                    state.selectors.carryRoles?.resolvePills(state.activeData.hashMap);
-                }
-
-                app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
-                const { searchBtn } = resolveHistoryShell();
-                searchBtn?.click();
+                const canonicalParams = await resolveReplayParams(params);
+                replayHistorySearch(canonicalParams);
             } catch (error) {
                 console.error('[History Replay Failed]', error);
                 if (typeof app.queryUi.setStatusMessage === 'function') {
