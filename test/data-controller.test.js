@@ -542,6 +542,48 @@ describe('renderer data controller', () => {
         );
     });
 
+    it('derives selector setup configs through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {}
+            },
+            queryUi: {},
+            history: {}
+        });
+
+        const unitOptions = [{ id: 'Aurora' }];
+        const traitOptions = [{ value: 'Invoker', label: 'Invoker' }];
+        const roleOptions = ['Carry', 'Tank'];
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getSelectorSetupConfigs(
+                unitOptions,
+                traitOptions,
+                roleOptions
+            ))),
+            [
+                { key: 'mustInclude', containerId: 'mustIncludeContainer', options: unitOptions, isUnit: true },
+                { key: 'mustExclude', containerId: 'mustExcludeContainer', options: unitOptions, isUnit: true },
+                { key: 'mustIncludeTraits', containerId: 'mustIncludeTraitsContainer', options: traitOptions, isUnit: false },
+                { key: 'mustExcludeTraits', containerId: 'mustExcludeTraitsContainer', options: traitOptions, isUnit: false },
+                { key: 'extraEmblems', containerId: 'extraEmblemsContainer', options: traitOptions, isUnit: false },
+                { key: 'tankRoles', containerId: 'tankRolesContainer', options: roleOptions, isUnit: false },
+                { key: 'carryRoles', containerId: 'carryRolesContainer', options: roleOptions, isUnit: false }
+            ]
+        );
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {

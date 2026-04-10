@@ -155,6 +155,18 @@
             }));
         }
 
+        function getSelectorSetupConfigs(unitOptions, traitOptions, roleOptions) {
+            return [
+                { key: 'mustInclude', containerId: 'mustIncludeContainer', options: unitOptions, isUnit: true },
+                { key: 'mustExclude', containerId: 'mustExcludeContainer', options: unitOptions, isUnit: true },
+                { key: 'mustIncludeTraits', containerId: 'mustIncludeTraitsContainer', options: traitOptions, isUnit: false },
+                { key: 'mustExcludeTraits', containerId: 'mustExcludeTraitsContainer', options: traitOptions, isUnit: false },
+                { key: 'extraEmblems', containerId: 'extraEmblemsContainer', options: traitOptions, isUnit: false },
+                { key: 'tankRoles', containerId: 'tankRolesContainer', options: roleOptions, isUnit: false },
+                { key: 'carryRoles', containerId: 'carryRolesContainer', options: roleOptions, isUnit: false }
+            ];
+        }
+
         function initializeSelectors(res, preservedVariantLocks) {
             const setupMultiSelect = getSetupMultiSelect();
             if (!setupMultiSelect) {
@@ -163,14 +175,15 @@
 
             const unitOptions = createUnitOptions(res.units);
             const traitOptions = createTraitOptions(res);
+            const selectorSetupConfigs = getSelectorSetupConfigs(unitOptions, traitOptions, res.roles);
 
-            state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
-            state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
-            state.selectors.mustIncludeTraits = setupMultiSelect('mustIncludeTraitsContainer', traitOptions, false);
-            state.selectors.mustExcludeTraits = setupMultiSelect('mustExcludeTraitsContainer', traitOptions, false);
-            state.selectors.extraEmblems = setupMultiSelect('extraEmblemsContainer', traitOptions, false);
-            state.selectors.tankRoles = setupMultiSelect('tankRolesContainer', res.roles, false);
-            state.selectors.carryRoles = setupMultiSelect('carryRolesContainer', res.roles, false);
+            selectorSetupConfigs.forEach((config) => {
+                state.selectors[config.key] = setupMultiSelect(
+                    config.containerId,
+                    config.options,
+                    config.isUnit
+                );
+            });
 
             app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
             Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
@@ -384,7 +397,8 @@
             __test: {
                 getRefreshQueryRestoreState,
                 getFetchFailureUiState,
-                getLoadedDataUiState
+                getLoadedDataUiState,
+                getSelectorSetupConfigs
             }
         };
     };
