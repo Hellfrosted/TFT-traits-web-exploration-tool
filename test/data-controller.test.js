@@ -371,6 +371,67 @@ describe('renderer data controller', () => {
         assert.equal(statusMessages.at(-1), 'Renderer dependency mismatch: selector controls unavailable.');
     });
 
+    it('derives refresh query restore state through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {}
+            },
+            queryUi: {},
+            history: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getRefreshQueryRestoreState({
+                hadVisibleResults: true,
+                dataChanged: true,
+                setLabel: 'PBE Set 17',
+                replayedComparisonKey: 'before',
+                effectiveComparisonKey: 'after'
+            }))),
+            {
+                shouldClearResults: true,
+                summaryMeta: 'Loaded PBE Set 17. Query normalized; re-run.'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getRefreshQueryRestoreState({
+                hadVisibleResults: true,
+                dataChanged: true,
+                setLabel: 'PBE Set 17',
+                replayedComparisonKey: 'same',
+                effectiveComparisonKey: 'same'
+            }))),
+            {
+                shouldClearResults: false,
+                summaryMeta: 'Loaded PBE Set 17. Query preserved.'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getRefreshQueryRestoreState({
+                hadVisibleResults: false,
+                dataChanged: false,
+                setLabel: 'PBE Set 17',
+                replayedComparisonKey: null,
+                effectiveComparisonKey: null
+            }))),
+            {
+                shouldClearResults: false,
+                summaryMeta: null
+            }
+        );
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {

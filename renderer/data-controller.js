@@ -212,6 +212,38 @@
             }
         }
 
+        function getRefreshQueryRestoreState({
+            hadVisibleResults = false,
+            dataChanged = false,
+            setLabel = '',
+            replayedComparisonKey = null,
+            effectiveComparisonKey = null
+        } = {}) {
+            const queryChanged = typeof replayedComparisonKey === 'string'
+                && typeof effectiveComparisonKey === 'string'
+                ? replayedComparisonKey !== effectiveComparisonKey
+                : true;
+
+            if (hadVisibleResults && queryChanged) {
+                return {
+                    shouldClearResults: true,
+                    summaryMeta: `Loaded ${setLabel}. Query normalized; re-run.`
+                };
+            }
+
+            if (hadVisibleResults) {
+                return {
+                    shouldClearResults: false,
+                    summaryMeta: dataChanged ? `Loaded ${setLabel}. Query preserved.` : `Loaded ${setLabel}.`
+                };
+            }
+
+            return {
+                shouldClearResults: false,
+                summaryMeta: null
+            };
+        }
+
         async function restoreQueryState(previousEffectiveQuery, {
             hadVisibleResults,
             dataChanged,
@@ -223,17 +255,20 @@
 
             const effectivePayload = await normalizeQuery(app.queryUi.getCurrentSearchParams());
             const effectiveQuery = effectivePayload.params;
-            const queryChanged = typeof replayedPayload.comparisonKey === 'string'
-                && typeof effectivePayload.comparisonKey === 'string'
-                ? replayedPayload.comparisonKey !== effectivePayload.comparisonKey
-                : true;
+            const restoreState = getRefreshQueryRestoreState({
+                hadVisibleResults,
+                dataChanged,
+                setLabel,
+                replayedComparisonKey: replayedPayload.comparisonKey,
+                effectiveComparisonKey: effectivePayload.comparisonKey
+            });
 
             app.queryUi.bindDraftQueryListeners();
             if (state.lastSearchParams) {
                 state.lastSearchParams = effectiveQuery;
             }
 
-            if (hadVisibleResults && queryChanged) {
+            if (restoreState.shouldClearResults) {
                 clearNormalizedResults(effectiveQuery, setLabel);
             } else {
                 applyPreservedRefreshState(effectiveQuery, setLabel, dataChanged, hadVisibleResults);
@@ -306,7 +341,10 @@
         }
 
         return {
-            fetchData
+            fetchData,
+            __test: {
+                getRefreshQueryRestoreState
+            }
         };
     };
 })();
