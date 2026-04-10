@@ -74,6 +74,31 @@
             return item;
         }
 
+        function getHistoryListStateMessage(result, error = null) {
+            if (error) {
+                return `History unavailable: ${error.message || String(error)}`;
+            }
+
+            if (!result?.success) {
+                return `History unavailable: ${result?.error || 'Unknown error'}`;
+            }
+
+            if (!Array.isArray(result.entries) || result.entries.length === 0) {
+                return 'No history';
+            }
+
+            return null;
+        }
+
+        function renderHistoryEntries(listEl, entries) {
+            const recent = entries.slice(0, 5);
+            listEl.innerHTML = '';
+
+            recent.forEach((entry) => {
+                listEl.appendChild(createHistoryItem(entry));
+            });
+        }
+
         async function updateHistoryList() {
             const { historyList: listEl } = resolveHistoryShell();
             if (!listEl) return;
@@ -86,24 +111,17 @@
             try {
                 res = await state.electronBridge.listCache();
             } catch (error) {
-                renderHistoryEmptyState(listEl, `History unavailable: ${error.message || String(error)}`);
+                renderHistoryEmptyState(listEl, getHistoryListStateMessage(null, error));
                 return;
             }
 
-            if (!res.success || res.entries.length === 0) {
-                renderHistoryEmptyState(
-                    listEl,
-                    res.success ? 'No history' : `History unavailable: ${res.error || 'Unknown error'}`
-                );
+            const stateMessage = getHistoryListStateMessage(res);
+            if (stateMessage) {
+                renderHistoryEmptyState(listEl, stateMessage);
                 return;
             }
 
-            const recent = res.entries.slice(0, 5);
-            listEl.innerHTML = '';
-
-            recent.forEach((entry) => {
-                listEl.appendChild(createHistoryItem(entry));
-            });
+            renderHistoryEntries(listEl, res.entries);
         }
 
         async function resolveReplayParams(params) {

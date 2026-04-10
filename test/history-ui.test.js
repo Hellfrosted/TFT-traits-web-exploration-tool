@@ -109,6 +109,80 @@ describe('renderer history UI', () => {
         assert.match(historyList.innerHTML, /History unavailable/);
     });
 
+    it('renders a no-history state when cache listing succeeds without entries', async () => {
+        const historyList = createDomElement('div');
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => id === 'historyList' ? historyList : null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                dependencies: {
+                    showAlert: () => {}
+                },
+                electronBridge: {
+                    listCache: async () => ({
+                        success: true,
+                        entries: []
+                    })
+                }
+            },
+            queryUi: {}
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.updateHistoryList();
+
+        assert.match(historyList.innerHTML, /No history/);
+    });
+
+    it('renders backend cache-list errors as a visible history state', async () => {
+        const historyList = createDomElement('div');
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => id === 'historyList' ? historyList : null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                dependencies: {
+                    showAlert: () => {}
+                },
+                electronBridge: {
+                    listCache: async () => ({
+                        success: false,
+                        error: 'Bridge unavailable'
+                    })
+                }
+            },
+            queryUi: {}
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.updateHistoryList();
+
+        assert.match(historyList.innerHTML, /History unavailable: Bridge unavailable/);
+    });
+
     it('renders recent history entries and replays the selected search', async () => {
         const historyList = createDomElement('div');
         let searchClicks = 0;
