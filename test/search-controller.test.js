@@ -62,6 +62,17 @@ function createResolveShellElements(shell) {
     };
 }
 
+async function waitFor(check, message, attempts = 10) {
+    for (let index = 0; index < attempts; index += 1) {
+        if (check()) {
+            return;
+        }
+        await Promise.resolve();
+    }
+
+    assert.fail(message);
+}
+
 function createSandbox(shell, overrides = {}) {
     const consoleApi = overrides.console || console;
     return {
@@ -421,9 +432,10 @@ describe('renderer search controller', () => {
 
         const searchPromise = controller.handleSearchClick();
 
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
+        await waitFor(
+            () => typeof resolveSearchBoards === 'function',
+            'Expected searchBoards to be invoked before asserting stale progress behavior.'
+        );
 
         capturedProgressHandler({ searchId: 1, pct: 99 });
 

@@ -122,6 +122,167 @@
             return 'Results pending...';
         }
 
+        function ensureBridgeMethod(methodName) {
+            const method = state.electronBridge?.[methodName];
+            if (typeof method !== 'function') {
+                throw new Error('Electron preload bridge is unavailable.');
+            }
+
+            return method;
+        }
+
+        function renderSearchMessageRow(tbody, message, className = 'results-message-row results-message-row-error') {
+            if (!tbody) {
+                return;
+            }
+
+            tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+        }
+
+        function renderSearchState({
+            tbody,
+            summary,
+            statusMessage,
+            queryParams = state.lastSearchParams || null,
+            queryMeta,
+            rowMessage,
+            rowClass = 'results-message-row results-message-row-error',
+            clearResults = false
+        }) {
+            if (clearResults) {
+                state.currentResults = [];
+            }
+
+            if (statusMessage) {
+                app.queryUi.setStatusMessage(statusMessage);
+            }
+            if (summary) {
+                app.results.renderEmptySummary(summary);
+            }
+            if (queryMeta) {
+                app.queryUi.renderQuerySummary(queryParams, queryMeta);
+            }
+            if (rowMessage) {
+                renderSearchMessageRow(tbody, rowMessage, rowClass);
+            }
+        }
+
+        async function normalizeCurrentSearchParams() {
+            const rawParams = app.queryUi.getCurrentSearchParams();
+            const normalizePayload = typeof app.queryUi.normalizeSearchParams === 'function'
+                ? await app.queryUi.normalizeSearchParams(rawParams)
+                : { params: rawParams };
+            return normalizePayload?.params || rawParams;
+        }
+
+        async function loadSearchEstimate(params) {
+            const getSearchEstimate = ensureBridgeMethod('getSearchEstimate');
+            const estimate = await getSearchEstimate(params);
+            state.activeSearchEstimate = estimate;
+            renderActiveSearchUi();
+            return estimate;
+        }
+
+        async function confirmLargeSearchEstimate(params, estimate, tbody) {
+            const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
+            if (estimate.remainingSlots > maxRemainingSlots) {
+                renderSearchState({
+                    tbody,
+                    summary: 'Board too large',
+                    queryParams: params,
+                    queryMeta: `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`,
+                    rowMessage: `Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`
+                });
+                return false;
+            }
+
+            const largeSearchThreshold = state.searchLimits.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
+            if (!Number.isFinite(Number(estimate.count)) || estimate.count <= largeSearchThreshold) {
+                return true;
+            }
+
+            const confirmed = await showConfirm(
+                `Search volume: ~${(estimate.count / 1e9).toFixed(1)}B combinations. This may take a minute. Continue?`,
+                'Performance Warning'
+            );
+            if (!confirmed) {
+                renderSearchState({
+                    tbody,
+                    summary: 'Search aborted',
+                    queryParams: params,
+                    queryMeta: 'Search cancelled',
+                    rowMessage: 'Search aborted by user.',
+                    rowClass: 'results-message-row results-message-row-muted'
+                });
+                return false;
+            }
+
+            return true;
+        }
+
+        function commitSearchResults(results) {
+            state.currentResults = results && results.length > 0 && !results[0].error ? results : [];
+            state.currentResultsFingerprint = state.activeData?.dataFingerprint || null;
+        }
+
+        async function handleSearchResponse(params, response, tbody, startTime) {
+            if (response?.searchId !== null && response?.searchId !== undefined) {
+                state.activeSearchId = response.searchId;
+            }
+
+            if (response.cancelled) {
+                renderSearchState({
+                    tbody,
+                    summary: 'Search cancelled',
+                    statusMessage: 'Search cancelled.',
+                    queryParams: params,
+                    queryMeta: 'Search cancelled',
+                    rowMessage: 'Search cancelled.',
+                    clearResults: true
+                });
+                return;
+            }
+
+            if (!response.success) {
+                const errorMessage = response.error || 'Search failed unexpectedly.';
+                state.currentResults = [];
+                app.queryUi.setStatusMessage(`Search Error: ${errorMessage}`);
+                void showAlert(errorMessage, 'Search Failed');
+                app.results.renderEmptySummary('Search error');
+                app.queryUi.renderQuerySummary(params, `Error: ${errorMessage}`);
+                renderSearchMessageRow(tbody, errorMessage);
+                return;
+            }
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const results = response.results;
+            const fromCache = response.fromCache;
+            commitSearchResults(results);
+
+            if (state.currentResults.length > 0) {
+                const statusInfo = fromCache
+                    ? `Found ${results.length} results (from cache in ${elapsed}s)`
+                    : `Found ${results.length} results (computed in ${elapsed}s)`;
+                app.queryUi.setStatusMessage(statusInfo);
+                app.queryUi.renderQuerySummary(
+                    params,
+                    fromCache
+                        ? `${results.length} cached boards in ${elapsed}s`
+                        : `${results.length} boards in ${elapsed}s`
+                );
+                app.history.updateHistoryList();
+            } else if (results && results[0] && results[0].error) {
+                app.queryUi.setStatusMessage(`Search Error: ${results[0].error}`);
+                app.queryUi.renderQuerySummary(params, `Error: ${results[0].error}`);
+            } else {
+                app.queryUi.setStatusMessage('No matching boards found.');
+                app.queryUi.renderQuerySummary(params, 'No matching boards');
+            }
+
+            const sorted = state.currentResults.length > 0 ? app.results.getSortedResults(state.currentResults) : results;
+            app.results.renderResults(sorted);
+        }
+
         function reportShellMismatchOnce(missingIds, contextMessage) {
             reportRendererIssue(app, reporterState, 'shellMismatch', {
                 consoleMessage: `[Renderer Shell Mismatch] ${contextMessage}`,
@@ -283,112 +444,42 @@
             setSearchState(true);
 
             if (!state.selectors.mustInclude) {
-                app.results.renderEmptySummary('Data required');
-                app.queryUi.renderQuerySummary(null, 'Load data first');
-                tbody.innerHTML = app.results.renderResultsMessageRow('Please fetch data first.', 'results-message-row results-message-row-error');
+                renderSearchState({
+                    tbody,
+                    summary: 'Data required',
+                    queryParams: null,
+                    queryMeta: 'Load data first',
+                    rowMessage: 'Please fetch data first.'
+                });
                 setSearchState(false);
                 return;
             }
 
             try {
-                const rawParams = app.queryUi.getCurrentSearchParams();
-                const normalizePayload = typeof app.queryUi.normalizeSearchParams === 'function'
-                    ? await app.queryUi.normalizeSearchParams(rawParams)
-                    : { params: rawParams };
-                const params = normalizePayload?.params || rawParams;
+                const params = await normalizeCurrentSearchParams();
                 state.lastSearchParams = params;
                 renderActiveSearchUi();
 
-                if (!state.electronBridge?.getSearchEstimate) {
-                    throw new Error('Electron preload bridge is unavailable.');
-                }
-                const estimate = await state.electronBridge.getSearchEstimate(params);
-                state.activeSearchEstimate = estimate;
-                renderActiveSearchUi();
-                const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
-                const largeSearchThreshold = state.searchLimits.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
-
-                if (estimate.remainingSlots > maxRemainingSlots) {
-                    app.results.renderEmptySummary('Board too large');
-                    app.queryUi.renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`);
-                    tbody.innerHTML = app.results.renderResultsMessageRow(`Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`, 'results-message-row results-message-row-error');
+                const estimate = await loadSearchEstimate(params);
+                if (!await confirmLargeSearchEstimate(params, estimate, tbody)) {
                     return;
-                }
-
-                if (Number.isFinite(Number(estimate.count)) && estimate.count > largeSearchThreshold) {
-                    const confirmed = await showConfirm(`Search volume: ~${(estimate.count / 1e9).toFixed(1)}B combinations. This may take a minute. Continue?`, 'Performance Warning');
-                    if (!confirmed) {
-                        app.results.renderEmptySummary('Search aborted');
-                        app.queryUi.renderQuerySummary(params, 'Search cancelled');
-                        tbody.innerHTML = app.results.renderResultsMessageRow('Search aborted by user.', 'results-message-row results-message-row-muted');
-                        return;
-                    }
                 }
 
                 const startTime = Date.now();
-                if (!state.electronBridge?.searchBoards) {
-                    throw new Error('Electron preload bridge is unavailable.');
-                }
-                const response = await state.electronBridge.searchBoards(params);
-                if (response?.searchId !== null && response?.searchId !== undefined) {
-                    state.activeSearchId = response.searchId;
-                }
-                if (response.cancelled) {
-                    state.currentResults = [];
-                    app.queryUi.setStatusMessage('Search cancelled.');
-                    app.results.renderEmptySummary('Search cancelled');
-                    app.queryUi.renderQuerySummary(params, 'Search cancelled');
-                    tbody.innerHTML = app.results.renderResultsMessageRow('Search cancelled.', 'results-message-row results-message-row-error');
-                    return;
-                }
-
-                if (!response.success) {
-                    const errorMessage = response.error || 'Search failed unexpectedly.';
-                    state.currentResults = [];
-                    app.queryUi.setStatusMessage(`Search Error: ${errorMessage}`);
-                    void showAlert(errorMessage, 'Search Failed');
-                    app.results.renderEmptySummary('Search error');
-                    app.queryUi.renderQuerySummary(params, `Error: ${errorMessage}`);
-                    tbody.innerHTML = app.results.renderResultsMessageRow(errorMessage, 'results-message-row results-message-row-error');
-                    return;
-                }
-
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                const results = response.results;
-                const fromCache = response.fromCache;
-
-                state.currentResults = results && results.length > 0 && !results[0].error ? results : [];
-                state.currentResultsFingerprint = state.activeData?.dataFingerprint || null;
-
-                if (state.currentResults.length > 0) {
-                    const statusInfo = fromCache
-                        ? `Found ${results.length} results (from cache in ${elapsed}s)`
-                        : `Found ${results.length} results (computed in ${elapsed}s)`;
-                    app.queryUi.setStatusMessage(statusInfo);
-                    app.queryUi.renderQuerySummary(
-                        params,
-                        fromCache
-                            ? `${results.length} cached boards in ${elapsed}s`
-                            : `${results.length} boards in ${elapsed}s`
-                    );
-                    app.history.updateHistoryList();
-                } else if (results && results[0] && results[0].error) {
-                    app.queryUi.setStatusMessage(`Search Error: ${results[0].error}`);
-                    app.queryUi.renderQuerySummary(params, `Error: ${results[0].error}`);
-                } else {
-                    app.queryUi.setStatusMessage('No matching boards found.');
-                    app.queryUi.renderQuerySummary(params, 'No matching boards');
-                }
-
-                const sorted = state.currentResults.length > 0 ? app.results.getSortedResults(state.currentResults) : results;
-                app.results.renderResults(sorted);
+                const searchBoards = ensureBridgeMethod('searchBoards');
+                const response = await searchBoards(params);
+                await handleSearchResponse(params, response, tbody, startTime);
             } catch (error) {
                 console.error(error);
-                app.queryUi.setStatusMessage('Search failed unexpectedly.');
                 void showAlert(error.message || String(error), 'Search Failed');
-                app.results.renderEmptySummary('Search error');
-                app.queryUi.renderQuerySummary(state.lastSearchParams, `Unexpected failure: ${error.message || String(error)}`);
-                tbody.innerHTML = app.results.renderResultsMessageRow('Search failed unexpectedly.', 'results-message-row results-message-row-error');
+                renderSearchState({
+                    tbody,
+                    summary: 'Search error',
+                    statusMessage: 'Search failed unexpectedly.',
+                    queryParams: state.lastSearchParams,
+                    queryMeta: `Unexpected failure: ${error.message || String(error)}`,
+                    rowMessage: 'Search failed unexpectedly.'
+                });
             } finally {
                 setSearchState(false);
             }
