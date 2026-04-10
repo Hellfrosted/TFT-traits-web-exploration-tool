@@ -59,6 +59,10 @@ function toCanonicalPayload(params = {}) {
 function createShared(overrides = {}) {
     return {
         formatSnapshotAge: () => '',
+        resolveShellElements: () => ({
+            elements: {},
+            missingIds: []
+        }),
         reportRendererIssue(app, reporterState, issueKey, options = {}) {
             if (reporterState && issueKey) {
                 if (reporterState[issueKey]) {

@@ -1,6 +1,6 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { getMissingRequiredShellIds, reportRendererIssue, createDialogInvoker } = ns.shared;
+    const { getMissingRequiredShellIds, resolveShellElements, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
         const { state } = app;
@@ -57,7 +57,10 @@
             app.results.renderEmptySummary('Awaiting execution');
             app.results.renderEmptySpotlight();
             app.queryUi.renderQuerySummary(null, 'Filters reset. Build a fresh query and compute when ready.');
-            document.getElementById('resBody').innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
+            const { elements } = resolveShellElements(['resBody']);
+            if (elements.resBody) {
+                elements.resBody.innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
+            }
             app.queryUi.setStatusMessage(state.activeData
                 ? `Loaded ${state.activeData.unitMap.size} parsed champions and ready for a new query.`
                 : 'Status: Unloaded');
@@ -66,34 +69,41 @@
         function bindStaticUiListeners() {
             if (state.listeners.staticBound) return;
             state.listeners.staticBound = true;
+            const { elements } = resolveShellElements([
+                'fetchBtn',
+                'sortMode',
+                'cancelBtn',
+                'resetFiltersBtn',
+                'searchBtn'
+            ]);
 
-            document.getElementById('fetchBtn')?.addEventListener('click', () => {
+            elements.fetchBtn?.addEventListener('click', () => {
                 app.data.fetchData().catch((error) => {
                     reportRendererInitFailure(error);
                 });
             });
 
-            document.getElementById('sortMode')?.addEventListener('change', () => {
+            elements.sortMode?.addEventListener('change', () => {
                 if (state.currentResults.length === 0) return;
                 app.results.renderResults(app.results.getSortedResults(state.currentResults));
             });
 
-            document.getElementById('cancelBtn')?.addEventListener('click', () => {
+            elements.cancelBtn?.addEventListener('click', () => {
                 app.search.requestCancelSearch().catch((error) => {
                     reportRendererInitFailure(error);
                 });
             });
 
-            document.getElementById('resetFiltersBtn')?.addEventListener('click', resetFilters);
+            elements.resetFiltersBtn?.addEventListener('click', resetFilters);
 
             document.addEventListener('keydown', (event) => {
                 const isSubmitChord = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
                 if (!isSubmitChord || state.isSearching) return;
                 event.preventDefault();
-                document.getElementById('searchBtn')?.click();
+                elements.searchBtn?.click();
             });
 
-            document.getElementById('searchBtn')?.addEventListener('click', app.search.handleSearchClick);
+            elements.searchBtn?.addEventListener('click', app.search.handleSearchClick);
         }
 
         function initializeUiShell() {
@@ -134,9 +144,9 @@
             if (state.listeners.bootStarted) return;
             if (!initializeUiShell()) return;
             state.listeners.bootStarted = true;
-            const sourceSelect = document.getElementById('dataSourceSelect');
-            if (sourceSelect) {
-                sourceSelect.value = state.defaultDataSource;
+            const { elements } = resolveShellElements(['dataSourceSelect']);
+            if (elements.dataSourceSelect) {
+                elements.dataSourceSelect.value = state.defaultDataSource;
             }
 
             if (!state.flags.smokeTest) {

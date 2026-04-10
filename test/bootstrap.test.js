@@ -59,6 +59,10 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
             TFTRenderer: {
                 shared: {
                     getMissingRequiredShellIds: () => [...missingIds],
+                    resolveShellElements: () => ({
+                        elements: {},
+                        missingIds: [...missingIds]
+                    }),
                     reportRendererIssue
                 }
             },
