@@ -1,5 +1,5 @@
-const path = require('path');
 const { serializeSearchParams: defaultSerializeSearchParams } = require('../searchParams.js');
+const { createSearchCacheStore } = require('./search-cache-store.js');
 
 function createSearchCacheService({
     storagePaths,
@@ -16,70 +16,14 @@ function createSearchCacheService({
     const searchResultMemoryCache = new Map();
     const searchEstimateMemoryCache = new Map();
     const preparedSearchContextMemoryCache = new Map();
-    const cacheDir = storagePaths.cacheDir;
-
-    function ensureCacheDir() {
-        ensureStorageDirs(storagePaths);
-    }
-
-    function isCurrentSearchVersion(payload) {
-        return (payload?.searchVersion ?? 1) === searchCacheVersion;
-    }
-
-    function getCacheEntryFilePath(key) {
-        return resolveCacheEntryPath(storagePaths, key);
-    }
-
-    function buildCachePayload({
-        dataFingerprint,
-        params,
-        results,
-        timestamp = Date.now()
-    }) {
-        return {
-            searchVersion: searchCacheVersion,
-            dataFingerprint,
-            params,
-            results,
-            timestamp
-        };
-    }
-
-    function setCachedResultsEntry(key, dataFingerprint, results) {
-        searchResultMemoryCache.set(key, {
-            dataFingerprint,
-            searchVersion: searchCacheVersion,
-            results
-        });
-    }
-
-    async function listCacheJsonFiles() {
-        ensureCacheDir();
-        return (await fsp.readdir(cacheDir)).filter((file) => file.endsWith('.json'));
-    }
-
-    async function readJsonFile(filePath, {
-        warningPrefix = null,
-        warnOnMissing = false
-    } = {}) {
-        try {
-            const raw = await fsp.readFile(filePath, 'utf-8');
-            return JSON.parse(raw);
-        } catch (error) {
-            if (warningPrefix && (warnOnMissing || error.code !== 'ENOENT')) {
-                console.warn(`${warningPrefix} ${error.message}`);
-            }
-            return null;
-        }
-    }
-
-    async function unlinkIfExists(filePath) {
-        await fsp.unlink(filePath).catch((error) => {
-            if (error.code !== 'ENOENT') {
-                throw error;
-            }
-        });
-    }
+    const cacheStore = createSearchCacheStore({
+        storagePaths,
+        ensureStorageDirs,
+        resolveCacheEntryPath,
+        resolveDataFallbackPath,
+        fsp
+    });
+    const { ensureCacheDir } = cacheStore;
 
     function getCacheKey(dataFingerprint, params) {
         const normalized = JSON.stringify({
@@ -121,20 +65,6 @@ function createSearchCacheService({
         return estimate;
     }
 
-    async function writeCachePayload(filePath, payload) {
-        const tempPath = `${filePath}.${process.pid || 'cache'}.${Date.now()}.tmp`;
-        await fsp.writeFile(tempPath, payload, 'utf-8');
-        try {
-            await fsp.rename(tempPath, filePath);
-        } catch (renameError) {
-            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
-                throw renameError;
-            }
-            await fsp.unlink(filePath).catch(() => {});
-            await fsp.rename(tempPath, filePath);
-        }
-    }
-
     async function readCache(key, dataFingerprint) {
         const memoryEntry = searchResultMemoryCache.get(key);
         if (
@@ -145,44 +75,52 @@ function createSearchCacheService({
             return memoryEntry.results;
         }
 
-        const parsed = await readJsonFile(getCacheEntryFilePath(key), {
-            warningPrefix: `Failed to read cache file ${key}:`
-        });
-        if (
-            parsed &&
-            parsed.results &&
-            parsed.dataFingerprint === dataFingerprint &&
-            isCurrentSearchVersion(parsed)
-        ) {
-            setCachedResultsEntry(key, dataFingerprint, parsed.results);
-            return parsed.results;
-        }
-
-        if (!parsed) {
+        try {
+            const parsed = await cacheStore.readCacheEntry(key);
+            if (
+                parsed &&
+                parsed.results &&
+                parsed.dataFingerprint === dataFingerprint &&
+                (parsed.searchVersion ?? 1) === searchCacheVersion
+            ) {
+                searchResultMemoryCache.set(key, {
+                    dataFingerprint,
+                    searchVersion: searchCacheVersion,
+                    results: parsed.results
+                });
+                return parsed.results;
+            }
+            return null;
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.warn(`Failed to read cache file ${key}:`, error.message);
+            }
             return null;
         }
-
-        return null;
     }
 
     async function writeCache(key, dataFingerprint, params, results) {
         ensureCacheDir();
-        setCachedResultsEntry(key, dataFingerprint, results);
+        searchResultMemoryCache.set(key, {
+            dataFingerprint,
+            searchVersion: searchCacheVersion,
+            results
+        });
         try {
-            const filePath = getCacheEntryFilePath(key);
-            const payload = JSON.stringify(buildCachePayload({
+            await cacheStore.writeCacheEntry(key, {
+                searchVersion: searchCacheVersion,
                 dataFingerprint,
                 params,
-                results
-            }));
-            await writeCachePayload(filePath, payload);
+                results,
+                timestamp: Date.now()
+            });
         } catch (error) {
             console.error('Failed to write cache:', error.message);
         }
     }
 
     async function migrateCanonicalParams({ canonicalizeByFingerprint } = {}) {
-        const files = await listCacheJsonFiles();
+        const files = await cacheStore.listCacheFiles();
         if (files.length === 0) {
             return {
                 rewritten: 0,
@@ -194,26 +132,27 @@ function createSearchCacheService({
         const processedPaths = [];
 
         for (const file of files) {
-            const filePath = path.join(cacheDir, file);
-            const parsed = await readJsonFile(filePath, {
-                warningPrefix: `Skipping corrupt cache file during migration ${file}:`
-            });
-            if (!parsed) {
+            let parsed;
+
+            try {
+                parsed = await cacheStore.readJsonFile(file.filePath);
+            } catch (error) {
+                console.warn(`Skipping corrupt cache file during migration ${file.file}:`, error.message);
                 continue;
             }
 
-            if (!isCurrentSearchVersion(parsed) || !parsed?.params) {
+            if ((parsed?.searchVersion ?? 1) !== searchCacheVersion || !parsed?.params) {
                 continue;
             }
 
-            processedPaths.push(filePath);
+            processedPaths.push(file.filePath);
             const dataFingerprint = typeof parsed.dataFingerprint === 'string' ? parsed.dataFingerprint : null;
             let canonicalParams = parsed.params;
             if (typeof canonicalizeByFingerprint === 'function') {
                 try {
                     canonicalParams = canonicalizeByFingerprint(dataFingerprint, parsed.params);
                 } catch (error) {
-                    console.warn(`Failed to canonicalize params for cache file ${file}:`, error.message || String(error));
+                    console.warn(`Failed to canonicalize params for cache file ${file.file}:`, error.message || String(error));
                     canonicalParams = parsed.params;
                 }
             }
@@ -222,12 +161,13 @@ function createSearchCacheService({
             }
             const key = getCacheKey(dataFingerprint, canonicalParams);
             const timestamp = Number.isFinite(parsed.timestamp) ? parsed.timestamp : 0;
-            const stagedPayload = buildCachePayload({
+            const stagedPayload = {
+                searchVersion: searchCacheVersion,
                 dataFingerprint,
                 params: canonicalParams,
                 results: Array.isArray(parsed.results) ? parsed.results : [],
                 timestamp: Number.isFinite(parsed.timestamp) ? parsed.timestamp : null
-            });
+            };
 
             const existing = stagedByKey.get(key);
             if (!existing || timestamp >= existing.timestamp) {
@@ -248,9 +188,9 @@ function createSearchCacheService({
 
         const winnerPaths = new Set();
         for (const staged of stagedByKey.values()) {
-            const outputPath = getCacheEntryFilePath(staged.key);
+            const outputPath = resolveCacheEntryPath(storagePaths, staged.key);
             winnerPaths.add(outputPath);
-            await writeCachePayload(outputPath, JSON.stringify(staged.payload));
+            await cacheStore.writeCacheEntry(staged.key, staged.payload);
         }
 
         let removed = 0;
@@ -258,7 +198,7 @@ function createSearchCacheService({
             if (winnerPaths.has(existingPath)) {
                 continue;
             }
-            await unlinkIfExists(existingPath);
+            await fsp.unlink(existingPath).catch(() => {});
             removed += 1;
         }
 
@@ -270,10 +210,8 @@ function createSearchCacheService({
     }
 
     async function writeDataFallback(source, rawData) {
-        ensureCacheDir();
         try {
-            const filePath = resolveDataFallbackPath(storagePaths, source);
-            await fsp.writeFile(filePath, JSON.stringify(rawData));
+            await cacheStore.writeDataFallback(source, rawData);
         } catch (error) {
             console.warn('Failed to write data fallback:', error.message);
         }
@@ -281,9 +219,7 @@ function createSearchCacheService({
 
     async function readDataFallback(source) {
         try {
-            const filePath = resolveDataFallbackPath(storagePaths, source);
-            const data = await fsp.readFile(filePath, 'utf-8');
-            return JSON.parse(data);
+            return await cacheStore.readDataFallback(source);
         } catch (error) {
             if (error.code !== 'ENOENT') {
                 console.warn('Failed to read data fallback:', error.message);
@@ -295,12 +231,15 @@ function createSearchCacheService({
     async function pruneCache(_activeDataFingerprint) {
         try {
             clearSearchMemoryCaches();
-            const files = await listCacheJsonFiles();
+            const files = await cacheStore.listCacheFiles();
             await Promise.all(files.map(async (file) => {
-                const filePath = path.join(cacheDir, file);
-                const parsed = await readJsonFile(filePath);
-                if (!parsed || !isCurrentSearchVersion(parsed)) {
-                    await unlinkIfExists(filePath);
+                try {
+                    const parsed = await cacheStore.readJsonFile(file.filePath);
+                    if ((parsed?.searchVersion ?? 1) !== searchCacheVersion) {
+                        await fsp.unlink(file.filePath);
+                    }
+                } catch {
+                    await fsp.unlink(file.filePath).catch(() => {});
                 }
             }));
         } catch (error) {
@@ -309,26 +248,27 @@ function createSearchCacheService({
     }
 
     async function listCacheEntries(activeDataFingerprint = null) {
-        const files = await listCacheJsonFiles();
+        const files = await cacheStore.listCacheFiles();
         const entries = [];
         for (const file of files) {
-            const parsed = await readJsonFile(path.join(cacheDir, file), {
-                warningPrefix: `Skipping corrupt cache file ${file}:`
-            });
-            const key = file.replace('.json', '');
-            if (!parsed || !isCurrentSearchVersion(parsed)) {
-                continue;
-            }
-            if (activeDataFingerprint && parsed?.dataFingerprint !== activeDataFingerprint) {
-                continue;
-            }
-            if (parsed && parsed.params) {
-                entries.push({
-                    key,
-                    params: parsed.params,
-                    resultCount: parsed.results ? parsed.results.length : 0,
-                    timestamp: parsed.timestamp || null
-                });
+            try {
+                const parsed = await cacheStore.readJsonFile(file.filePath);
+                if ((parsed?.searchVersion ?? 1) !== searchCacheVersion) {
+                    continue;
+                }
+                if (activeDataFingerprint && parsed?.dataFingerprint !== activeDataFingerprint) {
+                    continue;
+                }
+                if (parsed && parsed.params) {
+                    entries.push({
+                        key: file.key,
+                        params: parsed.params,
+                        resultCount: parsed.results ? parsed.results.length : 0,
+                        timestamp: parsed.timestamp || null
+                    });
+                }
+            } catch (error) {
+                console.warn(`Skipping corrupt cache file ${file.file}:`, error.message);
             }
         }
         entries.sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
@@ -339,16 +279,12 @@ function createSearchCacheService({
         searchResultMemoryCache.delete(key);
         searchEstimateMemoryCache.delete(key);
         preparedSearchContextMemoryCache.delete(key);
-        await unlinkIfExists(getCacheEntryFilePath(key));
+        await cacheStore.deleteCacheEntryFile(key);
     }
 
     async function clearAllCache() {
-        const files = await listCacheJsonFiles();
         clearSearchMemoryCaches();
-        for (const file of files) {
-            await fsp.unlink(path.join(cacheDir, file));
-        }
-        return files.length;
+        return await cacheStore.clearCacheFiles();
     }
 
     return {
