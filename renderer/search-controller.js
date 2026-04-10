@@ -298,9 +298,11 @@
         }
 
         function renderMissingDataState(tbody) {
-            app.results.renderEmptySummary('Data required');
-            app.queryUi.renderQuerySummary(null, 'Load data first');
-            renderSearchResultsRow(tbody, 'Please fetch data first.');
+            applyInterruptedSearchUiState(
+                tbody,
+                null,
+                getInterruptedSearchUiState('missingData')
+            );
         }
 
         async function normalizeCurrentSearchParams() {
@@ -309,15 +311,6 @@
                 ? await app.queryUi.normalizeSearchParams(rawParams)
                 : { params: rawParams };
             return normalizePayload?.params || rawParams;
-        }
-
-        function handleLargeBoardState(tbody, params, maxRemainingSlots) {
-            app.results.renderEmptySummary('Board too large');
-            app.queryUi.renderQuerySummary(params, `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`);
-            renderSearchResultsRow(
-                tbody,
-                `Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`
-            );
         }
 
         async function confirmLargeSearchVolume(estimate) {
@@ -332,27 +325,123 @@
             );
         }
 
+        function getInterruptedSearchUiState(type, options = {}) {
+            if (type === 'missingData') {
+                return {
+                    statusMessage: null,
+                    emptySummary: 'Data required',
+                    querySummaryMeta: 'Load data first',
+                    rowMessage: 'Please fetch data first.',
+                    rowClassName: 'results-message-row results-message-row-error',
+                    clearResults: false,
+                    alertMessage: null,
+                    alertTitle: null
+                };
+            }
+
+            if (type === 'largeBoard') {
+                const maxRemainingSlots = options.maxRemainingSlots ?? 7;
+                return {
+                    statusMessage: null,
+                    emptySummary: 'Board too large',
+                    querySummaryMeta: `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`,
+                    rowMessage: `Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`,
+                    rowClassName: 'results-message-row results-message-row-error',
+                    clearResults: false,
+                    alertMessage: null,
+                    alertTitle: null
+                };
+            }
+
+            if (type === 'aborted') {
+                return {
+                    statusMessage: null,
+                    emptySummary: 'Search aborted',
+                    querySummaryMeta: 'Search cancelled',
+                    rowMessage: 'Search aborted by user.',
+                    rowClassName: 'results-message-row results-message-row-muted',
+                    clearResults: false,
+                    alertMessage: null,
+                    alertTitle: null
+                };
+            }
+
+            if (type === 'cancelled') {
+                return {
+                    statusMessage: 'Search cancelled.',
+                    emptySummary: 'Search cancelled',
+                    querySummaryMeta: 'Search cancelled',
+                    rowMessage: 'Search cancelled.',
+                    rowClassName: 'results-message-row results-message-row-error',
+                    clearResults: true,
+                    alertMessage: null,
+                    alertTitle: null
+                };
+            }
+
+            const errorMessage = options.errorMessage || 'Search failed unexpectedly.';
+            return {
+                statusMessage: `Search Error: ${errorMessage}`,
+                emptySummary: 'Search error',
+                querySummaryMeta: `Error: ${errorMessage}`,
+                rowMessage: errorMessage,
+                rowClassName: 'results-message-row results-message-row-error',
+                clearResults: true,
+                alertMessage: errorMessage,
+                alertTitle: 'Search Failed'
+            };
+        }
+
+        function applyInterruptedSearchUiState(tbody, params, uiState) {
+            if (uiState?.clearResults) {
+                state.currentResults = [];
+            }
+            if (uiState?.statusMessage) {
+                app.queryUi.setStatusMessage(uiState.statusMessage);
+            }
+            if (uiState?.alertMessage) {
+                void showAlert(uiState.alertMessage, uiState.alertTitle || 'Attention');
+            }
+
+            app.results.renderEmptySummary(uiState?.emptySummary || 'Search error');
+            app.queryUi.renderQuerySummary(params, uiState?.querySummaryMeta || 'Search failed');
+            renderSearchResultsRow(
+                tbody,
+                uiState?.rowMessage || 'Search failed unexpectedly.',
+                uiState?.rowClassName || 'results-message-row results-message-row-error'
+            );
+        }
+
+        function handleLargeBoardState(tbody, params, maxRemainingSlots) {
+            applyInterruptedSearchUiState(
+                tbody,
+                params,
+                getInterruptedSearchUiState('largeBoard', { maxRemainingSlots })
+            );
+        }
+
         function handleAbortedSearchState(tbody, params) {
-            app.results.renderEmptySummary('Search aborted');
-            app.queryUi.renderQuerySummary(params, 'Search cancelled');
-            renderSearchResultsRow(tbody, 'Search aborted by user.', 'results-message-row results-message-row-muted');
+            applyInterruptedSearchUiState(
+                tbody,
+                params,
+                getInterruptedSearchUiState('aborted')
+            );
         }
 
         function handleCancelledSearchState(tbody, params) {
-            state.currentResults = [];
-            app.queryUi.setStatusMessage('Search cancelled.');
-            app.results.renderEmptySummary('Search cancelled');
-            app.queryUi.renderQuerySummary(params, 'Search cancelled');
-            renderSearchResultsRow(tbody, 'Search cancelled.');
+            applyInterruptedSearchUiState(
+                tbody,
+                params,
+                getInterruptedSearchUiState('cancelled')
+            );
         }
 
         function handleFailedSearchState(tbody, params, errorMessage) {
-            state.currentResults = [];
-            app.queryUi.setStatusMessage(`Search Error: ${errorMessage}`);
-            void showAlert(errorMessage, 'Search Failed');
-            app.results.renderEmptySummary('Search error');
-            app.queryUi.renderQuerySummary(params, `Error: ${errorMessage}`);
-            renderSearchResultsRow(tbody, errorMessage);
+            applyInterruptedSearchUiState(
+                tbody,
+                params,
+                getInterruptedSearchUiState('failed', { errorMessage })
+            );
         }
 
         function getSearchResultsUiState(results, fromCache = false, elapsed = '0.0') {
@@ -555,7 +644,8 @@
                 resolveProgressSearchId,
                 getSearchResultsUiState,
                 getSearchControlUiState,
-                applySearchControlUi
+                applySearchControlUi,
+                getInterruptedSearchUiState
             }
         };
     };

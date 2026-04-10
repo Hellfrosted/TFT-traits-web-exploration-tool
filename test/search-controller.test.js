@@ -466,6 +466,67 @@ describe('renderer search controller', () => {
         assert.equal(shell.cancelBtn.style.display, 'none');
     });
 
+    it('derives interrupted search UI payloads through the extracted helper', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getInterruptedSearchUiState('missingData'))),
+            {
+                statusMessage: null,
+                emptySummary: 'Data required',
+                querySummaryMeta: 'Load data first',
+                rowMessage: 'Please fetch data first.',
+                rowClassName: 'results-message-row results-message-row-error',
+                clearResults: false,
+                alertMessage: null,
+                alertTitle: null
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getInterruptedSearchUiState('largeBoard', {
+                maxRemainingSlots: 5
+            }))),
+            {
+                statusMessage: null,
+                emptySummary: 'Board too large',
+                querySummaryMeta: 'Too many open slots. The current engine limit is 5 remaining slots.',
+                rowMessage: 'Board too large! DFS engine supports up to 5 empty slots.',
+                rowClassName: 'results-message-row results-message-row-error',
+                clearResults: false,
+                alertMessage: null,
+                alertTitle: null
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getInterruptedSearchUiState('failed', {
+                errorMessage: 'boom'
+            }))),
+            {
+                statusMessage: 'Search Error: boom',
+                emptySummary: 'Search error',
+                querySummaryMeta: 'Error: boom',
+                rowMessage: 'boom',
+                rowClassName: 'results-message-row results-message-row-error',
+                clearResults: true,
+                alertMessage: 'boom',
+                alertTitle: 'Search Failed'
+            }
+        );
+    });
+
     it('sets a fresh status message when a search returns no results', async () => {
         const statusMessages = [];
         const querySummaries = [];
