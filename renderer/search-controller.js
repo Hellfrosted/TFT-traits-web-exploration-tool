@@ -411,6 +411,18 @@
             };
         }
 
+        function getUnexpectedSearchFailureUiState(error) {
+            const errorMessage = error?.message || String(error);
+            return {
+                statusMessage: 'Search failed unexpectedly.',
+                alertMessage: errorMessage,
+                alertTitle: 'Search Failed',
+                emptySummary: 'Search error',
+                querySummaryMeta: `Unexpected failure: ${errorMessage}`,
+                rowMessage: 'Search failed unexpectedly.'
+            };
+        }
+
         function applyInterruptedSearchUiState(tbody, params, uiState) {
             if (uiState?.clearResults) {
                 state.currentResults = [];
@@ -608,11 +620,12 @@
                 applySearchResults(response, params, elapsed);
             } catch (error) {
                 console.error(error);
-                app.queryUi.setStatusMessage('Search failed unexpectedly.');
-                void showAlert(error.message || String(error), 'Search Failed');
-                app.results.renderEmptySummary('Search error');
-                app.queryUi.renderQuerySummary(state.lastSearchParams, `Unexpected failure: ${error.message || String(error)}`);
-                renderSearchResultsRow(tbody, 'Search failed unexpectedly.');
+                const uiState = getUnexpectedSearchFailureUiState(error);
+                app.queryUi.setStatusMessage(uiState.statusMessage);
+                void showAlert(uiState.alertMessage, uiState.alertTitle);
+                app.results.renderEmptySummary(uiState.emptySummary);
+                app.queryUi.renderQuerySummary(state.lastSearchParams, uiState.querySummaryMeta);
+                renderSearchResultsRow(tbody, uiState.rowMessage);
             } finally {
                 setSearchState(false);
             }
@@ -665,7 +678,8 @@
                 getSearchControlUiState,
                 applySearchControlUi,
                 getInterruptedSearchUiState,
-                getActiveSearchUiState
+                getActiveSearchUiState,
+                getUnexpectedSearchFailureUiState
             }
         };
     };

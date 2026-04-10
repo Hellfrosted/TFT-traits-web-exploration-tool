@@ -578,6 +578,35 @@ describe('renderer search controller', () => {
         );
     });
 
+    it('derives unexpected search failure UI payloads through the extracted helper', () => {
+        const shell = createShell();
+        const sandbox = createSandbox(shell);
+        const createSearchController = loadSearchControllerFactory(sandbox);
+        const controller = createSearchController({
+            state: {
+                dependencies: {
+                    showAlert: () => {},
+                    showConfirm: async () => true
+                },
+                cleanupFns: []
+            },
+            queryUi: {},
+            results: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getUnexpectedSearchFailureUiState(new Error('bridge down')))),
+            {
+                statusMessage: 'Search failed unexpectedly.',
+                alertMessage: 'bridge down',
+                alertTitle: 'Search Failed',
+                emptySummary: 'Search error',
+                querySummaryMeta: 'Unexpected failure: bridge down',
+                rowMessage: 'Search failed unexpectedly.'
+            }
+        );
+    });
+
     it('sets a fresh status message when a search returns no results', async () => {
         const statusMessages = [];
         const querySummaries = [];
