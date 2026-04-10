@@ -140,6 +140,49 @@
             });
         }
 
+        function resetVariantLockSection(container) {
+            state.variantLockControls.clear();
+            container.innerHTML = '';
+        }
+
+        function setVariantLockSectionVisibility(section, hasVariantUnits) {
+            if (hasVariantUnits) {
+                section.classList.remove('hidden');
+                return;
+            }
+
+            section.classList.add('hidden');
+        }
+
+        function createVariantLockOption(value, label) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            return option;
+        }
+
+        function createVariantLockRow(unit) {
+            const row = document.createElement('div');
+            row.className = 'variant-lock-row';
+
+            const label = document.createElement('div');
+            label.className = 'variant-lock-name';
+            label.textContent = unit.displayName || unit.id;
+
+            const select = document.createElement('select');
+            select.className = 'variant-lock-select';
+            select.setAttribute('aria-label', `${unit.displayName || unit.id} variant lock`);
+            select.appendChild(createVariantLockOption('auto', 'Auto'));
+
+            unit.variants.forEach((variant) => {
+                select.appendChild(createVariantLockOption(variant.id, variant.label || variant.id));
+            });
+
+            row.appendChild(label);
+            row.appendChild(select);
+            return { row, select };
+        }
+
         function renderVariantLockControls(preservedLocks = null) {
             const {
                 variantLocksSection: section,
@@ -149,42 +192,17 @@
 
             const variantUnits = getVariantCapableUnits();
             const locks = preservedLocks || getCurrentVariantLocks();
-            state.variantLockControls.clear();
-            container.innerHTML = '';
+            resetVariantLockSection(container);
 
             if (variantUnits.length === 0) {
-                section.classList.add('hidden');
+                setVariantLockSectionVisibility(section, false);
                 return;
             }
 
-            section.classList.remove('hidden');
+            setVariantLockSectionVisibility(section, true);
 
             variantUnits.forEach((unit) => {
-                const row = document.createElement('div');
-                row.className = 'variant-lock-row';
-
-                const label = document.createElement('div');
-                label.className = 'variant-lock-name';
-                label.textContent = unit.displayName || unit.id;
-
-                const select = document.createElement('select');
-                select.className = 'variant-lock-select';
-                select.setAttribute('aria-label', `${unit.displayName || unit.id} variant lock`);
-
-                const autoOption = document.createElement('option');
-                autoOption.value = 'auto';
-                autoOption.textContent = 'Auto';
-                select.appendChild(autoOption);
-
-                unit.variants.forEach((variant) => {
-                    const option = document.createElement('option');
-                    option.value = variant.id;
-                    option.textContent = variant.label || variant.id;
-                    select.appendChild(option);
-                });
-
-                row.appendChild(label);
-                row.appendChild(select);
+                const { row, select } = createVariantLockRow(unit);
                 container.appendChild(row);
                 state.variantLockControls.set(unit.id, select);
 
