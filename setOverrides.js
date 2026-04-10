@@ -1,62 +1,8 @@
-const GLOBAL_OVERRIDES = Object.freeze({
-    excludedUnitPatterns: ['PVE_', '_FakeUnit', 'Dummy', 'Tracker', 'Golem', 'TFT_Item_', 'God_', 'Enemy_', '_TraitClone'],
-    excludedUnitSuffixes: ['Wolf', 'Lantern', 'Follower', 'Minion', 'Shrine', 'Prop', 'Core'],
-    excludedUnitExact: ['Summon'],
-    excludedTraitNames: [],
-    roleOverrides: {},
-    allowedUnknownRoleUnits: [],
-    specialCaseNotes: {},
-    unitOverrides: {}
-});
-
-function createSelectionGroup(id, options) {
-    return {
-        id,
-        options
-    };
-}
-
-function createSet17MechaFormSelectionGroup() {
-    return createSelectionGroup('mechaForm', [
-        {
-            id: 'standard',
-            label: 'Standard',
-            slotCost: 1
-        },
-        {
-            id: 'two-slot',
-            label: '2-Slot Mecha',
-            slotCost: 2,
-            traitContributions: {
-                Mecha: 2
-            }
-        }
-    ]);
-}
-
-function createSet17MechaOverride() {
-    return {
-        selectionGroups: [
-            createSet17MechaFormSelectionGroup()
-        ]
-    };
-}
+const { GLOBAL_OVERRIDES } = require('./set-overrides/global.js');
+const { SET_17_OVERRIDES } = require('./set-overrides/set17.js');
 
 const SET_OVERRIDES = Object.freeze({
-    '17': {
-        excludedTraitNames: ['Choose Trait'],
-        roleOverrides: {},
-        unitOverrides: {
-            Galio: createSet17MechaOverride(),
-            AurelionSol: createSet17MechaOverride(),
-            Urgot: createSet17MechaOverride(),
-            MissFortune: {
-                allowUnknownRole: true,
-                removeTraits: ['Choose Trait'],
-                note: 'Mode choice is auto-detected from trait-clone data, and the upstream payload currently omits a stable role.'
-            }
-        }
-    }
+    '17': SET_17_OVERRIDES
 });
 
 function mergeUnique(...lists) {
