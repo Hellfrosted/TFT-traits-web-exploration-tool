@@ -8,22 +8,54 @@
         const getDefaultBoardSize = () => 9;
         let nextDraftEstimateRequestId = 0;
 
+        function resolveQueryElements(ids) {
+            const elements = {};
+            (Array.isArray(ids) ? ids : []).forEach((id) => {
+                elements[id] = document.getElementById(id);
+            });
+            return elements;
+        }
+
+        function resolveSummaryShell() {
+            return resolveQueryElements([
+                'resultsSummary',
+                'resultsQuerySummary',
+                'dataStats',
+                'status',
+                'dataSourceSelect',
+                'fetchBtn',
+                'searchBtn',
+                'variantLocksSection',
+                'variantLocksContainer'
+            ]);
+        }
+
+        function resolveQueryControls() {
+            return resolveQueryElements([
+                'boardSize',
+                'maxResults',
+                'onlyActiveToggle',
+                'tierRankToggle',
+                'includeUniqueToggle'
+            ]);
+        }
+
         function setResultsSummary(content) {
-            const summary = document.getElementById('resultsSummary');
+            const { resultsSummary: summary } = resolveSummaryShell();
             if (summary) {
                 summary.innerHTML = content;
             }
         }
 
         function setQuerySummary(content) {
-            const summary = document.getElementById('resultsQuerySummary');
+            const { resultsQuerySummary: summary } = resolveSummaryShell();
             if (summary) {
                 summary.innerHTML = content;
             }
         }
 
         function setDataStats(units = '-', traits = '-', roles = '-', assets = '-') {
-            const stats = document.getElementById('dataStats');
+            const { dataStats: stats } = resolveSummaryShell();
             if (!stats) return;
 
             stats.innerHTML = `
@@ -47,14 +79,14 @@
         }
 
         function setStatusMessage(message) {
-            const status = document.getElementById('status');
+            const { status } = resolveSummaryShell();
             if (status) {
                 status.innerText = message;
             }
         }
 
         function getSelectedDataSource() {
-            const sourceSelect = document.getElementById('dataSourceSelect');
+            const { dataSourceSelect: sourceSelect } = resolveSummaryShell();
             return sourceSelect?.value || state.defaultDataSource;
         }
 
@@ -109,8 +141,10 @@
         }
 
         function renderVariantLockControls(preservedLocks = null) {
-            const section = document.getElementById('variantLocksSection');
-            const container = document.getElementById('variantLocksContainer');
+            const {
+                variantLocksSection: section,
+                variantLocksContainer: container
+            } = resolveSummaryShell();
             if (!section || !container) return;
 
             const variantUnits = getVariantCapableUnits();
@@ -189,7 +223,7 @@
         }
 
         function syncFetchButtonState() {
-            const fetchBtn = document.getElementById('fetchBtn');
+            const { fetchBtn } = resolveSummaryShell();
             if (!fetchBtn) return;
             const shouldDisable = state.isSearching || state.isFetchingData;
             fetchBtn.disabled = shouldDisable;
@@ -197,7 +231,7 @@
         }
 
         function syncSearchButtonState() {
-            const searchBtn = document.getElementById('searchBtn');
+            const { searchBtn } = resolveSummaryShell();
             if (!searchBtn) return;
 
             const shouldDisable = state.isSearching || state.isFetchingData || !state.activeData;
@@ -317,9 +351,16 @@
         }
 
         function getCurrentSearchParams() {
+            const {
+                boardSize,
+                maxResults,
+                onlyActiveToggle,
+                tierRankToggle,
+                includeUniqueToggle
+            } = resolveQueryControls();
             return {
-                boardSize: parseInt(document.getElementById('boardSize').value, 10) || getDefaultBoardSize(),
-                maxResults: parseInt(document.getElementById('maxResults').value, 10) || getDefaultMaxResults(),
+                boardSize: parseInt(boardSize?.value, 10) || getDefaultBoardSize(),
+                maxResults: parseInt(maxResults?.value, 10) || getDefaultMaxResults(),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
                 mustExclude: state.selectors.mustExclude?.getValues() || [],
                 mustIncludeTraits: state.selectors.mustIncludeTraits?.getValues() || [],
@@ -328,9 +369,9 @@
                 variantLocks: getCurrentVariantLocks(),
                 tankRoles: state.selectors.tankRoles?.getValues() || [],
                 carryRoles: state.selectors.carryRoles?.getValues() || [],
-                onlyActive: document.getElementById('onlyActiveToggle').checked,
-                tierRank: document.getElementById('tierRankToggle').checked,
-                includeUnique: document.getElementById('includeUniqueToggle').checked
+                onlyActive: !!onlyActiveToggle?.checked,
+                tierRank: !!tierRankToggle?.checked,
+                includeUnique: !!includeUniqueToggle?.checked
             };
         }
 
@@ -358,12 +399,19 @@
                 ...defaults,
                 ...params
             };
+            const {
+                boardSize,
+                maxResults,
+                onlyActiveToggle,
+                tierRankToggle,
+                includeUniqueToggle
+            } = resolveQueryControls();
 
-            document.getElementById('boardSize').value = nextParams.boardSize || getDefaultBoardSize();
-            document.getElementById('maxResults').value = nextParams.maxResults || getDefaultMaxResults();
-            document.getElementById('onlyActiveToggle').checked = !!nextParams.onlyActive;
-            document.getElementById('tierRankToggle').checked = !!nextParams.tierRank;
-            document.getElementById('includeUniqueToggle').checked = !!nextParams.includeUnique;
+            if (boardSize) boardSize.value = nextParams.boardSize || getDefaultBoardSize();
+            if (maxResults) maxResults.value = nextParams.maxResults || getDefaultMaxResults();
+            if (onlyActiveToggle) onlyActiveToggle.checked = !!nextParams.onlyActive;
+            if (tierRankToggle) tierRankToggle.checked = !!nextParams.tierRank;
+            if (includeUniqueToggle) includeUniqueToggle.checked = !!nextParams.includeUnique;
 
             if (state.selectors.mustInclude) state.selectors.mustInclude.setValues(nextParams.mustInclude || []);
             if (state.selectors.mustExclude) state.selectors.mustExclude.setValues(nextParams.mustExclude || []);
@@ -391,7 +439,10 @@
         }
 
         function clampNumericInput(id, min, max, fallback) {
-            const input = document.getElementById(id);
+            const input = resolveQueryControls()[id];
+            if (!input) {
+                return fallback;
+            }
             const parsed = parseInt(input.value, 10);
 
             if (Number.isNaN(parsed)) {
@@ -423,9 +474,11 @@
         function bindDraftQueryListeners() {
             if (state.listeners.draftBound) return;
             state.listeners.draftBound = true;
+            const controls = resolveQueryControls();
 
             ['boardSize', 'maxResults'].forEach((id) => {
-                const input = document.getElementById(id);
+                const input = controls[id];
+                if (!input) return;
                 input.addEventListener('change', () => {
                     if (id === 'boardSize') clampNumericInput('boardSize', 1, 20, 9);
                     if (id === 'maxResults') clampNumericInput('maxResults', 1, 10000, getDefaultMaxResults());
@@ -434,7 +487,7 @@
             });
 
             ['onlyActiveToggle', 'tierRankToggle', 'includeUniqueToggle'].forEach((id) => {
-                document.getElementById(id).addEventListener('change', refreshDraftQuerySummary);
+                controls[id]?.addEventListener('change', refreshDraftQuerySummary);
             });
 
             document.querySelector('.controls-body')?.addEventListener('multiselectchange', refreshDraftQuerySummary);
