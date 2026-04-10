@@ -271,6 +271,9 @@ function createSearchService({
             const searchContext = activeSearch;
             searchContext.cancelled = true;
             if (!searchContext.worker) {
+                if (activeSearch === searchContext) {
+                    activeSearch = null;
+                }
                 searchContext.settle?.(createSearchResponse({ cancelled: true }));
                 return { success: true };
             }

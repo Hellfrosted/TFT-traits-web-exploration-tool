@@ -289,6 +289,42 @@ describe('main-process search service', () => {
         assert.equal(FakeWorker.instances.length, 0);
     });
 
+    it('allows a new search immediately after cancelling before the worker starts', async () => {
+        resetWorkers();
+        const firstCacheRead = createDeferred();
+        let cacheReadCount = 0;
+        const { searchService } = createSearchServiceUnderTest({
+            readCacheImpl: () => {
+                cacheReadCount += 1;
+                return cacheReadCount === 1 ? firstCacheRead.promise : Promise.resolve(null);
+            }
+        });
+
+        const firstSearch = searchService.searchBoards({ boardSize: 9 });
+        const cancelResponse = await searchService.cancelSearch();
+        const secondSearch = searchService.searchBoards({ boardSize: 9 });
+        const worker = await waitForWorker();
+
+        assert.equal(cancelResponse.success, true);
+        assert.equal(searchService.hasActiveSearch(), true);
+
+        worker.emit('message', {
+            type: 'done',
+            success: true,
+            results: [{ units: ['B'] }]
+        });
+
+        firstCacheRead.resolve(null);
+
+        const firstResponse = await firstSearch;
+        const secondResponse = await secondSearch;
+
+        assert.equal(firstResponse.cancelled, true);
+        assert.equal(typeof firstResponse.searchId, 'number');
+        assert.equal(secondResponse.success, true);
+        assert.deepEqual(secondResponse.results, [{ units: ['B'] }]);
+    });
+
     it('fails cleanly if the worker exits without reporting a result', async () => {
         resetWorkers();
         const { searchService } = createSearchServiceUnderTest();

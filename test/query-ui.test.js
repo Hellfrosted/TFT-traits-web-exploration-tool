@@ -30,6 +30,16 @@ function createEventTarget() {
     };
 }
 
+function createDeferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}
+
 describe('renderer query UI', () => {
     it('refreshes the draft summary on multiselect changes', () => {
         const controlsBody = createEventTarget();
@@ -92,6 +102,7 @@ describe('renderer query UI', () => {
         const controlsBody = createEventTarget();
         const summaryNode = { innerHTML: '' };
         const resultsSummaries = [];
+        const renderEstimate = createDeferred();
         let estimateCalls = 0;
         const estimateParams = [];
         const sandbox = {
@@ -165,14 +176,17 @@ describe('renderer query UI', () => {
                 }
             },
             results: {
-                renderEstimateSummary: (estimate) => resultsSummaries.push(estimate)
+                renderEstimateSummary: (estimate) => {
+                    resultsSummaries.push(estimate);
+                    renderEstimate.resolve();
+                }
             }
         };
 
         const queryUi = createQueryUi(app);
         queryUi.bindDraftQueryListeners();
         controlsBody.dispatchEvent({ type: 'multiselectchange' });
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await renderEstimate.promise;
 
         assert.equal(estimateCalls, 1);
         assert.deepEqual(estimateParams[0], {
