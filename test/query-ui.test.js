@@ -240,6 +240,45 @@ describe('renderer query UI', () => {
         assert.match(summaryNode.innerHTML, /Search cancelled/);
     });
 
+    it('renders data stats through extracted markup helpers', () => {
+        const dataStatsNode = { innerHTML: '' };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => id === 'dataStats' ? dataStatsNode : null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        queryUi.setDataStats(61, 28, 7, '58/61');
+
+        assert.match(dataStatsNode.innerHTML, /Units/);
+        assert.match(dataStatsNode.innerHTML, />61</);
+        assert.match(dataStatsNode.innerHTML, /Traits/);
+        assert.match(dataStatsNode.innerHTML, />28</);
+        assert.match(dataStatsNode.innerHTML, /Roles/);
+        assert.match(dataStatsNode.innerHTML, />7</);
+        assert.match(dataStatsNode.innerHTML, /Splashes/);
+        assert.match(dataStatsNode.innerHTML, />58\/61</);
+    });
+
     it('refreshes the draft estimate when query constraints change', async () => {
         const controlsBody = createEventTarget();
         const summaryNode = { innerHTML: '' };

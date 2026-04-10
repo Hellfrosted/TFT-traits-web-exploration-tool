@@ -54,28 +54,39 @@
             }
         }
 
+        function buildDataStatMarkup(label, value) {
+            return `
+                <div class="data-stat">
+                    <span class="data-stat-label">${escapeHtml(label)}</span>
+                    <strong class="data-stat-value">${escapeHtml(value)}</strong>
+                </div>
+            `;
+        }
+
+        function buildDataStatsMarkup({
+            units = '-',
+            traits = '-',
+            roles = '-',
+            assets = '-'
+        } = {}) {
+            return `
+                ${buildDataStatMarkup('Units', units)}
+                ${buildDataStatMarkup('Traits', traits)}
+                ${buildDataStatMarkup('Roles', roles)}
+                ${buildDataStatMarkup('Splashes', assets)}
+            `;
+        }
+
         function setDataStats(units = '-', traits = '-', roles = '-', assets = '-') {
             const { dataStats: stats } = resolveSummaryShell();
             if (!stats) return;
 
-            stats.innerHTML = `
-                <div class="data-stat">
-                    <span class="data-stat-label">Units</span>
-                    <strong class="data-stat-value">${units}</strong>
-                </div>
-                <div class="data-stat">
-                    <span class="data-stat-label">Traits</span>
-                    <strong class="data-stat-value">${traits}</strong>
-                </div>
-                <div class="data-stat">
-                    <span class="data-stat-label">Roles</span>
-                    <strong class="data-stat-value">${roles}</strong>
-                </div>
-                <div class="data-stat">
-                    <span class="data-stat-label">Splashes</span>
-                    <strong class="data-stat-value">${assets}</strong>
-                </div>
-            `;
+            stats.innerHTML = buildDataStatsMarkup({
+                units,
+                traits,
+                roles,
+                assets
+            });
         }
 
         function setStatusMessage(message) {
