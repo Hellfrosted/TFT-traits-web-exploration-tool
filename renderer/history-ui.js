@@ -36,15 +36,25 @@
             listEl.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
         }
 
-        function createHistoryMeta(entry) {
+        function getHistoryItemDisplayState(entry = {}) {
+            const paramsText = summarizeParams(entry.params);
+            return {
+                title: entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search',
+                paramsText,
+                resultCountText: `${entry.resultCount} results`,
+                timestampText: formatTimestamp(entry.timestamp)
+            };
+        }
+
+        function createHistoryMeta(displayState) {
             const meta = document.createElement('div');
             meta.className = 'history-meta';
 
             const resultCount = document.createElement('span');
-            resultCount.textContent = `${entry.resultCount} results`;
+            resultCount.textContent = displayState.resultCountText;
 
             const timestamp = document.createElement('span');
-            timestamp.textContent = formatTimestamp(entry.timestamp);
+            timestamp.textContent = displayState.timestampText;
 
             meta.appendChild(resultCount);
             meta.appendChild(timestamp);
@@ -54,22 +64,20 @@
         function createHistoryItem(entry) {
             const item = document.createElement('div');
             item.className = 'history-item';
-
-            const paramsStr = summarizeParams(entry.params);
-            const title = entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search';
+            const displayState = getHistoryItemDisplayState(entry);
 
             const titleEl = document.createElement('div');
             titleEl.className = 'history-title';
-            titleEl.textContent = title;
+            titleEl.textContent = displayState.title;
 
             const paramsEl = document.createElement('div');
             paramsEl.className = 'history-params';
-            paramsEl.title = paramsStr;
-            paramsEl.textContent = paramsStr;
+            paramsEl.title = displayState.paramsText;
+            paramsEl.textContent = displayState.paramsText;
 
             item.appendChild(titleEl);
             item.appendChild(paramsEl);
-            item.appendChild(createHistoryMeta(entry));
+            item.appendChild(createHistoryMeta(displayState));
             item.addEventListener('click', () => loadSearchFromHistory(entry));
             return item;
         }
@@ -188,7 +196,8 @@
             loadSearchFromHistory,
             __test: {
                 getHistoryReplayBusyMessage,
-                getHistoryReplayFailureMessage
+                getHistoryReplayFailureMessage,
+                getHistoryItemDisplayState
             }
         };
     };

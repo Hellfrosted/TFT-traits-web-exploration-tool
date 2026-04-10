@@ -183,6 +183,64 @@ describe('renderer history UI', () => {
         assert.match(historyList.innerHTML, /History unavailable: Bridge unavailable/);
     });
 
+    it('derives history item display text through the extracted helper', () => {
+        const sandbox = {
+            console,
+            document: {
+                getElementById: () => null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared({
+                        summarizeParams: (params) => params?.mustInclude?.join(', ') || '',
+                        formatTimestamp: (timestamp) => `at ${timestamp}`
+                    })
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const historyUi = createHistoryUi({
+            state: {
+                dependencies: {
+                    showAlert: () => {}
+                }
+            },
+            queryUi: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(historyUi.__test.getHistoryItemDisplayState({
+                params: {
+                    boardSize: 9,
+                    mustInclude: ['Aurora']
+                },
+                resultCount: 7,
+                timestamp: 123
+            }))),
+            {
+                title: 'Level 9',
+                paramsText: 'Aurora',
+                resultCountText: '7 results',
+                timestampText: 'at 123'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(historyUi.__test.getHistoryItemDisplayState({
+                params: null,
+                resultCount: 0,
+                timestamp: 456
+            }))),
+            {
+                title: 'Saved Search',
+                paramsText: '',
+                resultCountText: '0 results',
+                timestampText: 'at 456'
+            }
+        );
+    });
+
     it('renders recent history entries and replays the selected search', async () => {
         const historyList = createDomElement('div');
         let searchClicks = 0;
