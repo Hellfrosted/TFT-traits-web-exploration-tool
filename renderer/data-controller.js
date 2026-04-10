@@ -67,6 +67,176 @@
             return [...traitNames].sort((left, right) => left.localeCompare(right));
         }
 
+        function syncFetchUi(sourceLabel = null) {
+            app.queryUi.syncFetchButtonState();
+            app.queryUi.syncSearchButtonState();
+            if (sourceLabel) {
+                app.queryUi.setStatusMessage(`Connecting to ${sourceLabel} Data Engine...`);
+            }
+        }
+
+        function getRetainedDatasetSummary() {
+            if (!state.activeData?.unitMap?.size) {
+                return '';
+            }
+
+            return ` Retaining previously loaded ${state.activeData.unitMap.size}-unit ${app.queryUi.getDataSourceLabel(state.activeData.dataSource)} dataset.`;
+        }
+
+        function getSetLabel(res, fallbackSource) {
+            const activeSource = res.dataSource || fallbackSource;
+            const activeSourceLabel = app.queryUi.getDataSourceLabel(activeSource);
+            return res.setNumber
+                ? `${activeSourceLabel} Set ${res.setNumber}`
+                : `${activeSourceLabel} latest detected set`;
+        }
+
+        function getCacheSummary(res) {
+            const snapshotAgeLabel = formatSnapshotAge(res.snapshotFetchedAt);
+            return res.usedCachedSnapshot
+                ? ` Using cached snapshot${snapshotAgeLabel ? ` (${snapshotAgeLabel})` : ''}.`
+                : '';
+        }
+
+        function buildActiveData(res, fallbackSource) {
+            return {
+                unitMap: new Map(res.units.map((unit) => [unit.id, unit])),
+                traits: res.traits || [],
+                roles: res.roles || [],
+                traitBreakpoints: res.traitBreakpoints || {},
+                traitIcons: res.traitIcons || {},
+                assetValidation: res.assetValidation || null,
+                setNumber: res.setNumber,
+                dataSource: res.dataSource || fallbackSource,
+                dataFingerprint: res.dataFingerprint,
+                hashMap: res.hashMap || {},
+                snapshotFetchedAt: res.snapshotFetchedAt || null,
+                usedCachedSnapshot: !!res.usedCachedSnapshot
+            };
+        }
+
+        function renderLoadedDataStatus(res, setLabel, cacheSummary) {
+            const fingerprintShort = res.dataFingerprint ? res.dataFingerprint.slice(0, 8) : 'unknown';
+            const assetSummary = app.queryUi.summarizeAssetValidation(res.assetValidation);
+
+            app.queryUi.setStatusMessage(assetSummary
+                ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}${cacheSummary}`
+                : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).${cacheSummary}`);
+            app.queryUi.setDataStats(
+                res.units.length,
+                res.traits.length,
+                res.roles.length,
+                app.queryUi.getAssetCoverageLabel(res.assetValidation)
+            );
+            app.queryUi.renderQuerySummary(null, `Loaded ${setLabel}`);
+        }
+
+        function createUnitOptions(units) {
+            return units.map((unit) => ({
+                ...unit,
+                pillLabel: unit.displayName || unit.id,
+                dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
+            }));
+        }
+
+        function createTraitOptions(res) {
+            return res.traits.map((trait) => ({
+                value: trait,
+                label: trait,
+                iconUrl: res.traitIcons?.[trait] || null
+            }));
+        }
+
+        function initializeSelectors(res, preservedVariantLocks) {
+            const setupMultiSelect = getSetupMultiSelect();
+            if (!setupMultiSelect) {
+                return false;
+            }
+
+            const unitOptions = createUnitOptions(res.units);
+            const traitOptions = createTraitOptions(res);
+
+            state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
+            state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
+            state.selectors.mustIncludeTraits = setupMultiSelect('mustIncludeTraitsContainer', traitOptions, false);
+            state.selectors.mustExcludeTraits = setupMultiSelect('mustExcludeTraitsContainer', traitOptions, false);
+            state.selectors.extraEmblems = setupMultiSelect('extraEmblemsContainer', traitOptions, false);
+            state.selectors.tankRoles = setupMultiSelect('tankRolesContainer', res.roles, false);
+            state.selectors.carryRoles = setupMultiSelect('carryRolesContainer', res.roles, false);
+
+            app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
+            Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
+            app.queryUi.applyDefaultRoleFilters();
+            return true;
+        }
+
+        async function normalizeQuery(params) {
+            const rawParams = params ?? app.queryUi.getCurrentSearchParams();
+            if (typeof app.queryUi.normalizeSearchParams !== 'function') {
+                return {
+                    params: rawParams,
+                    comparisonKey: null
+                };
+            }
+
+            const payload = await app.queryUi.normalizeSearchParams(rawParams);
+            return {
+                params: payload?.params || rawParams,
+                comparisonKey: payload?.comparisonKey || null
+            };
+        }
+
+        function clearNormalizedResults(effectiveQuery, setLabel) {
+            state.currentResults = [];
+            state.currentResultsFingerprint = null;
+            state.selectedBoardIndex = -1;
+            app.results.renderEmptySummary('Data refreshed');
+            app.results.renderEmptySpotlight('Query controls changed after refresh. Re-run the query to compute aligned results.');
+            document.getElementById('resBody').innerHTML = app.results.renderResultsMessageRow(
+                'Data refresh normalized the active query. Re-run the query to compute aligned results.',
+                'results-message-row results-message-row-muted'
+            );
+            app.queryUi.renderQuerySummary(effectiveQuery, `Loaded ${setLabel}. Query normalized; re-run.`);
+        }
+
+        function applyPreservedRefreshState(effectiveQuery, setLabel, dataChanged, hadVisibleResults) {
+            app.queryUi.refreshDraftQuerySummary();
+            if (hadVisibleResults) {
+                app.queryUi.renderQuerySummary(
+                    effectiveQuery,
+                    dataChanged ? `Loaded ${setLabel}. Query preserved.` : `Loaded ${setLabel}.`
+                );
+            }
+        }
+
+        async function restoreQueryState(previousEffectiveQuery, {
+            hadVisibleResults,
+            dataChanged,
+            setLabel
+        }) {
+            const replayedPayload = await normalizeQuery(previousEffectiveQuery);
+            const replayedQuery = replayedPayload.params;
+            app.queryUi.applySearchParams(replayedQuery);
+
+            const effectivePayload = await normalizeQuery(app.queryUi.getCurrentSearchParams());
+            const effectiveQuery = effectivePayload.params;
+            const queryChanged = typeof replayedPayload.comparisonKey === 'string'
+                && typeof effectivePayload.comparisonKey === 'string'
+                ? replayedPayload.comparisonKey !== effectivePayload.comparisonKey
+                : true;
+
+            app.queryUi.bindDraftQueryListeners();
+            if (state.lastSearchParams) {
+                state.lastSearchParams = effectiveQuery;
+            }
+
+            if (hadVisibleResults && queryChanged) {
+                clearNormalizedResults(effectiveQuery, setLabel);
+            } else {
+                applyPreservedRefreshState(effectiveQuery, setLabel, dataChanged, hadVisibleResults);
+            }
+        }
+
         async function fetchData() {
             const source = app.queryUi.getSelectedDataSource();
             const sourceLabel = app.queryUi.getDataSourceLabel(source);
@@ -81,9 +251,7 @@
             state.activeDataFetchRequestId = requestId;
             const previousFingerprint = state.activeData?.dataFingerprint || null;
             state.isFetchingData = true;
-            app.queryUi.syncFetchButtonState();
-            app.queryUi.syncSearchButtonState();
-            app.queryUi.setStatusMessage(`Connecting to ${sourceLabel} Data Engine...`);
+            syncFetchUi(sourceLabel);
 
             try {
                 if (!state.hasElectronAPI) {
@@ -95,114 +263,23 @@
                     return;
                 }
                 if (res.success) {
-                    const activeSource = res.dataSource || source;
-                    const activeSourceLabel = app.queryUi.getDataSourceLabel(activeSource);
-                    const setLabel = res.setNumber ? `${activeSourceLabel} Set ${res.setNumber}` : `${activeSourceLabel} latest detected set`;
-                    const fingerprintShort = res.dataFingerprint ? res.dataFingerprint.slice(0, 8) : 'unknown';
-                    const snapshotAgeLabel = formatSnapshotAge(res.snapshotFetchedAt);
-                    const cacheSummary = res.usedCachedSnapshot
-                        ? ` Using cached snapshot${snapshotAgeLabel ? ` (${snapshotAgeLabel})` : ''}.`
-                        : '';
-
-                    state.activeData = {
-                        unitMap: new Map(res.units.map((unit) => [unit.id, unit])),
-                        traits: res.traits || [],
-                        roles: res.roles || [],
-                        traitBreakpoints: res.traitBreakpoints || {},
-                        traitIcons: res.traitIcons || {},
-                        assetValidation: res.assetValidation || null,
-                        setNumber: res.setNumber,
-                        dataSource: activeSource,
-                        dataFingerprint: res.dataFingerprint,
-                        hashMap: res.hashMap || {},
-                        snapshotFetchedAt: res.snapshotFetchedAt || null,
-                        usedCachedSnapshot: !!res.usedCachedSnapshot
-                    };
-
+                    const setLabel = getSetLabel(res, source);
+                    const cacheSummary = getCacheSummary(res);
+                    state.activeData = buildActiveData(res, source);
                     const dataChanged = previousFingerprint && previousFingerprint !== state.activeData.dataFingerprint;
 
-                    const assetSummary = app.queryUi.summarizeAssetValidation(res.assetValidation);
-                    app.queryUi.setStatusMessage(assetSummary
-                        ? `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}). ${assetSummary}${cacheSummary}`
-                        : `Loaded ${res.count} parsed champions from ${setLabel} (${fingerprintShort}).${cacheSummary}`);
-                    app.queryUi.setDataStats(
-                        res.units.length,
-                        res.traits.length,
-                        res.roles.length,
-                        app.queryUi.getAssetCoverageLabel(res.assetValidation)
-                    );
-                    app.queryUi.renderQuerySummary(null, `Loaded ${setLabel}`);
-
-                    const unitOptions = res.units.map((unit) => ({
-                        ...unit,
-                        pillLabel: unit.displayName || unit.id,
-                        dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
-                    }));
-                    const setupMultiSelect = getSetupMultiSelect();
-                    if (!setupMultiSelect) {
+                    renderLoadedDataStatus(res, setLabel, cacheSummary);
+                    if (!initializeSelectors(res, preservedVariantLocks)) {
                         return;
                     }
-
-                    state.selectors.mustInclude = setupMultiSelect('mustIncludeContainer', unitOptions, true);
-                    state.selectors.mustExclude = setupMultiSelect('mustExcludeContainer', unitOptions, true);
-
-                    const traitOptions = res.traits.map((trait) => ({
-                        value: trait,
-                        label: trait,
-                        iconUrl: res.traitIcons?.[trait] || null
-                    }));
-                    state.selectors.mustIncludeTraits = setupMultiSelect('mustIncludeTraitsContainer', traitOptions, false);
-                    state.selectors.mustExcludeTraits = setupMultiSelect('mustExcludeTraitsContainer', traitOptions, false);
-                    state.selectors.extraEmblems = setupMultiSelect('extraEmblemsContainer', traitOptions, false);
-                    state.selectors.tankRoles = setupMultiSelect('tankRolesContainer', res.roles, false);
-                    state.selectors.carryRoles = setupMultiSelect('carryRolesContainer', res.roles, false);
-
-                    app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
-
-                    Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
-                    app.queryUi.applyDefaultRoleFilters();
-                    const replayedPayload = typeof app.queryUi.normalizeSearchParams === 'function'
-                        ? await app.queryUi.normalizeSearchParams(previousEffectiveQuery)
-                        : { params: previousEffectiveQuery, comparisonKey: null };
-                    const replayedQuery = replayedPayload?.params || previousEffectiveQuery;
-                    app.queryUi.applySearchParams(replayedQuery);
-                    const effectivePayload = typeof app.queryUi.normalizeSearchParams === 'function'
-                        ? await app.queryUi.normalizeSearchParams(app.queryUi.getCurrentSearchParams())
-                        : { params: app.queryUi.getCurrentSearchParams(), comparisonKey: null };
-                    const effectiveQuery = effectivePayload?.params || app.queryUi.getCurrentSearchParams();
-                    const queryChanged = typeof replayedPayload?.comparisonKey === 'string' && typeof effectivePayload?.comparisonKey === 'string'
-                        ? replayedPayload.comparisonKey !== effectivePayload.comparisonKey
-                        : true;
-
-                    app.queryUi.bindDraftQueryListeners();
-                    if (state.lastSearchParams) {
-                        state.lastSearchParams = effectiveQuery;
-                    }
-                    if (hadVisibleResults && queryChanged) {
-                        state.currentResults = [];
-                        state.currentResultsFingerprint = null;
-                        state.selectedBoardIndex = -1;
-                        app.results.renderEmptySummary('Data refreshed');
-                        app.results.renderEmptySpotlight('Query controls changed after refresh. Re-run the query to compute aligned results.');
-                        document.getElementById('resBody').innerHTML = app.results.renderResultsMessageRow(
-                            'Data refresh normalized the active query. Re-run the query to compute aligned results.',
-                            'results-message-row results-message-row-muted'
-                        );
-                        app.queryUi.renderQuerySummary(effectiveQuery, `Loaded ${setLabel}. Query normalized; re-run.`);
-                    } else {
-                        app.queryUi.refreshDraftQuerySummary();
-                        if (hadVisibleResults) {
-                            app.queryUi.renderQuerySummary(effectiveQuery, dataChanged
-                                ? `Loaded ${setLabel}. Query preserved.`
-                                : `Loaded ${setLabel}.`);
-                        }
-                    }
+                    await restoreQueryState(previousEffectiveQuery, {
+                        hadVisibleResults,
+                        dataChanged,
+                        setLabel
+                    });
                     app.history.updateHistoryList();
                 } else {
-                    const retained = state.activeData?.unitMap?.size
-                        ? ` Retaining previously loaded ${state.activeData.unitMap.size}-unit ${app.queryUi.getDataSourceLabel(state.activeData.dataSource)} dataset.`
-                        : '';
-                    app.queryUi.setStatusMessage(`Error: ${res.error}.${retained}`);
+                    app.queryUi.setStatusMessage(`Error: ${res.error}.${getRetainedDatasetSummary()}`);
                     if (!state.activeData) {
                         app.queryUi.setDataStats();
                     }
@@ -212,10 +289,7 @@
                 if (requestId !== state.activeDataFetchRequestId) {
                     return;
                 }
-                const retained = state.activeData?.unitMap?.size
-                    ? ` Retaining previously loaded ${state.activeData.unitMap.size}-unit ${app.queryUi.getDataSourceLabel(state.activeData.dataSource)} dataset.`
-                    : '';
-                app.queryUi.setStatusMessage(`Failed to communicate with main process: ${err.message || err}.${retained}`);
+                app.queryUi.setStatusMessage(`Failed to communicate with main process: ${err.message || err}.${getRetainedDatasetSummary()}`);
                 if (!state.activeData) {
                     app.queryUi.setDataStats();
                 }
@@ -223,8 +297,7 @@
             } finally {
                 if (requestId === state.activeDataFetchRequestId) {
                     state.isFetchingData = false;
-                    app.queryUi.syncFetchButtonState();
-                    app.queryUi.syncSearchButtonState();
+                    syncFetchUi();
                 }
             }
         }
