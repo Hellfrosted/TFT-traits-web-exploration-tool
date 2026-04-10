@@ -546,18 +546,26 @@
             return clamped;
         }
 
+        function countDraftQuerySignals(params = {}) {
+            return (params.mustInclude?.length || 0)
+                + (params.mustExclude?.length || 0)
+                + (params.mustIncludeTraits?.length || 0)
+                + (params.mustExcludeTraits?.length || 0)
+                + (params.extraEmblems?.length || 0)
+                + Object.keys(params.variantLocks || {}).length;
+        }
+
+        function getDraftQueryMeta(params = {}) {
+            const signalCount = countDraftQuerySignals(params);
+            return signalCount > 0
+                ? `${signalCount} active constraints`
+                : 'Idle';
+        }
+
         function refreshDraftQuerySummary() {
             if (!state.activeData || state.isSearching) return;
             const params = getCurrentSearchParams();
-            const signalCount = params.mustInclude.length
-                + params.mustExclude.length
-                + params.mustIncludeTraits.length
-                + params.mustExcludeTraits.length
-                + params.extraEmblems.length
-                + Object.keys(params.variantLocks || {}).length;
-            const meta = signalCount > 0
-                ? `${signalCount} active constraints`
-                : 'Idle';
+            const meta = getDraftQueryMeta(params);
             renderQuerySummary(params, meta);
             void refreshDraftEstimate();
         }
@@ -621,7 +629,9 @@
                 getFetchButtonUiState,
                 applyFetchButtonUi,
                 getSearchButtonUiState,
-                applySearchButtonUi
+                applySearchButtonUi,
+                countDraftQuerySignals,
+                getDraftQueryMeta
             }
         };
     };

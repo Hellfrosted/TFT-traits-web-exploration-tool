@@ -570,6 +570,58 @@ describe('renderer query UI', () => {
         assert.deepEqual(carryRoles.getValues(), ['Sniper', 'Sorcerer']);
     });
 
+    it('derives draft query signal counts and summary meta through extracted helpers', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: () => null,
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {},
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        assert.equal(queryUi.__test.countDraftQuerySignals({
+            mustInclude: ['A'],
+            mustExclude: ['B'],
+            mustIncludeTraits: ['Bruiser'],
+            mustExcludeTraits: [],
+            extraEmblems: ['Emblem'],
+            variantLocks: { MissFortune: 'conduit' }
+        }), 5);
+        assert.equal(queryUi.__test.getDraftQueryMeta({
+            mustInclude: [],
+            mustExclude: [],
+            mustIncludeTraits: [],
+            mustExcludeTraits: [],
+            extraEmblems: [],
+            variantLocks: {}
+        }), 'Idle');
+        assert.equal(queryUi.__test.getDraftQueryMeta({
+            mustInclude: ['A'],
+            mustExclude: [],
+            mustIncludeTraits: [],
+            mustExcludeTraits: [],
+            extraEmblems: [],
+            variantLocks: { MissFortune: 'challenger' }
+        }), '2 active constraints');
+    });
+
     it('refreshes the draft estimate when query constraints change', async () => {
         const controlsBody = createEventTarget();
         const summaryNode = { innerHTML: '' };
