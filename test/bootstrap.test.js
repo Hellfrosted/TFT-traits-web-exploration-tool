@@ -66,6 +66,8 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
     const includeAlertDependency = options.includeAlertDependency ?? true;
     const shellElements = options.shellElements || {};
     const statusMessages = [];
+    const querySummaryCalls = [];
+    const spotlightMessages = [];
     const dispatchedEvents = [];
     const errorLogs = [];
     const documentElement = {
@@ -137,12 +139,16 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
         queryUi: {
             setStatusMessage: (message) => statusMessages.push(message),
             setDataStats: () => {},
-            renderQuerySummary: () => {},
+            renderQuerySummary: (params, meta) => {
+                querySummaryCalls.push({ params, meta });
+            },
             syncFetchButtonState: () => {},
             syncSearchButtonState: () => {}
         },
         results: {
-            renderEmptySpotlight: () => {},
+            renderEmptySpotlight: (message) => {
+                spotlightMessages.push(message);
+            },
             renderEmptySummary: () => {}
         },
         search: {
@@ -163,6 +169,8 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
         bootstrap: createBootstrap(app),
         app,
         statusMessages,
+        querySummaryCalls,
+        spotlightMessages,
         dispatchedEvents,
         documentElement,
         documentEvents,
@@ -309,5 +317,40 @@ describe('renderer bootstrap', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         assert.equal(statusMessages.at(-1), 'Renderer init failed: fetch blew up');
+    });
+
+    it('derives bootstrap shell UI state through the extracted helper', () => {
+        const { bootstrap } = createBootstrapHarness([]);
+        const toPlainObject = (value) => JSON.parse(JSON.stringify(value));
+
+        assert.deepEqual(toPlainObject(bootstrap.__test.getBootstrapShellUiState(true)), {
+            querySummaryMeta: 'Initializing UI...',
+            spotlightMessage: 'Loading data...',
+            statusMessage: 'Initializing UI...'
+        });
+        assert.deepEqual(toPlainObject(bootstrap.__test.getBootstrapShellUiState(false)), {
+            querySummaryMeta: 'Electron bridge unavailable',
+            spotlightMessage: 'Electron preload bridge unavailable.',
+            statusMessage: 'Electron preload bridge unavailable.'
+        });
+    });
+
+    it('renders the preload-unavailable shell state when the Electron bridge is missing', () => {
+        const { bootstrap, app, statusMessages, querySummaryCalls, spotlightMessages } = createBootstrapHarness([], {
+            shellElements: {
+                fetchBtn: createButtonTarget(),
+                sortMode: createEventTarget(),
+                cancelBtn: createButtonTarget(),
+                resetFiltersBtn: createButtonTarget(),
+                searchBtn: createButtonTarget()
+            }
+        });
+
+        app.state.hasElectronAPI = false;
+        bootstrap.initializeUiShell();
+
+        assert.equal(querySummaryCalls.at(-1)?.meta, 'Electron bridge unavailable');
+        assert.equal(spotlightMessages.at(-1), 'Electron preload bridge unavailable.');
+        assert.equal(statusMessages.at(-1), 'Electron preload bridge unavailable.');
     });
 });

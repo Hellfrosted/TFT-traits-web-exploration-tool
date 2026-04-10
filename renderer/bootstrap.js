@@ -43,6 +43,29 @@
             publishRendererReadyState(false);
         }
 
+        function getBootstrapShellUiState(hasElectronAPI = state.hasElectronAPI) {
+            if (hasElectronAPI) {
+                return {
+                    querySummaryMeta: 'Initializing UI...',
+                    spotlightMessage: 'Loading data...',
+                    statusMessage: 'Initializing UI...'
+                };
+            }
+
+            return {
+                querySummaryMeta: 'Electron bridge unavailable',
+                spotlightMessage: 'Electron preload bridge unavailable.',
+                statusMessage: 'Electron preload bridge unavailable.'
+            };
+        }
+
+        function applyBootstrapShellUiState(uiState) {
+            app.queryUi.setDataStats();
+            app.queryUi.renderQuerySummary(null, uiState.querySummaryMeta);
+            app.results.renderEmptySpotlight(uiState.spotlightMessage);
+            app.queryUi.setStatusMessage(uiState.statusMessage);
+        }
+
         function resetFilters() {
             if (state.isSearching || state.isFetchingData) {
                 showAlert('Cancel the current search before resetting filters.');
@@ -134,10 +157,7 @@
                 return false;
             }
 
-            app.queryUi.setDataStats();
-            app.queryUi.renderQuerySummary(null, state.hasElectronAPI ? 'Initializing UI...' : 'Electron bridge unavailable');
-            app.results.renderEmptySpotlight(state.hasElectronAPI ? 'Loading data...' : 'Electron preload bridge unavailable.');
-            app.queryUi.setStatusMessage(state.hasElectronAPI ? 'Initializing UI...' : 'Electron preload bridge unavailable.');
+            applyBootstrapShellUiState(getBootstrapShellUiState());
             bindStaticUiListeners();
             app.queryUi.syncFetchButtonState();
             app.queryUi.syncSearchButtonState();
@@ -222,7 +242,10 @@
             start,
             initializeUiShell,
             scheduleRendererBootstrap,
-            reportRendererInitFailure
+            reportRendererInitFailure,
+            __test: {
+                getBootstrapShellUiState
+            }
         };
     };
 })();
