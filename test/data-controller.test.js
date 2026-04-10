@@ -432,6 +432,58 @@ describe('renderer data controller', () => {
         );
     });
 
+    it('derives fetch failure ui state through the extracted helper', () => {
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const controller = createDataController({
+            state: {
+                selectors: {},
+                dependencies: {}
+            },
+            queryUi: {},
+            history: {}
+        });
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getFetchFailureUiState({
+                statusLead: 'Error',
+                errorMessage: 'No network',
+                retainedDatasetSummary: ' Retaining previously loaded 1-unit PBE dataset.',
+                hasActiveData: true,
+                alertMessage: 'No network',
+                alertTitle: 'Data Fetch Failed'
+            }))),
+            {
+                statusMessage: 'Error: No network. Retaining previously loaded 1-unit PBE dataset.',
+                shouldResetStats: false,
+                alertMessage: 'No network',
+                alertTitle: 'Data Fetch Failed'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getFetchFailureUiState({
+                statusLead: 'Failed to communicate with main process',
+                errorMessage: 'bridge down',
+                retainedDatasetSummary: '',
+                hasActiveData: false
+            }))),
+            {
+                statusMessage: 'Failed to communicate with main process: bridge down.',
+                shouldResetStats: true,
+                alertMessage: null,
+                alertTitle: null
+            }
+        );
+    });
+
     it('keeps results when the effective query is preserved after refresh', async () => {
         const renderedMessages = [];
         const sandbox = {

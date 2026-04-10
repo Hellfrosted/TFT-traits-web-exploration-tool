@@ -244,6 +244,32 @@
             };
         }
 
+        function getFetchFailureUiState({
+            statusLead = 'Error',
+            errorMessage = 'Unknown error',
+            retainedDatasetSummary = '',
+            hasActiveData = false,
+            alertMessage = null,
+            alertTitle = null
+        } = {}) {
+            return {
+                statusMessage: `${statusLead}: ${errorMessage}.${retainedDatasetSummary}`,
+                shouldResetStats: !hasActiveData,
+                alertMessage,
+                alertTitle
+            };
+        }
+
+        function applyFetchFailureUiState(uiState = {}) {
+            app.queryUi.setStatusMessage(uiState.statusMessage || 'Error: Unknown error.');
+            if (uiState.shouldResetStats) {
+                app.queryUi.setDataStats();
+            }
+            if (uiState.alertMessage) {
+                void showAlert(uiState.alertMessage, uiState.alertTitle || 'Attention');
+            }
+        }
+
         async function restoreQueryState(previousEffectiveQuery, {
             hadVisibleResults,
             dataChanged,
@@ -317,20 +343,25 @@
                     });
                     app.history.updateHistoryList();
                 } else {
-                    app.queryUi.setStatusMessage(`Error: ${res.error}.${getRetainedDatasetSummary()}`);
-                    if (!state.activeData) {
-                        app.queryUi.setDataStats();
-                    }
-                    void showAlert(res.error, 'Data Fetch Failed');
+                    applyFetchFailureUiState(getFetchFailureUiState({
+                        statusLead: 'Error',
+                        errorMessage: res.error,
+                        retainedDatasetSummary: getRetainedDatasetSummary(),
+                        hasActiveData: !!state.activeData,
+                        alertMessage: res.error,
+                        alertTitle: 'Data Fetch Failed'
+                    }));
                 }
             } catch (err) {
                 if (requestId !== state.activeDataFetchRequestId) {
                     return;
                 }
-                app.queryUi.setStatusMessage(`Failed to communicate with main process: ${err.message || err}.${getRetainedDatasetSummary()}`);
-                if (!state.activeData) {
-                    app.queryUi.setDataStats();
-                }
+                applyFetchFailureUiState(getFetchFailureUiState({
+                    statusLead: 'Failed to communicate with main process',
+                    errorMessage: err.message || err,
+                    retainedDatasetSummary: getRetainedDatasetSummary(),
+                    hasActiveData: !!state.activeData
+                }));
                 console.error(err);
             } finally {
                 if (requestId === state.activeDataFetchRequestId) {
@@ -343,7 +374,8 @@
         return {
             fetchData,
             __test: {
-                getRefreshQueryRestoreState
+                getRefreshQueryRestoreState,
+                getFetchFailureUiState
             }
         };
     };
