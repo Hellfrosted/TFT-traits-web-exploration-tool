@@ -64,6 +64,38 @@
                 : 'Status: Unloaded');
         }
 
+        function bindAsyncClickAction(element, action) {
+            element?.addEventListener('click', () => {
+                Promise.resolve(action()).catch((error) => {
+                    reportRendererInitFailure(error);
+                });
+            });
+        }
+
+        function bindSortModeListener(sortMode) {
+            sortMode?.addEventListener('change', () => {
+                if (state.currentResults.length === 0) return;
+                app.results.renderResults(app.results.getSortedResults(state.currentResults));
+            });
+        }
+
+        function bindSearchShortcut(searchBtn) {
+            document.addEventListener('keydown', (event) => {
+                const isSubmitChord = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
+                if (!isSubmitChord || state.isSearching) return;
+                event.preventDefault();
+                searchBtn?.click();
+            });
+        }
+
+        function bindStaticUiControlListeners(elements) {
+            bindAsyncClickAction(elements.fetchBtn, () => app.data.fetchData());
+            bindSortModeListener(elements.sortMode);
+            bindAsyncClickAction(elements.cancelBtn, () => app.search.requestCancelSearch());
+            elements.resetFiltersBtn?.addEventListener('click', resetFilters);
+            elements.searchBtn?.addEventListener('click', app.search.handleSearchClick);
+        }
+
         function bindStaticUiListeners() {
             if (state.listeners.staticBound) return;
             state.listeners.staticBound = true;
@@ -75,33 +107,8 @@
                 'searchBtn'
             ]);
 
-            elements.fetchBtn?.addEventListener('click', () => {
-                app.data.fetchData().catch((error) => {
-                    reportRendererInitFailure(error);
-                });
-            });
-
-            elements.sortMode?.addEventListener('change', () => {
-                if (state.currentResults.length === 0) return;
-                app.results.renderResults(app.results.getSortedResults(state.currentResults));
-            });
-
-            elements.cancelBtn?.addEventListener('click', () => {
-                app.search.requestCancelSearch().catch((error) => {
-                    reportRendererInitFailure(error);
-                });
-            });
-
-            elements.resetFiltersBtn?.addEventListener('click', resetFilters);
-
-            document.addEventListener('keydown', (event) => {
-                const isSubmitChord = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
-                if (!isSubmitChord || state.isSearching) return;
-                event.preventDefault();
-                elements.searchBtn?.click();
-            });
-
-            elements.searchBtn?.addEventListener('click', app.search.handleSearchClick);
+            bindStaticUiControlListeners(elements);
+            bindSearchShortcut(elements.searchBtn);
         }
 
         function initializeUiShell() {

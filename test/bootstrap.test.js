@@ -36,14 +36,42 @@ function reportRendererIssue(app, reporterState, issueKey, options = {}) {
     return true;
 }
 
+function createEventTarget() {
+    const listeners = new Map();
+    return {
+        addEventListener(eventName, handler) {
+            if (!listeners.has(eventName)) {
+                listeners.set(eventName, []);
+            }
+            listeners.get(eventName).push(handler);
+        },
+        dispatchEvent(event) {
+            const handlers = listeners.get(event.type) || [];
+            handlers.forEach((handler) => handler(event));
+        }
+    };
+}
+
+function createButtonTarget() {
+    const target = createEventTarget();
+    return {
+        ...target,
+        click() {
+            target.dispatchEvent({ type: 'click' });
+        }
+    };
+}
+
 function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
     const includeAlertDependency = options.includeAlertDependency ?? true;
+    const shellElements = options.shellElements || {};
     const statusMessages = [];
     const dispatchedEvents = [];
     const errorLogs = [];
     const documentElement = {
         dataset: {}
     };
+    const documentEvents = createEventTarget();
     const sandbox = {
         console: {
             ...console,
@@ -52,17 +80,23 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
         document: {
             documentElement,
             readyState: 'complete',
-            getElementById: () => null,
-            addEventListener: () => {}
+            getElementById: (id) => shellElements[id] || null,
+            addEventListener: (...args) => documentEvents.addEventListener(...args)
         },
         window: {
             TFTRenderer: {
                 shared: {
                     getMissingRequiredShellIds: () => [...missingIds],
-                    resolveShellElements: () => ({
-                        elements: {},
-                        missingIds: [...missingIds]
-                    }),
+                    resolveShellElements: (ids = []) => {
+                        const elements = {};
+                        ids.forEach((id) => {
+                            elements[id] = shellElements[id] || null;
+                        });
+                        return {
+                            elements,
+                            missingIds: ids.filter((id) => !shellElements[id])
+                        };
+                    },
                     setResultsBodyMessage: () => false,
                     reportRendererIssue
                 }
@@ -131,6 +165,7 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
         statusMessages,
         dispatchedEvents,
         documentElement,
+        documentEvents,
         errorLogs,
         getCounts: () => ({
             subscribeCalls,
@@ -184,5 +219,95 @@ describe('renderer bootstrap', () => {
             'Renderer dependency mismatch: missing required dialog helper (showAlert).'
         );
         assert.equal(errorLogs.length, 1);
+    });
+
+    it('triggers the search button click from the submit shortcut when idle', () => {
+        const searchBtn = createButtonTarget();
+        let searchClicks = 0;
+        const { bootstrap, documentEvents } = createBootstrapHarness([], {
+            shellElements: {
+                fetchBtn: createButtonTarget(),
+                sortMode: createEventTarget(),
+                cancelBtn: createButtonTarget(),
+                resetFiltersBtn: createButtonTarget(),
+                searchBtn
+            }
+        });
+
+        bootstrap.initializeUiShell();
+        searchBtn.addEventListener('click', () => {
+            searchClicks += 1;
+        });
+
+        let prevented = false;
+        documentEvents.dispatchEvent({
+            type: 'keydown',
+            ctrlKey: true,
+            metaKey: false,
+            key: 'Enter',
+            preventDefault() {
+                prevented = true;
+            }
+        });
+
+        assert.equal(searchClicks, 1);
+        assert.equal(prevented, true);
+    });
+
+    it('ignores the submit shortcut while a search is already running', () => {
+        const searchBtn = createButtonTarget();
+        let searchClicks = 0;
+        const { bootstrap, app, documentEvents } = createBootstrapHarness([], {
+            shellElements: {
+                fetchBtn: createButtonTarget(),
+                sortMode: createEventTarget(),
+                cancelBtn: createButtonTarget(),
+                resetFiltersBtn: createButtonTarget(),
+                searchBtn
+            }
+        });
+
+        app.state.isSearching = true;
+        bootstrap.initializeUiShell();
+        searchBtn.addEventListener('click', () => {
+            searchClicks += 1;
+        });
+
+        let prevented = false;
+        documentEvents.dispatchEvent({
+            type: 'keydown',
+            ctrlKey: true,
+            metaKey: false,
+            key: 'Enter',
+            preventDefault() {
+                prevented = true;
+            }
+        });
+
+        assert.equal(searchClicks, 0);
+        assert.equal(prevented, false);
+    });
+
+    it('reports fetch button failures through the shared async click handler', async () => {
+        const fetchBtn = createButtonTarget();
+        const { bootstrap, statusMessages, app } = createBootstrapHarness([], {
+            shellElements: {
+                fetchBtn,
+                sortMode: createEventTarget(),
+                cancelBtn: createButtonTarget(),
+                resetFiltersBtn: createButtonTarget(),
+                searchBtn: createButtonTarget()
+            }
+        });
+
+        app.data.fetchData = async () => {
+            throw new Error('fetch blew up');
+        };
+
+        bootstrap.initializeUiShell();
+        fetchBtn.click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        assert.equal(statusMessages.at(-1), 'Renderer init failed: fetch blew up');
     });
 });
