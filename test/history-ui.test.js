@@ -398,6 +398,55 @@ describe('renderer history UI', () => {
         assert.equal(searchClicks, 1);
     });
 
+    it('derives replay busy and failure messages through extracted helpers', () => {
+        const sandbox = {
+            console,
+            document: {
+                getElementById: () => null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const historyUi = createHistoryUi({
+            state: {
+                isSearching: false,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                }
+            },
+            queryUi: {}
+        });
+
+        assert.equal(historyUi.__test.getHistoryReplayBusyMessage(), null);
+
+        const busyHistoryUi = createHistoryUi({
+            state: {
+                isSearching: true,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                }
+            },
+            queryUi: {}
+        });
+
+        assert.equal(
+            busyHistoryUi.__test.getHistoryReplayBusyMessage(),
+            'Wait for current search to finish or cancel it.'
+        );
+        assert.equal(
+            historyUi.__test.getHistoryReplayFailureMessage(new Error('normalize blew up')),
+            'Failed to replay cached query: normalize blew up'
+        );
+    });
+
     it('shows a busy-state alert instead of replaying while search work is active', async () => {
         let searchClicks = 0;
         const appliedParams = [];
@@ -455,5 +504,62 @@ describe('renderer history UI', () => {
         }]);
         assert.deepEqual(appliedParams, []);
         assert.equal(searchClicks, 0);
+    });
+
+    it('surfaces replay normalization failures through the status message without launching a search', async () => {
+        let searchClicks = 0;
+        const appliedParams = [];
+        const statusMessages = [];
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => {
+                    if (id === 'searchBtn') {
+                        return {
+                            click: () => {
+                                searchClicks += 1;
+                            }
+                        };
+                    }
+                    return null;
+                },
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                }
+            },
+            queryUi: {
+                applySearchParams: (params) => appliedParams.push(params),
+                normalizeSearchParams: async () => {
+                    throw new Error('normalize blew up');
+                },
+                renderQuerySummary: () => {},
+                setStatusMessage: (message) => statusMessages.push(message)
+            }
+        };
+
+        const historyUi = createHistoryUi(app);
+        await historyUi.loadSearchFromHistory({
+            params: {
+                boardSize: 7
+            }
+        });
+
+        assert.equal(searchClicks, 0);
+        assert.deepEqual(appliedParams, []);
+        assert.equal(statusMessages.at(-1), 'Failed to replay cached query: normalize blew up');
     });
 });

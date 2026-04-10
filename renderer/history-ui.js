@@ -150,9 +150,22 @@
             searchBtn?.click();
         }
 
-        async function loadSearchFromHistory(entry) {
+        function getHistoryReplayBusyMessage() {
             if (state.isSearching || state.isFetchingData) {
-                void showAlert('Wait for current search to finish or cancel it.');
+                return 'Wait for current search to finish or cancel it.';
+            }
+
+            return null;
+        }
+
+        function getHistoryReplayFailureMessage(error) {
+            return `Failed to replay cached query: ${error?.message || String(error)}`;
+        }
+
+        async function loadSearchFromHistory(entry) {
+            const replayBusyMessage = getHistoryReplayBusyMessage();
+            if (replayBusyMessage) {
+                void showAlert(replayBusyMessage);
                 return;
             }
 
@@ -165,14 +178,18 @@
             } catch (error) {
                 console.error('[History Replay Failed]', error);
                 if (typeof app.queryUi.setStatusMessage === 'function') {
-                    app.queryUi.setStatusMessage(`Failed to replay cached query: ${error.message || String(error)}`);
+                    app.queryUi.setStatusMessage(getHistoryReplayFailureMessage(error));
                 }
             }
         }
 
         return {
             updateHistoryList,
-            loadSearchFromHistory
+            loadSearchFromHistory,
+            __test: {
+                getHistoryReplayBusyMessage,
+                getHistoryReplayFailureMessage
+            }
         };
     };
 })();
