@@ -11,6 +11,12 @@ const {
     evaluateBoardSelection,
     createBoardResult
 } = require('./search-evaluator.js');
+const {
+    buildRemainingUnitPotential,
+    buildRemainingTraitPotential,
+    shouldPruneSearchBranch,
+    shouldEmitProgress
+} = require('./search-dfs-state.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -326,17 +332,12 @@ module.exports = {
         let lastProgressReport = 0;
 
         const currentTraitCounts = new Uint8Array(initialTraitCounts);
-        const remainingTankThreePlusFrom = new Uint8Array(availableIndices.length + 1);
-        const remainingTankFourPlusFrom = new Uint8Array(availableIndices.length + 1);
-        const remainingCarryFourPlusFrom = new Uint8Array(availableIndices.length + 1);
-        const remainingMaxSlotsFrom = new Uint8Array(availableIndices.length + 1);
-        for (let i = availableIndices.length - 1; i >= 0; i--) {
-            const info = unitInfo[availableIndices[i]];
-            remainingTankThreePlusFrom[i] = remainingTankThreePlusFrom[i + 1] + info.qualifyingTankThreePlus;
-            remainingTankFourPlusFrom[i] = remainingTankFourPlusFrom[i + 1] + info.qualifyingTankFourPlus;
-            remainingCarryFourPlusFrom[i] = remainingCarryFourPlusFrom[i + 1] + info.qualifyingCarryFourPlus;
-            remainingMaxSlotsFrom[i] = remainingMaxSlotsFrom[i + 1] + info.maxSlotCost;
-        }
+        const {
+            remainingTankThreePlusFrom,
+            remainingTankFourPlusFrom,
+            remainingCarryFourPlusFrom,
+            remainingMaxSlotsFrom
+        } = buildRemainingUnitPotential(availableIndices, unitInfo);
 
         const mustIncludeTraitTargets = buildMustIncludeTraitTargets(
             mustIncludeTraitIndices,
@@ -348,22 +349,15 @@ module.exports = {
             && !hasConditionalProfiles
             && !hasConditionalEffects
             && !hasVariableSlotCosts;
-        const remainingTraitPotentialFrom = useMustIncludePruning
-            ? mustIncludeTraitIndices.map(() => new Uint8Array(availableIndices.length + 1))
-            : [];
-        if (useMustIncludePruning) {
-            for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
-                const requiredTraitIndex = mustIncludeTraitIndices[traitPos];
-                const potential = remainingTraitPotentialFrom[traitPos];
-                for (let i = availableIndices.length - 1; i >= 0; i--) {
-                    const info = unitInfo[availableIndices[i]];
-                    potential[i] = potential[i + 1] + (info.traitContributionByIndex[requiredTraitIndex] || 0);
-                }
-            }
-        }
+        const remainingTraitPotentialFrom = buildRemainingTraitPotential({
+            useMustIncludePruning,
+            mustIncludeTraitIndices,
+            availableIndices,
+            unitInfo
+        });
         const currentVariantUnitIndices = [];
         const reportProgress = () => {
-            if (!onProgress || (combinationsChecked - lastProgressReport) < LIMITS.PROGRESS_INTERVAL) {
+            if (!onProgress || !shouldEmitProgress(combinationsChecked, lastProgressReport, LIMITS.PROGRESS_INTERVAL)) {
                 return;
             }
 
@@ -388,34 +382,29 @@ module.exports = {
             currentSlotFlex,
             currentIdxList
         ) => {
-            if (currentMinSlots > boardSize) {
+            if (shouldPruneSearchBranch({
+                startIdx,
+                currentMinSlots,
+                currentSlotFlex,
+                boardSize,
+                requireTank,
+                requireCarry,
+                tankThreePlusCount,
+                tankFourPlusCount,
+                carryFourPlusCount,
+                meetsTankRequirement,
+                meetsCarryRequirement,
+                remainingTankThreePlusFrom,
+                remainingTankFourPlusFrom,
+                remainingCarryFourPlusFrom,
+                remainingMaxSlotsFrom,
+                useMustIncludePruning,
+                mustIncludeTraitIndices,
+                mustIncludeTraitTargets,
+                currentTraitCounts,
+                remainingTraitPotentialFrom
+            })) {
                 return;
-            }
-            if (
-                requireTank &&
-                !meetsTankRequirement(tankThreePlusCount, tankFourPlusCount) &&
-                !(
-                    tankFourPlusCount + remainingTankFourPlusFrom[startIdx] >= 1 ||
-                    tankThreePlusCount + remainingTankThreePlusFrom[startIdx] >= 2
-                )
-            ) return;
-            if (
-                requireCarry &&
-                !meetsCarryRequirement(carryFourPlusCount) &&
-                (carryFourPlusCount + remainingCarryFourPlusFrom[startIdx] < 1)
-            ) return;
-            if ((currentMinSlots + currentSlotFlex + remainingMaxSlotsFrom[startIdx]) < boardSize) {
-                return;
-            }
-
-            if (useMustIncludePruning) {
-                for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
-                    const traitIndexValue = mustIncludeTraitIndices[traitPos];
-                    const target = mustIncludeTraitTargets[traitPos];
-                    if ((currentTraitCounts[traitIndexValue] + remainingTraitPotentialFrom[traitPos][startIdx]) < target) {
-                        return;
-                    }
-                }
             }
 
             if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
