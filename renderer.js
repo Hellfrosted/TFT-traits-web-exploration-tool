@@ -8,6 +8,7 @@
         'createQueryUi',
         'createResultsInteractions',
         'createResultsSpotlight',
+        'createResultsSummaryUi',
         'createResultsUi',
         'createHistoryUi',
         'createDataController',

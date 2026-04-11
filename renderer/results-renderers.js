@@ -1,9 +1,10 @@
 (function initializeResultsRenderersFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, formatBoardEstimate, resolveShellElements, setResultsBodyMessage } = ns.shared;
+    const { resolveShellElements, setResultsBodyMessage } = ns.shared;
     const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
     const createResultsInteractions = ns.createResultsInteractions;
     const createResultsSpotlight = ns.createResultsSpotlight;
+    const createResultsSummaryUi = ns.createResultsSummaryUi;
 
     ns.createResultsRenderers = function createResultsRenderers(app, model, tooltipController) {
         const { state } = app;
@@ -18,54 +19,6 @@
             return resolveShellElements(['boardSpotlight', 'resBody', 'resultsPager']).elements;
         }
 
-        function renderEmptySummary(message) {
-            app.queryUi.setResultsSummary(`
-                <div class="summary-card">
-                    <span class="summary-label">Status</span>
-                    <span class="summary-value">${escapeHtml(message)}</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Top Score</span>
-                    <span class="summary-value">-</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Lowest Cost</span>
-                    <span class="summary-value">-</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Best Value</span>
-                    <span class="summary-value">-</span>
-                </div>
-            `);
-        }
-
-        function renderEstimateSummary(estimate = null) {
-            const summaryState = resultsViewState.buildEstimateSummaryState(estimate, formatBoardEstimate);
-
-            app.queryUi.setResultsSummary(`
-                <div class="summary-card">
-                    <span class="summary-label">Search Space</span>
-                    <span class="summary-value">${escapeHtml(summaryState.estimateLabel)}</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Open Slots</span>
-                    <span class="summary-value">${escapeHtml(summaryState.openSlotsLabel)}</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Top Score</span>
-                    <span class="summary-value">-</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Lowest Cost</span>
-                    <span class="summary-value">-</span>
-                </div>
-            `);
-        }
-
-        function renderResultsMessageRow(message, className = 'results-message-row') {
-            return `<tr><td colspan="6" class="${className}">${escapeHtml(message)}</td></tr>`;
-        }
-
         function getVisibleResultsPage(results = [], page = 0, pageSize = resultsInteractions.getResultsPageSize()) {
             return resultsViewState.getVisibleResultsPage(results, page, pageSize);
         }
@@ -78,6 +31,10 @@
             resolveResultsShell,
             clearNode
         });
+        const resultsSummaryUi = createResultsSummaryUi(app, model);
+        const renderEmptySummary = resultsSummaryUi.renderEmptySummary;
+        const renderEstimateSummary = resultsSummaryUi.renderEstimateSummary;
+        const renderResultsMessageRow = resultsSummaryUi.renderResultsMessageRow;
         const renderEmptySpotlight = resultsSpotlight.renderEmptySpotlight;
         const renderSearchingSpotlight = resultsSpotlight.renderSearchingSpotlight;
         const renderBoardSpotlight = resultsSpotlight.renderBoardSpotlight;
@@ -116,26 +73,7 @@
             const pageData = getVisibleResultsPage(results, options.page, resultsInteractions.getResultsPageSize());
             state.currentResultsPage = pageData.page;
             state.selectedBoardIndex = resolveSelectedBoardIndex(state.selectedBoardIndex, pageData, results.length);
-
-            const summaryState = resultsViewState.buildResultsSummaryState(results, model.getBoardMetric);
-            app.queryUi.setResultsSummary(`
-                <div class="summary-card">
-                    <span class="summary-label">Status</span>
-                    <span class="summary-value">${summaryState.resultCount} boards</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Top Score</span>
-                    <span class="summary-value">${summaryState.topScore}</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Lowest Cost</span>
-                    <span class="summary-value">${summaryState.lowestCost}</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Best Value</span>
-                    <span class="summary-value">${summaryState.bestValue.toFixed(2)}</span>
-                </div>
-            `);
+            resultsSummaryUi.renderResultsSummary(results);
 
             const selectedRowRef = {
                 current: null
