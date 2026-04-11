@@ -4,13 +4,9 @@ const {
     createMissingDataResponse,
     createBusySearchResponse,
     createCachedSearchResponse,
-    createCancelledSearchResponse,
-    createWorkerProgressPayload,
-    shouldPersistSearchResults,
-    createWorkerDoneResponse,
-    createWorkerErrorResponse,
-    createWorkerExitResponse
+    createCancelledSearchResponse
 } = require('./search-service-state.js');
+const { createSearchWorkerRunner } = require('./search-worker-runner.js');
 
 function createSearchService({
     engine,
@@ -32,6 +28,12 @@ function createSearchService({
         : (params) => JSON.stringify(normalizeSearchParams(params));
     let activeSearch = null;
     let nextSearchId = 1;
+    const runWorkerSearch = createSearchWorkerRunner({
+        Worker,
+        workerPath,
+        ipcChannels,
+        getMainWindow
+    });
 
     function normalizeForActiveData(params) {
         const dataCache = getDataCache();
@@ -103,97 +105,18 @@ function createSearchService({
                 return createCachedSearchResponse(cached, searchContext.searchId);
             }
 
-            return await new Promise((resolve) => {
-                let resolved = false;
-
-                const safeResolve = (value) => {
-                    if (resolved) return;
-                    resolved = true;
-                    searchContext.settle = null;
-                    resolve(value);
-                };
-
-                const terminateWorker = () => {
-                    if (searchContext.terminated) {
-                        return searchContext.terminatePromise || Promise.resolve();
-                    }
-                    if (!searchContext.worker) {
-                        searchContext.terminated = true;
-                        cleanup();
-                        return Promise.resolve();
-                    }
-                    searchContext.terminated = true;
-                    try {
-                        const result = searchContext.worker.terminate();
-                        searchContext.terminatePromise = Promise.resolve(result)
-                            .catch(() => {})
-                            .finally(() => {
-                                cleanup();
-                            });
-                    } catch {
-                        cleanup();
-                        return Promise.resolve();
-                    }
-                    return searchContext.terminatePromise;
-                };
-
-                searchContext.settle = safeResolve;
-                searchContext.worker = new Worker(workerPath, {
-                    workerData: {
-                        dataCache: searchDataCache,
-                        params: normalizedParams,
-                        preparedSearchContext: preparedContext
-                    }
-                });
-                if (searchContext.cancelled) {
-                    void terminateWorker();
-                    safeResolve(createCancelledSearchResponse(searchContext.searchId));
-                    return;
-                }
-
-                searchContext.worker.on('message', (msg) => {
-                    if (msg.type === 'progress') {
-                        const mainWindow = getMainWindow();
-                        if (mainWindow && !mainWindow.isDestroyed()) {
-                            mainWindow.webContents.send(
-                                ipcChannels.SEARCH_PROGRESS,
-                                createWorkerProgressPayload(searchContext.searchId, msg)
-                            );
-                        }
-                    } else if (msg.type === 'done') {
-                        searchContext.completed = true;
-                        if (searchContext.cancelled) {
-                            void terminateWorker();
-                            safeResolve(createCancelledSearchResponse(searchContext.searchId));
-                            return;
-                        }
-                        const response = createWorkerDoneResponse(msg, searchContext.searchId);
-                        safeResolve(response);
-                        if (shouldPersistSearchResults(msg.results)) {
-                            void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
-                                .catch(() => {})
-                                .finally(() => {
-                                    void terminateWorker();
-                                });
-                            return;
-                        }
-                        void terminateWorker();
-                    }
-                });
-
-                searchContext.worker.on('error', (error) => {
-                    safeResolve(
-                        createWorkerErrorResponse(error, searchContext.searchId, searchContext.cancelled)
-                    );
-                });
-
-                searchContext.worker.on('exit', (code) => {
-                    cleanup();
-                    if (searchContext.completed) {
-                        return;
-                    }
-                    safeResolve(createWorkerExitResponse(code, searchContext.searchId, searchContext.cancelled));
-                });
+            return await runWorkerSearch({
+                searchContext,
+                workerData: {
+                    dataCache: searchDataCache,
+                    params: normalizedParams,
+                    preparedSearchContext: preparedContext
+                },
+                cacheService,
+                cacheKey,
+                searchFingerprint,
+                normalizedParams,
+                cleanup
             });
         } catch (error) {
             cleanup();
