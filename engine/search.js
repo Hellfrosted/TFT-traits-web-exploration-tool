@@ -35,6 +35,13 @@ const {
 const {
     countPreparedSearchSpaceCandidates
 } = require('./search-space-counter.js');
+const {
+    buildAvailableIndices,
+    buildUnitIndexById,
+    buildMustIncludeTraitIndices,
+    detectSearchFeatures,
+    createProgressTracker
+} = require('./search-runtime-state.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -76,17 +83,8 @@ module.exports = {
             return [];
         }
 
-        const availableIndices = [];
-        for (let i = 0; i < validUnits.length; i++) {
-            if ((mustHaveMask & (1n << BigInt(i))) === 0n) {
-                availableIndices.push(i);
-            }
-        }
-
-        const unitIndexById = Object.create(null);
-        validUnits.forEach((unit, index) => {
-            unitIndexById[unit.id] = index;
-        });
+        const availableIndices = buildAvailableIndices(validUnits, mustHaveMask);
+        const unitIndexById = buildUnitIndexById(validUnits);
 
         const {
             tankRoleSet,
@@ -98,9 +96,7 @@ module.exports = {
         } = buildRoleRequirementState(tankRoles, carryRoles);
 
         const numTraits = allTraitNames.length;
-        const mustIncludeTraitIndices = (mustIncludeTraits || [])
-            .map((traitName) => traitIndex[traitName])
-            .filter((index) => index !== undefined);
+        const mustIncludeTraitIndices = buildMustIncludeTraitIndices(mustIncludeTraits, traitIndex);
         const excludedTraitSet = new Set(mustExcludeTraits || []);
         const unitSortRank = buildUnitSortRank(validUnits);
         const unitInfo = buildUnitSearchInfo({
@@ -144,15 +140,11 @@ module.exports = {
         });
 
         const MAX_BOARDS = maxResults || LIMITS.DEFAULT_MAX_RESULTS;
-        const hasVariantUnits = unitInfo.some((info) => info.variantProfiles.length > 0);
-        const hasConditionalProfiles = unitInfo.some((info) =>
-            info.conditionalProfileEntries.length > 0 ||
-            info.variantProfiles.some((variant) => variant.conditionalProfileEntries.length > 0)
-        );
-        const hasConditionalEffects = unitInfo.some((info) =>
-            info.conditionalEffectEntries.length > 0 ||
-            info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
-        );
+        const {
+            hasVariantUnits,
+            hasConditionalProfiles,
+            hasConditionalEffects
+        } = detectSearchFeatures(unitInfo);
 
         const topBoardTracker = createTopBoardTracker({
             maxBoards: MAX_BOARDS,
@@ -168,8 +160,11 @@ module.exports = {
         const totalCombinations = hasVariableSlotCosts
             ? this.countSearchSpaceCandidates(dataCache, normalizedParams, preparedSearchContext)
             : this.combinations(availableIndices.length, remainingSlots);
-        let combinationsChecked = 0;
-        let lastProgressReport = 0;
+        const progressTracker = createProgressTracker({
+            onProgress,
+            totalCombinations,
+            shouldEmitProgress
+        });
 
         const currentTraitCounts = new Uint8Array(initialTraitCounts);
         const {
@@ -223,21 +218,6 @@ module.exports = {
             findFirstSatisfiedProfile: this.findFirstSatisfiedProfile.bind(this),
             traitCountsToRecord: this.traitCountsToRecord.bind(this)
         });
-        const reportProgress = () => {
-            if (!onProgress || !shouldEmitProgress(combinationsChecked, lastProgressReport, LIMITS.PROGRESS_INTERVAL)) {
-                return;
-            }
-
-            lastProgressReport = combinationsChecked;
-            if (Number.isFinite(totalCombinations) && totalCombinations > 0) {
-                const pct = Math.min(99, Math.round((combinationsChecked / totalCombinations) * 100));
-                onProgress(pct, combinationsChecked, totalCombinations);
-                return;
-            }
-
-            onProgress(null, combinationsChecked, totalCombinations);
-        };
-
         const dfs = (
             startIdx,
             currentMinSlots,
@@ -275,8 +255,7 @@ module.exports = {
             }
 
             if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
-                combinationsChecked++;
-                reportProgress();
+                progressTracker.markChecked();
 
                 evaluateSearchCandidate({
                     currentMinSlots,
@@ -371,13 +350,7 @@ module.exports = {
                 mustHaveInitialSlotFlex,
                 []
             );
-            if (onProgress) {
-                if (Number.isFinite(totalCombinations)) {
-                    onProgress(100, totalCombinations, totalCombinations);
-                } else {
-                    onProgress(100, combinationsChecked, totalCombinations);
-                }
-            }
+            progressTracker.complete();
         } else {
             const reason = resolveSearchSpaceError(totalCombinations, LIMITS);
             topBoardTracker.topBoards.push({ error: reason });
