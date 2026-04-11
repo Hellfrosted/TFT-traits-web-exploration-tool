@@ -4,6 +4,11 @@ const {
     mergeRawTraitMetadata,
     shouldIncludeChampionRecord
 } = require('./parse-data-state.js');
+const {
+    resolveChampionLinkedTraits,
+    collectResolvedUnitTaxonomy,
+    resolvePreferredChampionIcon
+} = require('./parse-data-units.js');
 
 function buildHashDictionary(rawJSON) {
     const hashDictionary = {};
@@ -95,28 +100,19 @@ module.exports = {
                 setOverrides
             });
 
-            const allLinkedTraits = (val.mLinkedTraits || []).reduce((result, traitLink) => {
-                const traitId = traitLink?.TraitData;
-                if (!traitId) return result;
-
-                const alias = hashDictionary[traitId] || traitId;
-                const resolvedName = traitNamesByAlias[alias] || traitNamesByAlias[traitId] || alias;
-                result.push({ traitId, resolvedName });
-                return result;
-            }, []);
-            const hasExcludedLinkedTraits = allLinkedTraits.some(({ resolvedName }) =>
-                this._isExcludedTraitName(resolvedName, setOverrides)
-            );
-            const linkedTraits = allLinkedTraits.filter(({ resolvedName }) =>
-                !this._isExcludedTraitName(resolvedName, setOverrides)
-            );
-            const linkedTraitNames = linkedTraits.map(({ resolvedName }) => resolvedName);
+            const linkedTraitState = resolveChampionLinkedTraits({
+                linkedTraits: val.mLinkedTraits,
+                hashDictionary,
+                traitNamesByAlias,
+                isExcludedTraitName: this._isExcludedTraitName.bind(this),
+                setOverrides
+            });
             const autoDetectedVariantOverride = !unitOverride?.variants?.length && !unitOverride?.selectionGroups?.length
                 ? this._buildDetectedVariantOverrides({
                     rawName,
                     baseRole: roleName,
-                    baseTraits: linkedTraitNames,
-                    hasExcludedLinkedTraits,
+                    baseTraits: linkedTraitState.linkedTraitNames,
+                    hasExcludedLinkedTraits: linkedTraitState.hasExcludedLinkedTraits,
                     rawChampionRecordMap,
                     hashDictionary,
                     traitNamesByAlias,
@@ -128,11 +124,11 @@ module.exports = {
                 .filter(([, count]) => Number(count) > 0)
                 .map(([trait]) => trait);
             const effectiveTraitNames = this._applyUnitTraitOverrides(
-                [...linkedTraitNames, ...overrideContributionTraits],
+                [...linkedTraitState.linkedTraitNames, ...overrideContributionTraits],
                 mergedUnitOverride
             );
             const effectiveTraitSet = new Set(effectiveTraitNames);
-            const linkedTraitIds = linkedTraits
+            const linkedTraitIds = linkedTraitState.includedLinkedTraits
                 .filter(({ resolvedName }) => effectiveTraitSet.has(resolvedName))
                 .map(({ traitId }) => traitId);
             const traitContributions = this._buildTraitContributionMap(effectiveTraitNames, mergedUnitOverride);
@@ -143,30 +139,15 @@ module.exports = {
                 mergedUnitOverride?.conditionalProfiles
             );
             const resolvedRoleName = this._deriveStableVariantRole(roleName, variants);
-            effectiveTraitNames.forEach((traitName) => traits.add(traitName));
-            conditionalEffects.forEach((effect) => {
-                Object.keys(effect.traitContributions).forEach((traitName) => traits.add(traitName));
+            collectResolvedUnitTaxonomy({
+                traits,
+                roles,
+                effectiveTraitNames,
+                conditionalEffects,
+                conditionalProfiles,
+                variants,
+                resolvedRoleName
             });
-            conditionalProfiles.forEach((profile) => {
-                profile.traits.forEach((traitName) => traits.add(traitName));
-                Object.keys(profile.traitContributions).forEach((traitName) => traits.add(traitName));
-            });
-            variants.forEach((variant) => {
-                variant.traits.forEach((traitName) => traits.add(traitName));
-                (variant.conditionalEffects || []).forEach((effect) => {
-                    Object.keys(effect.traitContributions).forEach((traitName) => traits.add(traitName));
-                });
-                (variant.conditionalProfiles || []).forEach((profile) => {
-                    profile.traits.forEach((traitName) => traits.add(traitName));
-                    Object.keys(profile.traitContributions).forEach((traitName) => traits.add(traitName));
-                });
-                if (variant.role && variant.role !== 'Unknown') {
-                    roles.add(variant.role);
-                }
-            });
-            if (resolvedRoleName && resolvedRoleName !== 'Unknown') {
-                roles.add(resolvedRoleName);
-            }
             const rawShopIcon = this._resolveRawChampionIcon(
                 val,
                 rawJSON,
@@ -177,28 +158,15 @@ module.exports = {
                 source
             );
             const championIcon = this._findChampionIcon(championAssets, rawName, cleanName, displayName);
-            const preferredMetadataIcon = championReference?.record?.iconUrl
-                ? {
-                    url: championReference.record.iconUrl,
-                    rank: this._rankChampionIconAsset(championReference.record.iconUrl)
-                }
-                : championIcon
-                    ? {
-                        url: championIcon.url,
-                        rank: championIcon.rank ?? this._rankChampionIconAsset(championIcon.url)
-                    }
-                    : null;
-            const rawIconBeatsMetadata = rawShopIcon && (
-                this._shouldPreferRawAsset(rawShopIcon.url, preferredMetadataIcon?.url, latestSet) ||
-                (
-                    this._assetMatchesSet(rawShopIcon.url, latestSet) &&
-                    this._assetMatchesSet(preferredMetadataIcon?.url, latestSet) &&
-                    rawShopIcon.rank > (preferredMetadataIcon?.rank ?? -1)
-                )
-            );
-            const resolvedIconUrl = rawIconBeatsMetadata
-                ? rawShopIcon.url
-                : (preferredMetadataIcon?.url || rawShopIcon?.url || null);
+            const resolvedIconUrl = resolvePreferredChampionIcon({
+                rawShopIcon,
+                championIcon,
+                championReferenceIconUrl: championReference?.record?.iconUrl,
+                latestSet,
+                shouldPreferRawAsset: this._shouldPreferRawAsset.bind(this),
+                assetMatchesSet: this._assetMatchesSet.bind(this),
+                rankChampionIconAsset: this._rankChampionIconAsset.bind(this)
+            });
             if (championReference?.record?.displayName) {
                 matchedChampionReferenceNames.add(championReference.record.displayName);
             }
