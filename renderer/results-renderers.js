@@ -1,6 +1,7 @@
 (function initializeResultsRenderersFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
     const { escapeHtml, formatBoardEstimate, resolveShellElements, setResultsBodyMessage } = ns.shared;
+    const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
 
     ns.createResultsRenderers = function createResultsRenderers(app, model, tooltipController) {
         const { state } = app;
@@ -37,25 +38,16 @@
         }
 
         function renderEstimateSummary(estimate = null) {
-            const estimateCount = estimate?.count;
-            const remainingSlots = estimate?.remainingSlots;
-            const estimateLabel = estimateCount === null
-                ? 'Variable search space'
-                : Number.isFinite(estimateCount)
-                    ? `~${formatBoardEstimate(estimateCount)} boards`
-                : 'Variable / estimating';
-            const openSlotsLabel = Number.isFinite(Number(remainingSlots))
-                ? String(remainingSlots)
-                : '-';
+            const summaryState = resultsViewState.buildEstimateSummaryState(estimate, formatBoardEstimate);
 
             app.queryUi.setResultsSummary(`
                 <div class="summary-card">
                     <span class="summary-label">Search Space</span>
-                    <span class="summary-value">${escapeHtml(estimateLabel)}</span>
+                    <span class="summary-value">${escapeHtml(summaryState.estimateLabel)}</span>
                 </div>
                 <div class="summary-card">
                     <span class="summary-label">Open Slots</span>
-                    <span class="summary-value">${escapeHtml(openSlotsLabel)}</span>
+                    <span class="summary-value">${escapeHtml(summaryState.openSlotsLabel)}</span>
                 </div>
                 <div class="summary-card">
                     <span class="summary-label">Top Score</span>
@@ -147,47 +139,12 @@
             return Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 100;
         }
 
-        function clampResultsPage(page, totalPages) {
-            const safeTotalPages = Math.max(1, Number.parseInt(totalPages, 10) || 1);
-            const numericPage = Number.parseInt(page, 10);
-            if (!Number.isFinite(numericPage) || numericPage < 0) {
-                return 0;
-            }
-            return Math.min(numericPage, safeTotalPages - 1);
-        }
-
         function getVisibleResultsPage(results = [], page = 0, pageSize = getResultsPageSize()) {
-            const safeResults = Array.isArray(results) ? results : [];
-            const safePageSize = Math.max(1, Number.parseInt(pageSize, 10) || getResultsPageSize());
-            const totalPages = Math.max(1, Math.ceil(safeResults.length / safePageSize));
-            const resolvedPage = clampResultsPage(page, totalPages);
-            const startIndex = resolvedPage * safePageSize;
-            const endIndex = Math.min(startIndex + safePageSize, safeResults.length);
-
-            return {
-                page: resolvedPage,
-                pageSize: safePageSize,
-                totalPages,
-                startIndex,
-                endIndex,
-                items: safeResults.slice(startIndex, endIndex)
-            };
+            return resultsViewState.getVisibleResultsPage(results, page, pageSize);
         }
 
         function resolveSelectedBoardIndex(selectedBoardIndex, pageData, totalResults) {
-            if (!totalResults) {
-                return -1;
-            }
-
-            if (
-                Number.isInteger(selectedBoardIndex)
-                && selectedBoardIndex >= pageData.startIndex
-                && selectedBoardIndex < pageData.endIndex
-            ) {
-                return selectedBoardIndex;
-            }
-
-            return pageData.startIndex;
+            return resultsViewState.resolveSelectedBoardIndex(selectedBoardIndex, pageData, totalResults);
         }
 
         function clearResultsPager() {
@@ -383,25 +340,23 @@
             state.currentResultsPage = pageData.page;
             state.selectedBoardIndex = resolveSelectedBoardIndex(state.selectedBoardIndex, pageData, results.length);
 
-            const bestValue = results.reduce((best, board) => Math.max(best, model.getBoardMetric(board) / Math.max(board.totalCost, 1)), 0);
-            const lowestCost = results.reduce((best, board) => Math.min(best, board.totalCost), Number.POSITIVE_INFINITY);
-            const topScore = results.reduce((best, board) => Math.max(best, model.getBoardMetric(board)), Number.NEGATIVE_INFINITY);
+            const summaryState = resultsViewState.buildResultsSummaryState(results, model.getBoardMetric);
             app.queryUi.setResultsSummary(`
                 <div class="summary-card">
                     <span class="summary-label">Status</span>
-                    <span class="summary-value">${results.length} boards</span>
+                    <span class="summary-value">${summaryState.resultCount} boards</span>
                 </div>
                 <div class="summary-card">
                     <span class="summary-label">Top Score</span>
-                    <span class="summary-value">${topScore}</span>
+                    <span class="summary-value">${summaryState.topScore}</span>
                 </div>
                 <div class="summary-card">
                     <span class="summary-label">Lowest Cost</span>
-                    <span class="summary-value">${lowestCost}</span>
+                    <span class="summary-value">${summaryState.lowestCost}</span>
                 </div>
                 <div class="summary-card">
                     <span class="summary-label">Best Value</span>
-                    <span class="summary-value">${bestValue.toFixed(2)}</span>
+                    <span class="summary-value">${summaryState.bestValue.toFixed(2)}</span>
                 </div>
             `);
 

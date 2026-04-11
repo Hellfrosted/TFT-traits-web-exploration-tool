@@ -9,7 +9,11 @@
         return {
             ...renderers,
             getSortedResults: model.getSortedResults,
-            __test: renderers.__test
+            __test: {
+                ...renderers.__test,
+                buildEstimateSummaryState: ns.resultsViewState?.buildEstimateSummaryState,
+                buildResultsSummaryState: ns.resultsViewState?.buildResultsSummaryState
+            }
         };
     };
 })();

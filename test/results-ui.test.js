@@ -7,6 +7,7 @@ const vm = require('node:vm');
 function createResultsUiForSortMode(sortMode) {
     const sources = [
         'results-model.js',
+        'results-view-state.js',
         'results-tooltip.js',
         'results-renderers.js',
         'results-ui.js'
@@ -65,6 +66,7 @@ function createResultsUiForSortMode(sortMode) {
 function createResultsUiForSummary(summarySink) {
     const sources = [
         'results-model.js',
+        'results-view-state.js',
         'results-tooltip.js',
         'results-renderers.js',
         'results-ui.js'
@@ -160,6 +162,22 @@ describe('results UI sorting', () => {
         assert.match(summaries.at(-1), />6</);
     });
 
+    it('derives estimate summary state through the extracted results view helper', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const state = resultsUi.__test.buildEstimateSummaryState(
+            { count: 1250000, remainingSlots: 4 },
+            (value) => `${value}`
+        );
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(state)),
+            {
+                estimateLabel: '~1250000 boards',
+                openSlotsLabel: '4'
+            }
+        );
+    });
+
     it('derives a bounded visible result page for large result sets', () => {
         const resultsUi = createResultsUiForSummary(() => {});
         const boards = Array.from({ length: 250 }, (_value, index) => ({
@@ -176,6 +194,24 @@ describe('results UI sorting', () => {
         assert.equal(page.endIndex, 200);
         assert.equal(page.items.length, 100);
         assert.equal(page.items[0].units[0], 'Unit-101');
+    });
+
+    it('derives results summary state through the extracted results view helper', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const state = resultsUi.__test.buildResultsSummaryState([
+            { totalCost: 10, synergyScore: 4 },
+            { totalCost: 8, synergyScore: 6 }
+        ], (board) => board.synergyScore);
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(state)),
+            {
+                resultCount: 2,
+                bestValue: 0.75,
+                lowestCost: 8,
+                topScore: 6
+            }
+        );
     });
 
     it('falls back to the current page start when the selected board is off-page', () => {
