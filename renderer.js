@@ -6,6 +6,7 @@
         'createResultsUi',
         'createHistoryUi',
         'createDataController',
+        'createSearchOperations',
         'createSearchOutcomesUi',
         'createSearchController',
         'createBootstrap',
