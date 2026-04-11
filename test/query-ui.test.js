@@ -21,6 +21,10 @@ function loadQueryUiFactory(sandbox) {
         path.join(__dirname, '..', 'renderer', 'query-shell-ui.js'),
         'utf8'
     );
+    const queryParamsUiSource = fs.readFileSync(
+        path.join(__dirname, '..', 'renderer', 'query-params-ui.js'),
+        'utf8'
+    );
     const source = fs.readFileSync(
         path.join(__dirname, '..', 'renderer', 'query-ui.js'),
         'utf8'
@@ -30,6 +34,7 @@ function loadQueryUiFactory(sandbox) {
     vm.runInNewContext(querySummaryUiSource, sandbox, { filename: 'renderer/query-summary-ui.js' });
     vm.runInNewContext(queryControlStateSource, sandbox, { filename: 'renderer/query-control-state.js' });
     vm.runInNewContext(queryShellUiSource, sandbox, { filename: 'renderer/query-shell-ui.js' });
+    vm.runInNewContext(queryParamsUiSource, sandbox, { filename: 'renderer/query-params-ui.js' });
     vm.runInNewContext(source, sandbox, { filename: 'renderer/query-ui.js' });
     return sandbox.window.TFTRenderer.createQueryUi;
 }

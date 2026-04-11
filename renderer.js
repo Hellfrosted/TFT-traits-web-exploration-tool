@@ -6,6 +6,7 @@
         'createQuerySummaryUi',
         'createQueryControlState',
         'createQueryShellUi',
+        'createQueryParamsUi',
         'createQueryUi',
         'createResultsInteractions',
         'createResultsSpotlight',

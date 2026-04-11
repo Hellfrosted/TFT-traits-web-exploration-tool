@@ -4,6 +4,7 @@
     const createQuerySummaryUi = ns.createQuerySummaryUi;
     const createQueryControlState = ns.createQueryControlState;
     const createQueryShellUi = ns.createQueryShellUi;
+    const createQueryParamsUi = ns.createQueryParamsUi;
 
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
@@ -20,39 +21,14 @@
             querySummaryUi,
             queryControlState
         });
-
-        function getDefaultRoleFilterValues() {
-            if (!state.activeData?.roles) return null;
-
-            return {
-                tankRoles: state.resolveDefaultTankRoles(state.activeData.roles),
-                carryRoles: state.resolveDefaultCarryRoles(state.activeData.roles)
-            };
-        }
-
-        function setSelectorValues(selector, values = []) {
-            if (selector) {
-                selector.setValues(values);
-            }
-        }
-
-        function applyDefaultRoleSelectorValues(selector, values, force = false) {
-            if (!selector) return;
-            if (force || selector.getValues().length === 0) {
-                selector.setValues(values);
-            }
-        }
-
-        function applyDefaultRoleFilters(force = false) {
-            const defaultRoleValues = getDefaultRoleFilterValues();
-            if (!defaultRoleValues) return;
-
-            applyDefaultRoleSelectorValues(state.selectors.tankRoles, defaultRoleValues.tankRoles, force);
-            applyDefaultRoleSelectorValues(state.selectors.carryRoles, defaultRoleValues.carryRoles, force);
-        }
         const variantLockUi = createVariantLockUi(app, {
             resolveSummaryShell: queryShellUi.resolveSummaryShell,
             refreshDraftQuerySummary
+        });
+        const queryParamsUi = createQueryParamsUi(app, {
+            queryControlState,
+            queryShellUi,
+            variantLockUi
         });
 
         function getAssetCoverageLabel(assetValidation) {
@@ -109,7 +85,7 @@
             }
         }
 
-        async function normalizeSearchParams(params = getCurrentSearchParams()) {
+        async function normalizeSearchParams(params = queryParamsUi.getCurrentSearchParams()) {
             if (state.electronBridge?.normalizeSearchParams) {
                 try {
                     const payload = await state.electronBridge.normalizeSearchParams(params);
@@ -132,70 +108,13 @@
             };
         }
 
-        function getCurrentSearchParams() {
-            const controls = queryShellUi.resolveQueryControls();
-            return {
-                ...queryControlState.readQueryControlValues(controls),
-                mustInclude: state.selectors.mustInclude?.getValues() || [],
-                mustExclude: state.selectors.mustExclude?.getValues() || [],
-                mustIncludeTraits: state.selectors.mustIncludeTraits?.getValues() || [],
-                mustExcludeTraits: state.selectors.mustExcludeTraits?.getValues() || [],
-                extraEmblems: state.selectors.extraEmblems?.getValues() || [],
-                variantLocks: variantLockUi.getCurrentVariantLocks(),
-                tankRoles: state.selectors.tankRoles?.getValues() || [],
-                carryRoles: state.selectors.carryRoles?.getValues() || []
-            };
-        }
-
-        function getDefaultSearchParams() {
-            return queryControlState.getDefaultSearchParams();
-        }
-
-        function applySelectorSearchParams(params) {
-            setSelectorValues(state.selectors.mustInclude, params.mustInclude || []);
-            setSelectorValues(state.selectors.mustExclude, params.mustExclude || []);
-            setSelectorValues(state.selectors.mustIncludeTraits, params.mustIncludeTraits || []);
-            setSelectorValues(state.selectors.mustExcludeTraits, params.mustExcludeTraits || []);
-            setSelectorValues(state.selectors.extraEmblems, params.extraEmblems || []);
-
-            const defaultRoleValues = getDefaultRoleFilterValues();
-            queryControlState.applyRoleSelectorSearchParams(
-                state.selectors.tankRoles,
-                params.tankRoles,
-                defaultRoleValues?.tankRoles
-            );
-            queryControlState.applyRoleSelectorSearchParams(
-                state.selectors.carryRoles,
-                params.carryRoles,
-                defaultRoleValues?.carryRoles
-            );
-
-            variantLockUi.applyVariantLocks(params.variantLocks || {});
-        }
-
-        function applySearchParams(params = {}) {
-            const defaults = getDefaultSearchParams();
-            const nextParams = {
-                ...defaults,
-                ...params
-            };
-            const controls = queryShellUi.resolveQueryControls();
-            queryControlState.applyQueryControlValues(controls, nextParams);
-            applySelectorSearchParams(nextParams);
-        }
-
-        function clampNumericInput(id, min, max, fallback) {
-            const input = queryShellUi.resolveQueryControls()[id];
-            return queryControlState.clampNumericInput(input, min, max, fallback);
-        }
-
         function getDraftQueryMeta(params = {}) {
             return querySummaryUi.getDraftQueryMeta(params);
         }
 
         function refreshDraftQuerySummary() {
             if (!state.activeData || state.isSearching) return;
-            const params = getCurrentSearchParams();
+            const params = queryParamsUi.getCurrentSearchParams();
             const meta = getDraftQueryMeta(params);
             renderQuerySummary(params, meta);
             void refreshDraftEstimate();
@@ -206,8 +125,10 @@
                 const input = controls[id];
                 if (!input) return;
                 input.addEventListener('change', () => {
-                    if (id === 'boardSize') clampNumericInput('boardSize', 1, 20, 9);
-                    if (id === 'maxResults') clampNumericInput('maxResults', 1, getMaxResultsLimit(), getDefaultMaxResults());
+                    if (id === 'boardSize') queryParamsUi.clampNumericInput('boardSize', 1, 20, 9);
+                    if (id === 'maxResults') {
+                        queryParamsUi.clampNumericInput('maxResults', 1, getMaxResultsLimit(), getDefaultMaxResults());
+                    }
                     refreshDraftQuerySummary();
                 });
             });
@@ -239,7 +160,7 @@
             setStatusMessage: queryShellUi.setStatusMessage,
             getSelectedDataSource: queryShellUi.getSelectedDataSource,
             getDataSourceLabel: queryShellUi.getDataSourceLabel,
-            applyDefaultRoleFilters,
+            applyDefaultRoleFilters: queryParamsUi.applyDefaultRoleFilters,
             getCurrentVariantLocks: variantLockUi.getCurrentVariantLocks,
             applyVariantLocks: variantLockUi.applyVariantLocks,
             renderVariantLockControls: variantLockUi.renderVariantLockControls,
@@ -248,11 +169,11 @@
             syncFetchButtonState: queryShellUi.syncFetchButtonState,
             syncSearchButtonState: queryShellUi.syncSearchButtonState,
             renderQuerySummary,
-            getCurrentSearchParams,
+            getCurrentSearchParams: queryParamsUi.getCurrentSearchParams,
             normalizeSearchParams,
-            getDefaultSearchParams,
-            applySearchParams,
-            clampNumericInput,
+            getDefaultSearchParams: queryParamsUi.getDefaultSearchParams,
+            applySearchParams: queryParamsUi.applySearchParams,
+            clampNumericInput: queryParamsUi.clampNumericInput,
             refreshDraftEstimate,
             refreshDraftQuerySummary,
             bindDraftQueryListeners,
