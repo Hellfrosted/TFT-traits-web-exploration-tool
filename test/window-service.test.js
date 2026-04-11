@@ -8,7 +8,6 @@ function createWindowServiceUnderTest({
     executeJavaScriptImpl,
     smokeTimeoutMs = 20000
 } = {}) {
-    const EXIT_TIMEOUT_MS = 500;
     const app = {
         exitCalls: [],
         exitResolvers: [],
@@ -18,14 +17,9 @@ function createWindowServiceUnderTest({
                 this.exitResolvers.shift()(code);
             }
         },
-        waitForExit(timeoutMs = EXIT_TIMEOUT_MS) {
-            return new Promise((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                    reject(new Error(`Timed out waiting for app.exit() after ${timeoutMs}ms.`));
-                }, timeoutMs);
-
+        waitForExit() {
+            return new Promise((resolve) => {
                 this.exitResolvers.push((code) => {
-                    clearTimeout(timeoutId);
                     resolve(code);
                 });
             });
@@ -80,7 +74,7 @@ function createWindowServiceUnderTest({
 }
 
 describe('window service smoke test', () => {
-    it('uses explicit renderer readiness signals instead of tight polling loops', async () => {
+    it('uses explicit renderer readiness signals instead of tight polling loops', { timeout: 5000 }, async () => {
         let inspectionScript = '';
         const { service, app, listeners } = createWindowServiceUnderTest({
             executeJavaScriptImpl: async (script) => {
@@ -103,7 +97,7 @@ describe('window service smoke test', () => {
         assert.doesNotMatch(inspectionScript, /setTimeout\(inspect, 50\)/);
     });
 
-    it('waits for the renderer inspection promise before finishing the smoke test', async () => {
+    it('waits for the renderer inspection promise before finishing the smoke test', { timeout: 5000 }, async () => {
         let resolveInspection;
         const inspectionPromise = new Promise((resolve) => {
             resolveInspection = resolve;

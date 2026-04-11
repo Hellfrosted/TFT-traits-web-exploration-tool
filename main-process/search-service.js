@@ -181,12 +181,14 @@ function createSearchService({
                     } else if (msg.type === 'done') {
                         searchContext.completed = true;
                         if (searchContext.cancelled) {
-                            void terminateWorker();
+                            cleanup();
                             safeResolve(createSearchResponse({ cancelled: true, searchId: searchContext.searchId }));
+                            void terminateWorker();
                             return;
                         }
                         if (msg.success) {
                             if (msg.results.length > 0 && !msg.results[0].error) {
+                                cleanup();
                                 safeResolve(createSearchResponse({
                                     success: true,
                                     fromCache: false,
@@ -200,6 +202,7 @@ function createSearchService({
                                     });
                                 return;
                             }
+                            cleanup();
                             safeResolve(createSearchResponse({
                                 success: true,
                                 fromCache: false,
@@ -207,6 +210,7 @@ function createSearchService({
                                 searchId: searchContext.searchId
                             }));
                         } else {
+                            cleanup();
                             safeResolve(createSearchResponse({
                                 success: false,
                                 error: msg.error,
@@ -218,6 +222,7 @@ function createSearchService({
                 });
 
                 searchContext.worker.on('error', (error) => {
+                    cleanup();
                     safeResolve(
                         searchContext.cancelled
                             ? createSearchResponse({ cancelled: true, searchId: searchContext.searchId })
