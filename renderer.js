@@ -3,6 +3,7 @@
     const REQUIRED_FACTORIES = [
         'createState',
         'createVariantLockUi',
+        'createQuerySummaryUi',
         'createQueryUi',
         'createResultsInteractions',
         'createResultsSpotlight',

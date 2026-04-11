@@ -9,12 +9,17 @@ function loadQueryUiFactory(sandbox) {
         path.join(__dirname, '..', 'renderer', 'variant-lock-ui.js'),
         'utf8'
     );
+    const querySummaryUiSource = fs.readFileSync(
+        path.join(__dirname, '..', 'renderer', 'query-summary-ui.js'),
+        'utf8'
+    );
     const source = fs.readFileSync(
         path.join(__dirname, '..', 'renderer', 'query-ui.js'),
         'utf8'
     );
 
     vm.runInNewContext(variantLockUiSource, sandbox, { filename: 'renderer/variant-lock-ui.js' });
+    vm.runInNewContext(querySummaryUiSource, sandbox, { filename: 'renderer/query-summary-ui.js' });
     vm.runInNewContext(source, sandbox, { filename: 'renderer/query-ui.js' });
     return sandbox.window.TFTRenderer.createQueryUi;
 }
