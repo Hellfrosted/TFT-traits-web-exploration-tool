@@ -2,6 +2,7 @@
     const ns = window.TFTRenderer = window.TFTRenderer || {};
     const createVariantLockUi = ns.createVariantLockUi;
     const createQuerySummaryUi = ns.createQuerySummaryUi;
+    const createQueryControlState = ns.createQueryControlState;
 
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
@@ -10,6 +11,10 @@
         const getDefaultBoardSize = () => 9;
         let nextDraftEstimateRequestId = 0;
         const querySummaryUi = createQuerySummaryUi();
+        const queryControlState = createQueryControlState({
+            getDefaultBoardSize,
+            getDefaultMaxResults
+        });
 
         function resolveQueryElements(ids) {
             const elements = {};
@@ -130,63 +135,23 @@
         function syncFetchButtonState() {
             const { fetchBtn } = resolveSummaryShell();
             if (!fetchBtn) return;
-            const uiState = getFetchButtonUiState({
+            const uiState = queryControlState.getFetchButtonUiState({
                 isSearching: state.isSearching,
                 isFetchingData: state.isFetchingData
             });
-            applyFetchButtonUi(fetchBtn, uiState);
+            queryControlState.applyFetchButtonUi(fetchBtn, uiState);
         }
 
         function syncSearchButtonState() {
             const { searchBtn } = resolveSummaryShell();
             if (!searchBtn) return;
 
-            const uiState = getSearchButtonUiState({
+            const uiState = queryControlState.getSearchButtonUiState({
                 isSearching: state.isSearching,
                 isFetchingData: state.isFetchingData,
                 hasActiveData: !!state.activeData
             });
-            applySearchButtonUi(searchBtn, uiState);
-        }
-
-        function getFetchButtonUiState({
-            isSearching = false,
-            isFetchingData = false
-        } = {}) {
-            const disabled = isSearching || isFetchingData;
-            return {
-                disabled,
-                opacity: disabled ? '0.5' : '1'
-            };
-        }
-
-        function applyFetchButtonUi(button, uiState) {
-            button.disabled = !!uiState?.disabled;
-            button.style.opacity = uiState?.opacity || '1';
-        }
-
-        function getSearchButtonUiState({
-            isSearching = false,
-            isFetchingData = false,
-            hasActiveData = false
-        } = {}) {
-            const disabled = isSearching || isFetchingData || !hasActiveData;
-            return {
-                disabled,
-                classDisabled: disabled,
-                text: isSearching
-                    ? null
-                    : (isFetchingData ? 'Loading data...' : 'Compute')
-            };
-        }
-
-        function applySearchButtonUi(button, uiState) {
-            button.disabled = !!uiState?.disabled;
-            button.classList.toggle('disabled', !!uiState?.classDisabled);
-
-            if (uiState?.text !== null && uiState?.text !== undefined) {
-                button.innerText = uiState.text;
-            }
+            queryControlState.applySearchButtonUi(searchBtn, uiState);
         }
 
         function renderQuerySummary(params = null, meta = 'Idle') {
@@ -258,20 +223,10 @@
             };
         }
 
-        function readQueryControlValues(controls) {
-            return {
-                boardSize: parseInt(controls.boardSize?.value, 10) || getDefaultBoardSize(),
-                maxResults: parseInt(controls.maxResults?.value, 10) || getDefaultMaxResults(),
-                onlyActive: !!controls.onlyActiveToggle?.checked,
-                tierRank: !!controls.tierRankToggle?.checked,
-                includeUnique: !!controls.includeUniqueToggle?.checked
-            };
-        }
-
         function getCurrentSearchParams() {
             const controls = resolveQueryControls();
             return {
-                ...readQueryControlValues(controls),
+                ...queryControlState.readQueryControlValues(controls),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
                 mustExclude: state.selectors.mustExclude?.getValues() || [],
                 mustIncludeTraits: state.selectors.mustIncludeTraits?.getValues() || [],
@@ -284,42 +239,7 @@
         }
 
         function getDefaultSearchParams() {
-            return {
-                boardSize: getDefaultBoardSize(),
-                maxResults: getDefaultMaxResults(),
-                mustInclude: [],
-                mustExclude: [],
-                mustIncludeTraits: [],
-                mustExcludeTraits: [],
-                extraEmblems: [],
-                variantLocks: {},
-                tankRoles: null,
-                carryRoles: null,
-                onlyActive: true,
-                tierRank: true,
-                includeUnique: false
-            };
-        }
-
-        function applyQueryControlValues(controls, params) {
-            if (controls.boardSize) controls.boardSize.value = params.boardSize || getDefaultBoardSize();
-            if (controls.maxResults) controls.maxResults.value = params.maxResults || getDefaultMaxResults();
-            if (controls.onlyActiveToggle) controls.onlyActiveToggle.checked = !!params.onlyActive;
-            if (controls.tierRankToggle) controls.tierRankToggle.checked = !!params.tierRank;
-            if (controls.includeUniqueToggle) controls.includeUniqueToggle.checked = !!params.includeUnique;
-        }
-
-        function applyRoleSelectorSearchParams(selector, values, defaultValues = null) {
-            if (!selector) return;
-
-            if (Array.isArray(values)) {
-                selector.setValues(values);
-                return;
-            }
-
-            if (defaultValues) {
-                selector.setValues(defaultValues);
-            }
+            return queryControlState.getDefaultSearchParams();
         }
 
         function applySelectorSearchParams(params) {
@@ -330,8 +250,16 @@
             setSelectorValues(state.selectors.extraEmblems, params.extraEmblems || []);
 
             const defaultRoleValues = getDefaultRoleFilterValues();
-            applyRoleSelectorSearchParams(state.selectors.tankRoles, params.tankRoles, defaultRoleValues?.tankRoles);
-            applyRoleSelectorSearchParams(state.selectors.carryRoles, params.carryRoles, defaultRoleValues?.carryRoles);
+            queryControlState.applyRoleSelectorSearchParams(
+                state.selectors.tankRoles,
+                params.tankRoles,
+                defaultRoleValues?.tankRoles
+            );
+            queryControlState.applyRoleSelectorSearchParams(
+                state.selectors.carryRoles,
+                params.carryRoles,
+                defaultRoleValues?.carryRoles
+            );
 
             variantLockUi.applyVariantLocks(params.variantLocks || {});
         }
@@ -343,25 +271,13 @@
                 ...params
             };
             const controls = resolveQueryControls();
-            applyQueryControlValues(controls, nextParams);
+            queryControlState.applyQueryControlValues(controls, nextParams);
             applySelectorSearchParams(nextParams);
         }
 
         function clampNumericInput(id, min, max, fallback) {
             const input = resolveQueryControls()[id];
-            if (!input) {
-                return fallback;
-            }
-            const parsed = parseInt(input.value, 10);
-
-            if (Number.isNaN(parsed)) {
-                input.value = fallback;
-                return fallback;
-            }
-
-            const clamped = Math.min(Math.max(parsed, min), max);
-            if (clamped !== parsed) input.value = clamped;
-            return clamped;
+            return queryControlState.clampNumericInput(input, min, max, fallback);
         }
 
         function getDraftQueryMeta(params = {}) {
@@ -432,10 +348,10 @@
             refreshDraftQuerySummary,
             bindDraftQueryListeners,
             __test: {
-                getFetchButtonUiState,
-                applyFetchButtonUi,
-                getSearchButtonUiState,
-                applySearchButtonUi,
+                getFetchButtonUiState: queryControlState.getFetchButtonUiState,
+                applyFetchButtonUi: queryControlState.applyFetchButtonUi,
+                getSearchButtonUiState: queryControlState.getSearchButtonUiState,
+                applySearchButtonUi: queryControlState.applySearchButtonUi,
                 countDraftQuerySignals: querySummaryUi.countDraftQuerySignals,
                 getDraftQueryMeta
             }
