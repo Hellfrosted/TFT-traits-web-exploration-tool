@@ -79,11 +79,58 @@
             };
         }
 
+        function buildBoardSpotlightState(
+            board,
+            rankIndex,
+            getBoardMetric = (item) => item?.synergyScore ?? 0,
+            getBoardSortLabel = () => 'Best Synergy'
+        ) {
+            const boardMetric = getBoardMetric(board);
+            const unitCount = Array.isArray(board?.units) ? board.units.length : 0;
+            const occupiedSlots = Number.isFinite(Number(board?.occupiedSlots))
+                ? Number(board.occupiedSlots)
+                : unitCount;
+
+            return {
+                boardMetric,
+                valueScore: (boardMetric / Math.max(board?.totalCost ?? 0, 1)).toFixed(2),
+                boardTitle: occupiedSlots === unitCount
+                    ? `Level ${occupiedSlots} board - ${boardMetric} score`
+                    : `${occupiedSlots}-slot board (${unitCount} units) - ${boardMetric} score`,
+                rankLabel: `Rank #${rankIndex + 1} by ${getBoardSortLabel()}`,
+                metricLabels: [
+                    `Score ${boardMetric}`,
+                    `1-Star ${board?.totalCost}`,
+                    `2-Star ${(board?.totalCost ?? 0) * 3}`,
+                    `Value ${(boardMetric / Math.max(board?.totalCost ?? 0, 1)).toFixed(2)}`
+                ]
+            };
+        }
+
+        function buildResultRowState(
+            board,
+            index,
+            traits,
+            getBoardMetric = (item) => item?.synergyScore ?? 0
+        ) {
+            const boardMetric = getBoardMetric(board);
+            return {
+                rankLabel: `#${index + 1}`,
+                boardMetric,
+                valueLabel: `Value ${(boardMetric / Math.max(board?.totalCost ?? 0, 1)).toFixed(2)}`,
+                totalCostLabel: String(board?.totalCost ?? 0),
+                twoStarCostLabel: String((board?.totalCost ?? 0) * 3),
+                traits
+            };
+        }
+
         return {
             getVisibleResultsPage,
             resolveSelectedBoardIndex,
             buildEstimateSummaryState,
-            buildResultsSummaryState
+            buildResultsSummaryState,
+            buildBoardSpotlightState,
+            buildResultRowState
         };
     };
 

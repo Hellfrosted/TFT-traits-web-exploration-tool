@@ -12,7 +12,9 @@
             __test: {
                 ...renderers.__test,
                 buildEstimateSummaryState: ns.resultsViewState?.buildEstimateSummaryState,
-                buildResultsSummaryState: ns.resultsViewState?.buildResultsSummaryState
+                buildResultsSummaryState: ns.resultsViewState?.buildResultsSummaryState,
+                buildBoardSpotlightState: ns.resultsViewState?.buildBoardSpotlightState,
+                buildResultRowState: ns.resultsViewState?.buildResultRowState
             }
         };
     };

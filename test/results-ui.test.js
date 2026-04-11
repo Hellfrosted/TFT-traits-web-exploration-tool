@@ -214,6 +214,54 @@ describe('results UI sorting', () => {
         );
     });
 
+    it('derives spotlight state through the extracted results view helper', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const state = resultsUi.__test.buildBoardSpotlightState(
+            {
+                units: ['A', 'B', 'C'],
+                totalCost: 12,
+                occupiedSlots: 4,
+                synergyScore: 9
+            },
+            2,
+            (board) => board.synergyScore,
+            () => 'Best Synergy'
+        );
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(state)),
+            {
+                boardMetric: 9,
+                valueScore: '0.75',
+                boardTitle: '4-slot board (3 units) - 9 score',
+                rankLabel: 'Rank #3 by Best Synergy',
+                metricLabels: ['Score 9', '1-Star 12', '2-Star 36', 'Value 0.75']
+            }
+        );
+    });
+
+    it('derives result row state through the extracted results view helper', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const state = resultsUi.__test.buildResultRowState(
+            { totalCost: 7, synergyScore: 5 },
+            4,
+            [{ name: 'Bruiser', isActive: true }],
+            (board) => board.synergyScore
+        );
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(state)),
+            {
+                rankLabel: '#5',
+                boardMetric: 5,
+                valueLabel: 'Value 0.71',
+                totalCostLabel: '7',
+                twoStarCostLabel: '21',
+                traits: [{ name: 'Bruiser', isActive: true }]
+            }
+        );
+    });
+
     it('falls back to the current page start when the selected board is off-page', () => {
         const resultsUi = createResultsUiForSummary(() => {});
         const pageData = {

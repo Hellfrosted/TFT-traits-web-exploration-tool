@@ -213,13 +213,12 @@
             const { boardSpotlight: spotlight } = resolveResultsShell();
             if (!spotlight) return;
             const traits = model.buildBoardTraitSummary(board, { showInactive: true });
-            const valueScore = (model.getBoardMetric(board) / Math.max(board.totalCost, 1)).toFixed(2);
-            const occupiedSlots = Number.isFinite(Number(board.occupiedSlots))
-                ? Number(board.occupiedSlots)
-                : board.units.length;
-            const boardTitle = occupiedSlots === board.units.length
-                ? `Level ${occupiedSlots} board - ${model.getBoardMetric(board)} score`
-                : `${occupiedSlots}-slot board (${board.units.length} units) - ${model.getBoardMetric(board)} score`;
+            const spotlightState = resultsViewState.buildBoardSpotlightState(
+                board,
+                rankIndex,
+                model.getBoardMetric,
+                model.getBoardSortLabel
+            );
 
             spotlight.className = 'board-spotlight';
             clearNode(spotlight);
@@ -232,12 +231,12 @@
             label.textContent = 'Selected Board';
             const title = document.createElement('h3');
             title.className = 'board-spotlight-title';
-            title.textContent = boardTitle;
+            title.textContent = spotlightState.boardTitle;
             heading.appendChild(label);
             heading.appendChild(title);
             const rank = document.createElement('span');
             rank.className = 'board-spotlight-rank';
-            rank.textContent = `Rank #${rankIndex + 1} by ${model.getBoardSortLabel()}`;
+            rank.textContent = spotlightState.rankLabel;
             header.appendChild(heading);
             header.appendChild(rank);
 
@@ -248,10 +247,9 @@
             metricsBlock.className = 'spotlight-inline-block';
             const metrics = document.createElement('div');
             metrics.className = 'spotlight-metrics';
-            metrics.appendChild(createMetricBadge(`Score ${model.getBoardMetric(board)}`));
-            metrics.appendChild(createMetricBadge(`1-Star ${board.totalCost}`));
-            metrics.appendChild(createMetricBadge(`2-Star ${board.totalCost * 3}`));
-            metrics.appendChild(createMetricBadge(`Value ${valueScore}`));
+            spotlightState.metricLabels.forEach((metricLabel) => {
+                metrics.appendChild(createMetricBadge(metricLabel));
+            });
             metricsBlock.appendChild(metrics);
 
             const unitsBlock = document.createElement('div');
@@ -375,31 +373,36 @@
                 }
 
                 const traits = model.buildBoardTraitSummary(board, { showInactive: true });
-                const valueScore = (model.getBoardMetric(board) / Math.max(board.totalCost, 1)).toFixed(2);
+                const rowState = resultsViewState.buildResultRowState(
+                    board,
+                    index,
+                    traits,
+                    model.getBoardMetric
+                );
 
                 const rankCell = document.createElement('td');
                 rankCell.className = 'rank-cell';
-                rankCell.textContent = `#${index + 1}`;
+                rankCell.textContent = rowState.rankLabel;
 
                 const scoreCell = document.createElement('td');
                 const scoreStack = document.createElement('div');
                 scoreStack.className = 'score-stack';
                 const score = document.createElement('strong');
-                score.textContent = String(model.getBoardMetric(board));
+                score.textContent = String(rowState.boardMetric);
                 const value = document.createElement('span');
-                value.textContent = `Value ${valueScore}`;
+                value.textContent = rowState.valueLabel;
                 scoreStack.appendChild(score);
                 scoreStack.appendChild(value);
                 scoreCell.appendChild(scoreStack);
 
                 const traitCell = document.createElement('td');
-                traitCell.appendChild(createTraitChipList(traits));
+                traitCell.appendChild(createTraitChipList(rowState.traits));
 
                 const costCell = document.createElement('td');
-                costCell.textContent = String(board.totalCost);
+                costCell.textContent = rowState.totalCostLabel;
 
                 const twoStarCell = document.createElement('td');
-                twoStarCell.textContent = String(board.totalCost * 3);
+                twoStarCell.textContent = rowState.twoStarCostLabel;
 
                 const unitsCell = document.createElement('td');
                 unitsCell.appendChild(createUnitPillList(board));
