@@ -23,6 +23,15 @@ const {
     buildUnitSearchInfo,
     buildInitialSearchState
 } = require('./search-setup.js');
+const {
+    createTopBoardTracker,
+    finalizeTopBoards
+} = require('./search-results.js');
+const {
+    applyUnitSelectionState,
+    rollbackUnitSelectionState,
+    evaluateSearchCandidate
+} = require('./search-visit.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -183,10 +192,7 @@ module.exports = {
             numTraits
         });
 
-        const topBoards = [];
         const MAX_BOARDS = maxResults || LIMITS.DEFAULT_MAX_RESULTS;
-        let worstScore = -Infinity;
-        let worstIndex = -1;
         const hasVariantUnits = unitInfo.some((info) => info.variantProfiles.length > 0);
         const hasConditionalProfiles = unitInfo.some((info) =>
             info.conditionalProfileEntries.length > 0 ||
@@ -197,27 +203,16 @@ module.exports = {
             info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
         );
 
-        const addResult = (unitIds, evaluation, totalCost) => {
-            const board = createBoardResult({
+        const topBoardTracker = createTopBoardTracker({
+            maxBoards: MAX_BOARDS,
+            findWorstBoardIndex: this.findWorstBoardIndex.bind(this),
+            createBoardResult: ({ unitIds, evaluation, totalCost }) => createBoardResult({
                 unitIds,
                 evaluation,
                 totalCost,
                 scoreBoard
-            });
-            const totalScore = board._score;
-
-            if (topBoards.length < MAX_BOARDS) {
-                topBoards.push(board);
-                if (topBoards.length === MAX_BOARDS) {
-                    worstIndex = this.findWorstBoardIndex(topBoards);
-                    worstScore = topBoards[worstIndex]._score;
-                }
-            } else if (totalScore > worstScore) {
-                topBoards[worstIndex] = board;
-                worstIndex = this.findWorstBoardIndex(topBoards);
-                worstScore = topBoards[worstIndex]._score;
-            }
-        };
+            })
+        });
 
         const totalCombinations = hasVariableSlotCosts
             ? this.countSearchSpaceCandidates(dataCache, normalizedParams, preparedSearchContext)
@@ -250,6 +245,33 @@ module.exports = {
             unitInfo
         });
         const currentVariantUnitIndices = [];
+        const evaluateResolvedBoardSelection = ({
+            selectedUnitIndices,
+            selectedVariantIndices,
+            baseTraitCounts,
+            minOccupiedSlots
+        }) => evaluateBoardSelection({
+            selectedUnitIndices,
+            selectedVariantIndices,
+            baseTraitCounts,
+            minOccupiedSlots,
+            boardSize,
+            unitInfo,
+            activeUnitFlags,
+            mustIncludeTraitIndices,
+            mustIncludeTraitTargets,
+            allTraitNames,
+            calculateSynergyScore: (resolvedCounts) => calculateSynergyScore(resolvedCounts, {
+                allTraitNames,
+                traitBreakpoints: traitBPs,
+                onlyActive,
+                tierRank,
+                includeUnique
+            }),
+            isCompiledConditionSatisfied: this.isCompiledConditionSatisfied.bind(this),
+            findFirstSatisfiedProfile: this.findFirstSatisfiedProfile.bind(this),
+            traitCountsToRecord: this.traitCountsToRecord.bind(this)
+        });
         const reportProgress = () => {
             if (!onProgress || !shouldEmitProgress(combinationsChecked, lastProgressReport, LIMITS.PROGRESS_INTERVAL)) {
                 return;
@@ -305,77 +327,40 @@ module.exports = {
                 combinationsChecked++;
                 reportProgress();
 
-                if (!meetsTankRequirement(tankThreePlusCount, tankFourPlusCount)) return;
-                if (!meetsCarryRequirement(carryFourPlusCount)) return;
-
-                const totalCost = mustHaveTotalCost + currentCost;
-                const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
-                const totalComplexUnitCount = mustHaveComplexUnitCount + currentComplexUnitCount;
-
-                if (totalComplexUnitCount === 0) {
-                    if (currentMinSlots !== boardSize) {
-                        return;
-                    }
-                    for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
-                        const traitIndexValue = mustIncludeTraitIndices[traitPos];
-                        const requiredThreshold = mustIncludeTraitTargets[traitPos];
-                        if ((currentTraitCounts[traitIndexValue] || 0) < requiredThreshold) {
-                            return;
-                        }
-                    }
-
-                    const synergyScore = calculateSynergyScore(currentTraitCounts, {
-                        allTraitNames,
-                        traitBreakpoints: traitBPs,
-                        onlyActive,
-                        tierRank,
-                        includeUnique
-                    });
-                    const totalScore = scoreBoard(synergyScore, totalCost);
-                    if (topBoards.length >= MAX_BOARDS && totalScore <= worstScore) return;
-
-                    addResult(
-                        this.buildSortedBoardUnits(selectedUnitIndices, unitInfo),
-                        {
-                            synergyScore,
-                            occupiedSlots: currentMinSlots,
-                            traitCounts: this.traitCountsToRecord(currentTraitCounts, allTraitNames)
-                        },
-                        totalCost
-                    );
-                    return;
-                }
-
-                const selectedVariantIndices = mustHaveVariantUnitIndices.concat(currentVariantUnitIndices);
-                const evaluation = evaluateBoardSelection({
-                    selectedUnitIndices,
-                    selectedVariantIndices,
-                    baseTraitCounts: currentTraitCounts,
-                    minOccupiedSlots: currentMinSlots,
+                evaluateSearchCandidate({
+                    currentMinSlots,
                     boardSize,
-                    unitInfo,
-                    activeUnitFlags,
+                    tankThreePlusCount,
+                    tankFourPlusCount,
+                    carryFourPlusCount,
+                    meetsTankRequirement,
+                    meetsCarryRequirement,
+                    mustHaveTotalCost,
+                    currentCost,
+                    mustHaveUnitIndices,
+                    currentIdxList,
+                    mustHaveComplexUnitCount,
+                    currentComplexUnitCount,
                     mustIncludeTraitIndices,
                     mustIncludeTraitTargets,
-                    allTraitNames,
-                    calculateSynergyScore: (resolvedCounts) => calculateSynergyScore(resolvedCounts, {
+                    currentTraitCounts,
+                    calculateSynergyScore: (counts) => calculateSynergyScore(counts, {
                         allTraitNames,
                         traitBreakpoints: traitBPs,
                         onlyActive,
                         tierRank,
                         includeUnique
                     }),
-                    isCompiledConditionSatisfied: this.isCompiledConditionSatisfied.bind(this),
-                    findFirstSatisfiedProfile: this.findFirstSatisfiedProfile.bind(this),
-                    traitCountsToRecord: this.traitCountsToRecord.bind(this)
+                    scoreBoard,
+                    topBoardTracker,
+                    buildSortedBoardUnits: this.buildSortedBoardUnits.bind(this),
+                    unitInfo,
+                    traitCountsToRecord: this.traitCountsToRecord.bind(this),
+                    allTraitNames,
+                    mustHaveVariantUnitIndices,
+                    currentVariantUnitIndices,
+                    evaluateBoardSelection: evaluateResolvedBoardSelection
                 });
-                if (evaluation) {
-                    const totalScore = scoreBoard(evaluation.synergyScore, totalCost);
-
-                    if (!(topBoards.length >= MAX_BOARDS && totalScore <= worstScore)) {
-                        addResult(this.buildSortedBoardUnits(selectedUnitIndices, unitInfo), evaluation, totalCost);
-                    }
-                }
             }
 
             if (currentMinSlots === boardSize) {
@@ -390,15 +375,14 @@ module.exports = {
                     continue;
                 }
 
-                for (const { index, count } of info.fixedTraitContributionEntries) {
-                    currentTraitCounts[index] += count;
-                }
-
-                activeUnitFlags[idx] = 1;
-                currentIdxList.push(idx);
-                if (info.variantProfiles.length > 0) {
-                    currentVariantUnitIndices.push(idx);
-                }
+                applyUnitSelectionState({
+                    idx,
+                    info,
+                    currentTraitCounts,
+                    activeUnitFlags,
+                    currentIdxList,
+                    currentVariantUnitIndices
+                });
                 dfs(
                     i + 1,
                     nextMinSlots,
@@ -410,15 +394,14 @@ module.exports = {
                     currentSlotFlex + info.slotFlex,
                     currentIdxList
                 );
-                if (info.variantProfiles.length > 0) {
-                    currentVariantUnitIndices.pop();
-                }
-                currentIdxList.pop();
-                activeUnitFlags[idx] = 0;
-
-                for (const { index, count } of info.fixedTraitContributionEntries) {
-                    currentTraitCounts[index] -= count;
-                }
+                rollbackUnitSelectionState({
+                    idx,
+                    info,
+                    currentTraitCounts,
+                    activeUnitFlags,
+                    currentIdxList,
+                    currentVariantUnitIndices
+                });
             }
         };
 
@@ -446,16 +429,10 @@ module.exports = {
             }
         } else {
             const reason = resolveSearchSpaceError(totalCombinations, LIMITS);
-            topBoards.push({ error: reason });
-            return topBoards;
+            topBoardTracker.topBoards.push({ error: reason });
+            return topBoardTracker.topBoards;
         }
 
-        for (const board of topBoards) delete board._score;
-        topBoards.sort((left, right) =>
-            right.synergyScore - left.synergyScore ||
-            right.totalCost - left.totalCost ||
-            left.units.join(',').localeCompare(right.units.join(','))
-        );
-        return topBoards;
+        return finalizeTopBoards(topBoardTracker.topBoards);
     }
 };
