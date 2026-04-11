@@ -1,6 +1,7 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
     const { resolveShellElements, formatBoardEstimate, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
+    const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared);
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
@@ -50,94 +51,23 @@
                 return false;
             };
 
-        function normalizeSearchProgress(progress = null) {
-            if (Number.isFinite(progress)) {
-                return {
-                    pct: Math.max(0, Math.min(100, Math.round(progress))),
-                    checked: null,
-                    total: null
-                };
-            }
-
-            if (!progress || typeof progress !== 'object') {
-                return {
-                    pct: null,
-                    checked: null,
-                    total: null
-                };
-            }
-
-            let pct = Number.isFinite(progress.pct)
-                ? Math.max(0, Math.min(100, Math.round(progress.pct)))
-                : null;
-            const checked = Number.isFinite(progress.checked) && progress.checked >= 0
-                ? progress.checked
-                : null;
-            const total = Number.isFinite(progress.total) && progress.total >= 0
-                ? progress.total
-                : null;
-
-            if (pct === null && Number.isFinite(checked) && Number.isFinite(total) && total > 0) {
-                pct = Math.max(0, Math.min(100, Math.round((checked / total) * 100)));
-            }
-
-            return { pct, checked, total };
-        }
-
-        function formatCheckedProgressLabel(checked = null, total = null) {
-            if (!Number.isFinite(checked)) {
-                return null;
-            }
-
-            if (Number.isFinite(total) && total > 0) {
-                return `${formatBoardEstimate(checked)} / ${formatBoardEstimate(total)}`;
-            }
-
-            return `${formatBoardEstimate(checked)} checked`;
-        }
-
         function buildSearchMeta() {
-            return 'Active query';
+            return searchUiState.buildSearchMeta();
         }
 
         function buildSearchButtonLabel(progress = null) {
-            const normalizedProgress = normalizeSearchProgress(progress);
-            if (Number.isFinite(normalizedProgress.pct)) {
-                return `Searching ${normalizedProgress.pct}%`;
-            }
-
-            const checkedLabel = formatCheckedProgressLabel(normalizedProgress.checked, normalizedProgress.total);
-            if (checkedLabel) {
-                return `Searching ${checkedLabel}`;
-            }
-
-            if (state.isSearching) {
-                return 'Searching...';
-            }
-
-            return 'Estimating...';
+            return searchUiState.buildSearchButtonLabel(progress, {
+                isSearching: state.isSearching,
+                formatBoardEstimate
+            });
         }
 
         function buildSearchTableMessage() {
-            return 'Results pending...';
+            return searchUiState.buildSearchTableMessage();
         }
 
         function resolveProgressSearchId(data, activeSearchId = null, lastCompletedSearchId = null) {
-            if (!data || data.searchId === null || data.searchId === undefined) {
-                return null;
-            }
-
-            if (activeSearchId === null || activeSearchId === undefined) {
-                if (lastCompletedSearchId !== null && lastCompletedSearchId !== undefined && data.searchId <= lastCompletedSearchId) {
-                    return null;
-                }
-
-                return data.searchId;
-            }
-
-            return data.searchId === activeSearchId
-                ? activeSearchId
-                : null;
+            return searchUiState.resolveProgressSearchId(data, activeSearchId, lastCompletedSearchId);
         }
 
         function reportShellMismatchOnce(missingIds, contextMessage) {
@@ -180,19 +110,7 @@
         }
 
         function getSearchControlUiState(searching, searchLabel = buildSearchButtonLabel()) {
-            if (searching) {
-                return {
-                    searchDisabled: true,
-                    searchClassDisabled: true,
-                    searchText: searchLabel,
-                    cancelDisplay: 'block',
-                    cancelDisabled: false
-                };
-            }
-
-            return {
-                cancelDisplay: 'none'
-            };
+            return searchUiState.getSearchControlUiState(searching, searchLabel);
         }
 
         function applySearchControlUi(shell, uiState = {}) {
@@ -222,14 +140,13 @@
             lastSearchParams = null,
             currentResults = []
         } = {}) {
-            const activeProgress = progress ?? fallbackProgress ?? null;
-            return {
-                searchLabel: isSearching ? buildSearchButtonLabel(activeProgress) : null,
-                querySummaryParams: lastSearchParams || null,
-                querySummaryMeta: buildSearchMeta(),
-                shouldRenderPendingRow: !Array.isArray(currentResults) || currentResults.length === 0,
-                pendingRowMessage: buildSearchTableMessage()
-            };
+            return searchUiState.getActiveSearchUiState({
+                isSearching,
+                progress,
+                fallbackProgress,
+                lastSearchParams,
+                currentResults
+            });
         }
 
         function renderActiveSearchUi(progress = null) {
@@ -350,82 +267,11 @@
         }
 
         function getInterruptedSearchUiState(type, options = {}) {
-            if (type === 'missingData') {
-                return {
-                    statusMessage: null,
-                    emptySummary: 'Data required',
-                    querySummaryMeta: 'Load data first',
-                    rowMessage: 'Please fetch data first.',
-                    rowClassName: 'results-message-row results-message-row-error',
-                    clearResults: false,
-                    alertMessage: null,
-                    alertTitle: null
-                };
-            }
-
-            if (type === 'largeBoard') {
-                const maxRemainingSlots = options.maxRemainingSlots ?? 7;
-                return {
-                    statusMessage: null,
-                    emptySummary: 'Board too large',
-                    querySummaryMeta: `Too many open slots. The current engine limit is ${maxRemainingSlots} remaining slots.`,
-                    rowMessage: `Board too large! DFS engine supports up to ${maxRemainingSlots} empty slots.`,
-                    rowClassName: 'results-message-row results-message-row-error',
-                    clearResults: false,
-                    alertMessage: null,
-                    alertTitle: null
-                };
-            }
-
-            if (type === 'aborted') {
-                return {
-                    statusMessage: null,
-                    emptySummary: 'Search aborted',
-                    querySummaryMeta: 'Search cancelled',
-                    rowMessage: 'Search aborted by user.',
-                    rowClassName: 'results-message-row results-message-row-muted',
-                    clearResults: false,
-                    alertMessage: null,
-                    alertTitle: null
-                };
-            }
-
-            if (type === 'cancelled') {
-                return {
-                    statusMessage: 'Search cancelled.',
-                    emptySummary: 'Search cancelled',
-                    querySummaryMeta: 'Search cancelled',
-                    rowMessage: 'Search cancelled.',
-                    rowClassName: 'results-message-row results-message-row-error',
-                    clearResults: true,
-                    alertMessage: null,
-                    alertTitle: null
-                };
-            }
-
-            const errorMessage = options.errorMessage || 'Search failed unexpectedly.';
-            return {
-                statusMessage: `Search Error: ${errorMessage}`,
-                emptySummary: 'Search error',
-                querySummaryMeta: `Error: ${errorMessage}`,
-                rowMessage: errorMessage,
-                rowClassName: 'results-message-row results-message-row-error',
-                clearResults: true,
-                alertMessage: errorMessage,
-                alertTitle: 'Search Failed'
-            };
+            return searchUiState.getInterruptedSearchUiState(type, options);
         }
 
         function getUnexpectedSearchFailureUiState(error) {
-            const errorMessage = error?.message || String(error);
-            return {
-                statusMessage: 'Search failed unexpectedly.',
-                alertMessage: errorMessage,
-                alertTitle: 'Search Failed',
-                emptySummary: 'Search error',
-                querySummaryMeta: `Unexpected failure: ${errorMessage}`,
-                rowMessage: 'Search failed unexpectedly.'
-            };
+            return searchUiState.getUnexpectedSearchFailureUiState(error);
         }
 
         function applyInterruptedSearchUiState(tbody, params, uiState) {
@@ -481,32 +327,7 @@
         }
 
         function getSearchResultsUiState(results, fromCache = false, elapsed = '0.0') {
-            const hasResults = Array.isArray(results) && results.length > 0 && !results[0].error;
-            if (hasResults) {
-                return {
-                    statusMessage: fromCache
-                        ? `Found ${results.length} results (from cache in ${elapsed}s)`
-                        : `Found ${results.length} results (computed in ${elapsed}s)`,
-                    querySummaryMeta: fromCache
-                        ? `${results.length} cached boards in ${elapsed}s`
-                        : `${results.length} boards in ${elapsed}s`,
-                    shouldUpdateHistory: true
-                };
-            }
-
-            if (results && results[0] && results[0].error) {
-                return {
-                    statusMessage: `Search Error: ${results[0].error}`,
-                    querySummaryMeta: `Error: ${results[0].error}`,
-                    shouldUpdateHistory: false
-                };
-            }
-
-            return {
-                statusMessage: 'No matching boards found.',
-                querySummaryMeta: 'No matching boards',
-                shouldUpdateHistory: false
-            };
+            return searchUiState.getSearchResultsUiState(results, fromCache, elapsed);
         }
 
         function applySearchResults(response, params, elapsed) {
