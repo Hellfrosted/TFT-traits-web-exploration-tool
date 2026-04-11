@@ -1,69 +1,50 @@
-const { getSetOverrides } = require('../setOverrides.js');
 const {
-    buildSetTraitIndexes,
-    mergeRawTraitMetadata,
     shouldIncludeChampionRecord
 } = require('./parse-data-state.js');
+const {
+    buildParseDataContext,
+    buildParsedDataResult
+} = require('./parse-data-context.js');
 const {
     resolveChampionLinkedTraits,
     collectResolvedUnitTaxonomy,
     resolvePreferredChampionIcon
 } = require('./parse-data-units.js');
 
-function buildHashDictionary(rawJSON) {
-    const hashDictionary = {};
-
-    for (const [key, val] of Object.entries(rawJSON)) {
-        if (key.startsWith('{') && key.endsWith('}')) {
-            const name = val.name || val.mName || val.mDisplayName || val.mLabel || val.mCharacterName;
-            if (name) hashDictionary[key] = name;
-        }
-    }
-
-    for (const [key, val] of Object.entries(rawJSON)) {
-        if (val.mName || val.mDisplayName || key.includes('Trait') || key.includes('CharacterRole')) {
-            if (!hashDictionary[key]) {
-                hashDictionary[key] = val.mName || val.mDisplayName || val.mCharacterName || key;
-            }
-        }
-    }
-
-    return hashDictionary;
-}
-
 module.exports = {
     parseData(rawJSON, cdragonJSON, assetSources = {}, parseOptions = {}) {
-        const source = this.normalizeDataSource(parseOptions.source);
         const units = [];
         const traits = new Set();
         const roles = new Set();
-        const hashDictionary = buildHashDictionary(rawJSON);
-        const traitNamesByAlias = {};
-        const rawTraitMetadata = this._buildRawTraitMetadata(rawJSON, source);
-        const rawChampionRecordMap = this._buildRawChampionRecordMap(rawJSON);
-        const rawShopDataLookup = this._buildRawShopDataLookup(rawJSON);
-        const traitBreakpoints = {};
-        const latestSet = this._detectLatestSet(cdragonJSON) || this._detectLatestSetFromRaw(rawJSON);
-        const setOverrides = parseOptions.setOverrides || getSetOverrides({ setNumber: latestSet });
-        const setData = this._getLatestSetData(cdragonJSON);
-        const setChampionRecords = this._buildSetChampionRecords(setData, source, setOverrides);
-        const setChampionIdentitySet = this._buildChampionIdentitySet(setChampionRecords);
-        const championReferenceMap = this._buildChampionReferenceMap(setChampionRecords);
-        const championAssets = this._buildChampionAssetMap(assetSources.rawChampionSplashesHtml, latestSet, source);
-        const traitIcons = this._buildTraitIconMap(assetSources.rawTraitIconsHtml, setData, latestSet, source, rawTraitMetadata);
         const matchedChampionReferenceNames = new Set();
-
-        const setTraitIndexes = buildSetTraitIndexes(setData, this._normalizeBreakpoints.bind(this));
-        Object.assign(traitNamesByAlias, setTraitIndexes.traitNamesByAlias);
-        Object.assign(traitBreakpoints, setTraitIndexes.traitBreakpoints);
-
-        mergeRawTraitMetadata({
-            rawTraitMetadata,
-            traitNamesByAlias,
-            traitBreakpoints,
-            traitIcons,
-            setOverrides,
+        const {
+            source,
+            hashDictionary,
+            rawChampionRecordMap,
+            rawShopDataLookup,
             latestSet,
+            setOverrides,
+            setChampionRecords,
+            setChampionIdentitySet,
+            championReferenceMap,
+            championAssets,
+            traitIcons,
+            traitBreakpoints,
+            traitNamesByAlias
+        } = buildParseDataContext(rawJSON, cdragonJSON, assetSources, parseOptions, {
+            normalizeDataSource: this.normalizeDataSource.bind(this),
+            buildRawTraitMetadata: this._buildRawTraitMetadata.bind(this),
+            buildRawChampionRecordMap: this._buildRawChampionRecordMap.bind(this),
+            buildRawShopDataLookup: this._buildRawShopDataLookup.bind(this),
+            detectLatestSet: this._detectLatestSet.bind(this),
+            detectLatestSetFromRaw: this._detectLatestSetFromRaw.bind(this),
+            getLatestSetData: this._getLatestSetData.bind(this),
+            buildSetChampionRecords: this._buildSetChampionRecords.bind(this),
+            buildChampionIdentitySet: this._buildChampionIdentitySet.bind(this),
+            buildChampionReferenceMap: this._buildChampionReferenceMap.bind(this),
+            buildChampionAssetMap: this._buildChampionAssetMap.bind(this),
+            buildTraitIconMap: this._buildTraitIconMap.bind(this),
+            normalizeBreakpoints: this._normalizeBreakpoints.bind(this),
             isExcludedTraitName: this._isExcludedTraitName.bind(this),
             shouldPreferRawAsset: this._shouldPreferRawAsset.bind(this)
         });
@@ -189,35 +170,19 @@ module.exports = {
             });
         }
 
-        const sortedTraits = Array.from(traits).sort();
-        const missingChampionIcons = units
-            .filter((unit) => !unit.iconUrl)
-            .map((unit) => unit.displayName);
-
-        const parsedData = {
+        return buildParsedDataResult({
             units,
-            traits: sortedTraits,
-            roles: Array.from(roles).sort(),
+            traits,
+            roles,
             traitBreakpoints,
             traitIcons,
-            hashMap: hashDictionary,
-            setNumber: latestSet,
-            dataSource: source,
+            hashDictionary,
+            latestSet,
+            source,
             setOverrides,
-            assetValidation: {
-                championAssetCount: setChampionRecords.length,
-                matchedChampionCount: matchedChampionReferenceNames.size,
-                totalUnits: units.length,
-                missingChampionIcons,
-                unmatchedChampionAssets: Math.max(0, setChampionRecords.length - matchedChampionReferenceNames.size),
-                traitIconCount: Object.keys(traitIcons).length,
-                totalTraits: sortedTraits.length
-            }
-        };
-
-        return {
-            ...parsedData,
-            dataFingerprint: this._createDataFingerprint(parsedData)
-        };
+            setChampionRecords,
+            matchedChampionReferenceNames,
+            createDataFingerprint: this._createDataFingerprint.bind(this)
+        });
     }
 };
