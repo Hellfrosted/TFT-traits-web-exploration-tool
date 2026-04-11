@@ -4,6 +4,7 @@
         'createState',
         'createVariantLockUi',
         'createQueryUi',
+        'createResultsInteractions',
         'createResultsUi',
         'createHistoryUi',
         'createDataController',

@@ -2,6 +2,7 @@
     const ns = window.TFTRenderer = window.TFTRenderer || {};
     const { escapeHtml, formatBoardEstimate, resolveShellElements, setResultsBodyMessage } = ns.shared;
     const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+    const createResultsInteractions = ns.createResultsInteractions;
 
     ns.createResultsRenderers = function createResultsRenderers(app, model, tooltipController) {
         const { state } = app;
@@ -134,73 +135,12 @@
             return wrapper;
         }
 
-        function getResultsPageSize() {
-            const pageSize = Number.parseInt(state.searchLimits?.RESULTS_PAGE_SIZE, 10);
-            return Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 100;
-        }
-
-        function getVisibleResultsPage(results = [], page = 0, pageSize = getResultsPageSize()) {
+        function getVisibleResultsPage(results = [], page = 0, pageSize = resultsInteractions.getResultsPageSize()) {
             return resultsViewState.getVisibleResultsPage(results, page, pageSize);
         }
 
         function resolveSelectedBoardIndex(selectedBoardIndex, pageData, totalResults) {
             return resultsViewState.resolveSelectedBoardIndex(selectedBoardIndex, pageData, totalResults);
-        }
-
-        function clearResultsPager() {
-            const { resultsPager } = resolveResultsShell();
-            if (resultsPager) {
-                clearNode(resultsPager);
-            }
-        }
-
-        function renderResultsPager(results, pageData) {
-            const { resultsPager } = resolveResultsShell();
-            if (!resultsPager) return;
-
-            clearNode(resultsPager);
-            if (!Array.isArray(results) || results.length === 0 || pageData.totalPages <= 1) {
-                return;
-            }
-
-            const status = document.createElement('div');
-            status.className = 'results-pager-status';
-            status.textContent = `Showing ${pageData.startIndex + 1}-${pageData.endIndex} of ${results.length} boards`;
-
-            const controls = document.createElement('div');
-            controls.className = 'results-pager-controls';
-
-            const previousButton = document.createElement('button');
-            previousButton.type = 'button';
-            previousButton.className = 'btn-outline results-pager-btn';
-            previousButton.textContent = 'Previous';
-            previousButton.disabled = pageData.page === 0;
-            previousButton.addEventListener('click', () => {
-                renderResults(results, {
-                    page: pageData.page - 1
-                });
-            });
-
-            const pageLabel = document.createElement('span');
-            pageLabel.className = 'results-pager-label';
-            pageLabel.textContent = `Page ${pageData.page + 1} / ${pageData.totalPages}`;
-
-            const nextButton = document.createElement('button');
-            nextButton.type = 'button';
-            nextButton.className = 'btn-outline results-pager-btn';
-            nextButton.textContent = 'Next';
-            nextButton.disabled = pageData.page >= pageData.totalPages - 1;
-            nextButton.addEventListener('click', () => {
-                renderResults(results, {
-                    page: pageData.page + 1
-                });
-            });
-
-            controls.appendChild(previousButton);
-            controls.appendChild(pageLabel);
-            controls.appendChild(nextButton);
-            resultsPager.appendChild(status);
-            resultsPager.appendChild(controls);
         }
 
         function renderBoardSpotlight(board, rankIndex) {
@@ -285,29 +225,12 @@
             spotlight.appendChild(header);
             spotlight.appendChild(inline);
         }
-
-        function bindRowSelection(row, results, index, selectedRowRef) {
-            const selectRow = () => {
-                if (selectedRowRef.current) {
-                    selectedRowRef.current.classList.remove('result-row-selected');
-                    selectedRowRef.current.setAttribute('aria-selected', 'false');
-                }
-                state.selectedBoardIndex = index;
-                selectedRowRef.current = row;
-                selectedRowRef.current.classList.add('result-row-selected');
-                selectedRowRef.current.setAttribute('aria-selected', 'true');
-                renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
-            };
-
-            row.addEventListener('click', selectRow);
-            row.addEventListener('keydown', (event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') {
-                    return;
-                }
-                event.preventDefault();
-                selectRow();
-            });
-        }
+        const resultsInteractions = createResultsInteractions(app, {
+            resolveResultsShell,
+            clearNode,
+            renderResults,
+            renderBoardSpotlight
+        });
 
         function renderResults(results, options = {}) {
             const { resBody: tbody } = resolveResultsShell();
@@ -321,7 +244,7 @@
                 renderEmptySummary('No results');
                 setResultsBodyMessage(app, tbody, 'No results found for these constraints.', 'results-message-row results-message-row-error');
                 renderEmptySpotlight('No boards matched the current filters. Relax constraints or widen the search.');
-                clearResultsPager();
+                resultsInteractions.clearResultsPager();
                 return;
             }
 
@@ -330,11 +253,11 @@
                 renderEmptySummary('Search error');
                 setResultsBodyMessage(app, tbody, results[0].error, 'results-message-row results-message-row-error');
                 renderEmptySpotlight('Search failed before a board could be inspected.');
-                clearResultsPager();
+                resultsInteractions.clearResultsPager();
                 return;
             }
 
-            const pageData = getVisibleResultsPage(results, options.page, getResultsPageSize());
+            const pageData = getVisibleResultsPage(results, options.page, resultsInteractions.getResultsPageSize());
             state.currentResultsPage = pageData.page;
             state.selectedBoardIndex = resolveSelectedBoardIndex(state.selectedBoardIndex, pageData, results.length);
 
@@ -414,12 +337,12 @@
                 row.appendChild(twoStarCell);
                 row.appendChild(unitsCell);
 
-                bindRowSelection(row, results, index, selectedRowRef);
+                resultsInteractions.bindRowSelection(row, results, index, selectedRowRef);
                 fragment.appendChild(row);
             });
             tbody.appendChild(fragment);
 
-            renderResultsPager(results, pageData);
+            resultsInteractions.renderResultsPager(results, pageData);
             tooltipController.bindTooltipListeners();
             renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
         }
