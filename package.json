@@ -7,11 +7,13 @@
   "scripts": {
     "start": "electron .",
     "test": "node tools/run-node-tests.js",
-    "test:smoke": "node --test test/window-service.test.js",
-    "test:all": "npm test && npm run test:smoke",
+    "test:smoke": "node tools/run-electron-smoke.js",
+    "test:smoke:unit": "node --test test/window-service.test.js",
+    "test:all": "npm test && npm run test:smoke && npm run lint",
     "lint": "eslint *.js components/*.js renderer/*.js renderer/**/*.js data-engine/*.js data-engine/**/*.js engine/*.js main-process/*.js tools/*.js test/ test/**/*.js",
     "validate:data": "node tools/validate-data-sources.js",
-    "pack:win": "electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\""
+    "pack:win": "electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\"",
+    "pack:smoke": "node tools/run-packaged-smoke.js"
   },
   "devDependencies": {
     "@electron/packager": "^19.1.0",
