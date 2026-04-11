@@ -1,4 +1,9 @@
 const { getSetOverrides } = require('../setOverrides.js');
+const {
+    buildSetTraitIndexes,
+    mergeRawTraitMetadata,
+    shouldIncludeChampionRecord
+} = require('./parse-data-state.js');
 
 function buildHashDictionary(rawJSON) {
     const hashDictionary = {};
@@ -43,71 +48,39 @@ module.exports = {
         const traitIcons = this._buildTraitIconMap(assetSources.rawTraitIconsHtml, setData, latestSet, source, rawTraitMetadata);
         const matchedChampionReferenceNames = new Set();
 
-        if (setData?.traits && Array.isArray(setData.traits)) {
-            setData.traits.forEach((trait) => {
-                const bps = this._normalizeBreakpoints(trait.effects);
-                const displayName = trait.displayName || trait.name || trait.apiName || trait.traitId;
-                if (!displayName) return;
+        const setTraitIndexes = buildSetTraitIndexes(setData, this._normalizeBreakpoints.bind(this));
+        Object.assign(traitNamesByAlias, setTraitIndexes.traitNamesByAlias);
+        Object.assign(traitBreakpoints, setTraitIndexes.traitBreakpoints);
 
-                const aliases = [
-                    trait.apiName,
-                    trait.name,
-                    trait.displayName,
-                    trait.traitId
-                ].filter(Boolean);
-
-                aliases.forEach((alias) => {
-                    traitNamesByAlias[alias] = displayName;
-                    if (bps.length > 0) {
-                        traitBreakpoints[alias] = bps;
-                    }
-                });
-            });
-        }
-
-        Object.entries(rawTraitMetadata.traitBreakpoints).forEach(([alias, breakpoints]) => {
-            const resolvedName = traitNamesByAlias[alias] || alias;
-            if (this._isExcludedTraitName(resolvedName, setOverrides)) return;
-
-            if (!traitBreakpoints[alias]) {
-                traitBreakpoints[alias] = breakpoints;
-            }
-            if (!traitBreakpoints[resolvedName]) {
-                traitBreakpoints[resolvedName] = breakpoints;
-            }
-        });
-
-        Object.entries(rawTraitMetadata.traitIcons).forEach(([alias, iconUrl]) => {
-            const resolvedName = traitNamesByAlias[alias] || alias;
-            if (this._isExcludedTraitName(resolvedName, setOverrides)) return;
-
-            if (!traitIcons[alias] || this._shouldPreferRawAsset(iconUrl, traitIcons[alias], latestSet)) {
-                traitIcons[alias] = iconUrl;
-            }
-            if (!traitIcons[resolvedName] || this._shouldPreferRawAsset(iconUrl, traitIcons[resolvedName], latestSet)) {
-                traitIcons[resolvedName] = iconUrl;
-            }
+        mergeRawTraitMetadata({
+            rawTraitMetadata,
+            traitNamesByAlias,
+            traitBreakpoints,
+            traitIcons,
+            setOverrides,
+            latestSet,
+            isExcludedTraitName: this._isExcludedTraitName.bind(this),
+            shouldPreferRawAsset: this._shouldPreferRawAsset.bind(this)
         });
 
         for (const [key, val] of Object.entries(rawJSON)) {
-            if (!this._isChampionRecord(key, val)) {
+            if (!shouldIncludeChampionRecord({
+                key,
+                value: val,
+                rawJSON,
+                rawShopDataLookup,
+                latestSet,
+                setChampionIdentitySet,
+                setOverrides,
+                isChampionRecord: this._isChampionRecord.bind(this),
+                isExcludedUnit: this._isExcludedUnit.bind(this),
+                normalizeChampionIdentity: this._normalizeChampionIdentity.bind(this),
+                detectRawUnitSetNumber: this._detectRawUnitSetNumber.bind(this)
+            })) {
                 continue;
             }
 
             const rawName = val.mCharacterName || '';
-            if (this._isExcludedUnit(rawName, setOverrides) || val.tier === 0) continue;
-            if (setChampionIdentitySet.size > 0) {
-                const rawIdentity = this._normalizeChampionIdentity(rawName);
-                if (!setChampionIdentitySet.has(rawIdentity)) {
-                    continue;
-                }
-            } else if (latestSet) {
-                const rawSetNumber = this._detectRawUnitSetNumber(val, rawJSON, rawShopDataLookup);
-                if (rawSetNumber && rawSetNumber !== latestSet) {
-                    continue;
-                }
-            }
-
             const tier = val.tier || 1;
             const cleanName = rawName.replace(/^TFT\d+_/, '');
             const displayName = this._toDisplayName(cleanName) || cleanName;
