@@ -1,5 +1,12 @@
 const { LIMITS } = require('../constants.js');
 const { normalizeSearchParams } = require('../searchParams.js');
+const {
+    buildTraitIndex,
+    buildMustIncludeTraitTargets,
+    calculateSynergyScore,
+    scoreBoard,
+    resolveSearchSpaceError
+} = require('./search-state.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -78,10 +85,7 @@ module.exports = {
         } = normalizedParams;
 
         const allTraitNames = dataCache.traits;
-        const traitIndex = {};
-        allTraitNames.forEach((traitName, index) => {
-            traitIndex[traitName] = index;
-        });
+        const traitIndex = buildTraitIndex(allTraitNames);
         const traitBPs = dataCache.traitBreakpoints || {};
 
         const {
@@ -289,39 +293,6 @@ module.exports = {
             info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
         );
 
-        const calculateSynergyScore = (counts) => {
-            let score = 0;
-            for (let i = 0; i < numTraits; i++) {
-                const count = counts[i];
-                if (count === 0) continue;
-
-                const name = allTraitNames[i];
-                const bps = traitBPs[name] || [1];
-                const isUnique = bps.length === 1 && bps[0] === 1;
-
-                if (!includeUnique && isUnique) continue;
-
-                let levelsPassed = 0;
-                for (const bp of bps) {
-                    if (count >= bp) levelsPassed++;
-                    else break;
-                }
-
-                if (onlyActive && levelsPassed === 0) continue;
-
-                if (tierRank) {
-                    score += levelsPassed;
-                } else {
-                    score += (levelsPassed > 0 ? 1 : (onlyActive ? 0 : 1));
-                }
-            }
-            return score;
-        };
-
-        const scoreBoard = (synergyScore, totalCost) => {
-            return synergyScore * 10000 + totalCost;
-        };
-
         const evaluateBoardSelection = (selectedUnitIndices, selectedVariantIndices, baseTraitCounts, minOccupiedSlots) => {
             const workingCounts = new Uint8Array(baseTraitCounts);
             const selectedVariantByUnitIndex = [];
@@ -398,7 +369,13 @@ module.exports = {
                     }
                 }
 
-                const synergyScore = calculateSynergyScore(resolvedCounts);
+                const synergyScore = calculateSynergyScore(resolvedCounts, {
+                    allTraitNames,
+                    traitBreakpoints: traitBPs,
+                    onlyActive,
+                    tierRank,
+                    includeUnique
+                });
                 if (bestEvaluation && synergyScore <= bestEvaluation.synergyScore) {
                     return;
                 }
@@ -501,11 +478,11 @@ module.exports = {
             remainingMaxSlotsFrom[i] = remainingMaxSlotsFrom[i + 1] + info.maxSlotCost;
         }
 
-        const mustIncludeTraitTargets = mustIncludeTraitIndices.map((traitIdx) => {
-            const name = allTraitNames[traitIdx];
-            const bps = traitBPs[name] || [1];
-            return bps[0];
-        });
+        const mustIncludeTraitTargets = buildMustIncludeTraitTargets(
+            mustIncludeTraitIndices,
+            allTraitNames,
+            traitBPs
+        );
         const useMustIncludePruning = mustIncludeTraitIndices.length > 0
             && !hasVariantUnits
             && !hasConditionalProfiles
@@ -604,7 +581,13 @@ module.exports = {
                         }
                     }
 
-                    const synergyScore = calculateSynergyScore(currentTraitCounts);
+                    const synergyScore = calculateSynergyScore(currentTraitCounts, {
+                        allTraitNames,
+                        traitBreakpoints: traitBPs,
+                        onlyActive,
+                        tierRank,
+                        includeUnique
+                    });
                     const totalScore = scoreBoard(synergyScore, totalCost);
                     if (topBoards.length >= MAX_BOARDS && totalScore <= worstScore) return;
 
@@ -703,9 +686,7 @@ module.exports = {
                 }
             }
         } else {
-            const reason = Number.isFinite(totalCombinations) && totalCombinations > LIMITS.COMBINATION_LIMIT
-                ? `Search space too large (~${(totalCombinations / 1e9).toFixed(1)}B combinations). Pick more Must-Haves.`
-                : 'Board size too large. Supports up to 7 empty slots.';
+            const reason = resolveSearchSpaceError(totalCombinations, LIMITS);
             topBoards.push({ error: reason });
             return topBoards;
         }
