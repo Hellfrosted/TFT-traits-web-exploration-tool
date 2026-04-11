@@ -23,6 +23,10 @@ function trimMemoryCache(cache, maxEntries) {
     }
 }
 
+function isParseError(error) {
+    return error instanceof SyntaxError || error?.name === 'SyntaxError';
+}
+
 function createSearchCacheService({
     storagePaths,
     ensureStorageDirs,
@@ -267,16 +271,18 @@ function createSearchCacheService({
         } catch (error) {
             if (error.code !== 'ENOENT') {
                 console.warn('Failed to read data fallback:', error.message);
-                try {
-                    const quarantinedPath = await cacheStore.quarantineDataFallback(source);
-                    if (quarantinedPath) {
-                        console.warn(`Quarantined malformed data fallback snapshot for ${source}: ${quarantinedPath}`);
+                if (isParseError(error)) {
+                    try {
+                        const quarantinedPath = await cacheStore.quarantineDataFallback(source);
+                        if (quarantinedPath) {
+                            console.warn(`Quarantined malformed data fallback snapshot for ${source}: ${quarantinedPath}`);
+                        }
+                    } catch (quarantineError) {
+                        console.warn(
+                            `Failed to quarantine malformed data fallback snapshot for ${source}:`,
+                            quarantineError.message || String(quarantineError)
+                        );
                     }
-                } catch (quarantineError) {
-                    console.warn(
-                        `Failed to quarantine malformed data fallback snapshot for ${source}:`,
-                        quarantineError.message || String(quarantineError)
-                    );
                 }
             }
         }

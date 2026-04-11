@@ -134,6 +134,76 @@ describe('main-process cache service', () => {
         assert.equal(operations[1][2], 'C:\\cache-root\\data_fallback_pbe.json');
     });
 
+    it('quarantines malformed fallback snapshots after a JSON parse failure', async () => {
+        const renameCalls = [];
+        const service = createSearchCacheService({
+            storagePaths: {
+                cacheDir: 'C:\\cache',
+                storageRoot: 'C:\\cache-root'
+            },
+            ensureStorageDirs: () => {},
+            resolveCacheEntryPath: () => 'C:\\cache\\entry.json',
+            resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
+            engine: {
+                prepareSearchContext: () => ({ prepared: true })
+            },
+            fsp: {
+                readFile: async () => '{not-json',
+                rename: async (fromPath, toPath) => {
+                    renameCalls.push([fromPath, toPath]);
+                },
+                readdir: async () => [],
+                unlink: async () => {}
+            },
+            crypto,
+            limits: LIMITS,
+            searchCacheVersion: 4
+        });
+
+        const result = await service.readDataFallback('pbe');
+
+        assert.equal(result, null);
+        assert.equal(renameCalls.length, 1);
+        assert.equal(renameCalls[0][0], 'C:\\cache-root\\data_fallback_pbe.json');
+        assert.match(renameCalls[0][1], /data_fallback_pbe\.json\.corrupt\.\d+$/);
+    });
+
+    it('does not quarantine fallback snapshots for filesystem read errors', async () => {
+        const renameCalls = [];
+        const readError = new Error('snapshot is locked');
+        readError.code = 'EPERM';
+        const service = createSearchCacheService({
+            storagePaths: {
+                cacheDir: 'C:\\cache',
+                storageRoot: 'C:\\cache-root'
+            },
+            ensureStorageDirs: () => {},
+            resolveCacheEntryPath: () => 'C:\\cache\\entry.json',
+            resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
+            engine: {
+                prepareSearchContext: () => ({ prepared: true })
+            },
+            fsp: {
+                readFile: async () => {
+                    throw readError;
+                },
+                rename: async (fromPath, toPath) => {
+                    renameCalls.push([fromPath, toPath]);
+                },
+                readdir: async () => [],
+                unlink: async () => {}
+            },
+            crypto,
+            limits: LIMITS,
+            searchCacheVersion: 4
+        });
+
+        const result = await service.readDataFallback('pbe');
+
+        assert.equal(result, null);
+        assert.deepEqual(renameCalls, []);
+    });
+
     it('prunes obsolete, corrupt, and inactive-fingerprint cache entries while preserving the active fingerprint', async () => {
         const sandboxRoot = makeTempDir('tft-cache-service-');
 
