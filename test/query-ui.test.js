@@ -5,11 +5,16 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 function loadQueryUiFactory(sandbox) {
+    const variantLockUiSource = fs.readFileSync(
+        path.join(__dirname, '..', 'renderer', 'variant-lock-ui.js'),
+        'utf8'
+    );
     const source = fs.readFileSync(
         path.join(__dirname, '..', 'renderer', 'query-ui.js'),
         'utf8'
     );
 
+    vm.runInNewContext(variantLockUiSource, sandbox, { filename: 'renderer/variant-lock-ui.js' });
     vm.runInNewContext(source, sandbox, { filename: 'renderer/query-ui.js' });
     return sandbox.window.TFTRenderer.createQueryUi;
 }

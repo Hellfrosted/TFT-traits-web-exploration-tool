@@ -2,6 +2,7 @@
     const rendererNamespace = window.TFTRenderer || {};
     const REQUIRED_FACTORIES = [
         'createState',
+        'createVariantLockUi',
         'createQueryUi',
         'createResultsUi',
         'createHistoryUi',
