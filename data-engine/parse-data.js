@@ -21,258 +21,339 @@ function buildHashDictionary(rawJSON) {
     return hashDictionary;
 }
 
-module.exports = {
-    parseData(rawJSON, cdragonJSON, assetSources = {}, parseOptions = {}) {
-        const source = this.normalizeDataSource(parseOptions.source);
-        const units = [];
-        const traits = new Set();
-        const roles = new Set();
-        const hashDictionary = buildHashDictionary(rawJSON);
-        const traitNamesByAlias = {};
-        const rawTraitMetadata = this._buildRawTraitMetadata(rawJSON, source);
-        const rawChampionRecordMap = this._buildRawChampionRecordMap(rawJSON);
-        const rawShopDataLookup = this._buildRawShopDataLookup(rawJSON);
-        const traitBreakpoints = {};
-        const latestSet = this._detectLatestSet(cdragonJSON) || this._detectLatestSetFromRaw(rawJSON);
-        const setOverrides = parseOptions.setOverrides || getSetOverrides({ setNumber: latestSet });
-        const setData = this._getLatestSetData(cdragonJSON);
-        const setChampionRecords = this._buildSetChampionRecords(setData, source, setOverrides);
-        const setChampionIdentitySet = this._buildChampionIdentitySet(setChampionRecords);
-        const championReferenceMap = this._buildChampionReferenceMap(setChampionRecords);
-        const championAssets = this._buildChampionAssetMap(assetSources.rawChampionSplashesHtml, latestSet, source);
-        const traitIcons = this._buildTraitIconMap(assetSources.rawTraitIconsHtml, setData, latestSet, source, rawTraitMetadata);
-        const matchedChampionReferenceNames = new Set();
+function buildParseContext(engine, rawJSON, cdragonJSON, assetSources, parseOptions) {
+    const source = engine.normalizeDataSource(parseOptions.source);
+    const hashDictionary = buildHashDictionary(rawJSON);
+    const rawTraitMetadata = engine._buildRawTraitMetadata(rawJSON, source);
+    const rawChampionRecordMap = engine._buildRawChampionRecordMap(rawJSON);
+    const rawShopDataLookup = engine._buildRawShopDataLookup(rawJSON);
+    const latestSet = engine._detectLatestSet(cdragonJSON) || engine._detectLatestSetFromRaw(rawJSON);
+    const setOverrides = parseOptions.setOverrides || getSetOverrides({ setNumber: latestSet });
+    const setData = engine._getLatestSetData(cdragonJSON);
+    const setChampionRecords = engine._buildSetChampionRecords(setData, source, setOverrides);
+    const setChampionIdentitySet = engine._buildChampionIdentitySet(setChampionRecords);
+    const championReferenceMap = engine._buildChampionReferenceMap(setChampionRecords);
+    const championAssets = engine._buildChampionAssetMap(assetSources.rawChampionSplashesHtml, latestSet, source);
+    const traitIcons = engine._buildTraitIconMap(
+        assetSources.rawTraitIconsHtml,
+        setData,
+        latestSet,
+        source,
+        rawTraitMetadata
+    );
 
-        if (setData?.traits && Array.isArray(setData.traits)) {
-            setData.traits.forEach((trait) => {
-                const bps = this._normalizeBreakpoints(trait.effects);
-                const displayName = trait.displayName || trait.name || trait.apiName || trait.traitId;
-                if (!displayName) return;
+    return {
+        source,
+        hashDictionary,
+        rawTraitMetadata,
+        rawChampionRecordMap,
+        rawShopDataLookup,
+        latestSet,
+        setOverrides,
+        setData,
+        setChampionRecords,
+        setChampionIdentitySet,
+        championReferenceMap,
+        championAssets,
+        traitIcons,
+        traitNamesByAlias: {},
+        traitBreakpoints: {},
+        matchedChampionReferenceNames: new Set()
+    };
+}
 
-                const aliases = [
-                    trait.apiName,
-                    trait.name,
-                    trait.displayName,
-                    trait.traitId
-                ].filter(Boolean);
+function mergeTraitMetadata(engine, context) {
+    const {
+        setData,
+        setOverrides,
+        rawTraitMetadata,
+        traitNamesByAlias,
+        traitBreakpoints,
+        traitIcons,
+        latestSet
+    } = context;
 
-                aliases.forEach((alias) => {
-                    traitNamesByAlias[alias] = displayName;
-                    if (bps.length > 0) {
-                        traitBreakpoints[alias] = bps;
-                    }
-                });
+    if (setData?.traits && Array.isArray(setData.traits)) {
+        setData.traits.forEach((trait) => {
+            const bps = engine._normalizeBreakpoints(trait.effects);
+            const displayName = trait.displayName || trait.name || trait.apiName || trait.traitId;
+            if (!displayName) return;
+
+            const aliases = [
+                trait.apiName,
+                trait.name,
+                trait.displayName,
+                trait.traitId
+            ].filter(Boolean);
+
+            aliases.forEach((alias) => {
+                traitNamesByAlias[alias] = displayName;
+                if (bps.length > 0) {
+                    traitBreakpoints[alias] = bps;
+                }
             });
+        });
+    }
+
+    Object.entries(rawTraitMetadata.traitBreakpoints).forEach(([alias, breakpoints]) => {
+        const resolvedName = traitNamesByAlias[alias] || alias;
+        if (engine._isExcludedTraitName(resolvedName, setOverrides)) return;
+
+        if (!traitBreakpoints[alias]) {
+            traitBreakpoints[alias] = breakpoints;
+        }
+        if (!traitBreakpoints[resolvedName]) {
+            traitBreakpoints[resolvedName] = breakpoints;
+        }
+    });
+
+    Object.entries(rawTraitMetadata.traitIcons).forEach(([alias, iconUrl]) => {
+        const resolvedName = traitNamesByAlias[alias] || alias;
+        if (engine._isExcludedTraitName(resolvedName, setOverrides)) return;
+
+        if (!traitIcons[alias] || engine._shouldPreferRawAsset(iconUrl, traitIcons[alias], latestSet)) {
+            traitIcons[alias] = iconUrl;
+        }
+        if (!traitIcons[resolvedName] || engine._shouldPreferRawAsset(iconUrl, traitIcons[resolvedName], latestSet)) {
+            traitIcons[resolvedName] = iconUrl;
+        }
+    });
+}
+
+function shouldIncludeChampionRecord(engine, recordKey, recordValue, context, rawJSON) {
+    const {
+        setOverrides,
+        setChampionIdentitySet,
+        latestSet,
+        rawShopDataLookup
+    } = context;
+
+    if (!engine._isChampionRecord(recordKey, recordValue)) {
+        return false;
+    }
+
+    const rawName = recordValue.mCharacterName || '';
+    if (engine._isExcludedUnit(rawName, setOverrides) || recordValue.tier === 0) {
+        return false;
+    }
+
+    if (setChampionIdentitySet.size > 0) {
+        const rawIdentity = engine._normalizeChampionIdentity(rawName);
+        return setChampionIdentitySet.has(rawIdentity);
+    }
+
+    if (latestSet) {
+        const rawSetNumber = engine._detectRawUnitSetNumber(recordValue, rawJSON, rawShopDataLookup);
+        return !rawSetNumber || rawSetNumber === latestSet;
+    }
+
+    return true;
+}
+
+function buildParsedUnits(engine, rawJSON, context) {
+    const units = [];
+    const traits = new Set();
+    const roles = new Set();
+    const {
+        source,
+        hashDictionary,
+        rawChampionRecordMap,
+        rawShopDataLookup,
+        latestSet,
+        setOverrides,
+        championReferenceMap,
+        championAssets,
+        traitNamesByAlias,
+        matchedChampionReferenceNames
+    } = context;
+
+    for (const [key, val] of Object.entries(rawJSON)) {
+        if (!shouldIncludeChampionRecord(engine, key, val, context, rawJSON)) {
+            continue;
         }
 
-        Object.entries(rawTraitMetadata.traitBreakpoints).forEach(([alias, breakpoints]) => {
-            const resolvedName = traitNamesByAlias[alias] || alias;
-            if (this._isExcludedTraitName(resolvedName, setOverrides)) return;
-
-            if (!traitBreakpoints[alias]) {
-                traitBreakpoints[alias] = breakpoints;
-            }
-            if (!traitBreakpoints[resolvedName]) {
-                traitBreakpoints[resolvedName] = breakpoints;
-            }
+        const rawName = val.mCharacterName || '';
+        const tier = val.tier || 1;
+        const cleanName = rawName.replace(/^TFT\d+_/, '');
+        const displayName = engine._toDisplayName(cleanName) || cleanName;
+        const championReference = engine._findChampionReference(championReferenceMap, rawName, cleanName, displayName);
+        const unitOverride = engine._getUnitOverride(cleanName, rawName, setOverrides);
+        const roleName = engine._resolveRoleName({
+            cleanName,
+            rawName,
+            roleId: val.CharacterRole || 'Unknown',
+            hashDictionary,
+            championReference,
+            setOverrides
         });
 
-        Object.entries(rawTraitMetadata.traitIcons).forEach(([alias, iconUrl]) => {
-            const resolvedName = traitNamesByAlias[alias] || alias;
-            if (this._isExcludedTraitName(resolvedName, setOverrides)) return;
+        const allLinkedTraits = (val.mLinkedTraits || []).reduce((result, traitLink) => {
+            const traitId = traitLink?.TraitData;
+            if (!traitId) return result;
 
-            if (!traitIcons[alias] || this._shouldPreferRawAsset(iconUrl, traitIcons[alias], latestSet)) {
-                traitIcons[alias] = iconUrl;
-            }
-            if (!traitIcons[resolvedName] || this._shouldPreferRawAsset(iconUrl, traitIcons[resolvedName], latestSet)) {
-                traitIcons[resolvedName] = iconUrl;
-            }
-        });
-
-        for (const [key, val] of Object.entries(rawJSON)) {
-            if (!this._isChampionRecord(key, val)) {
-                continue;
-            }
-
-            const rawName = val.mCharacterName || '';
-            if (this._isExcludedUnit(rawName, setOverrides) || val.tier === 0) continue;
-            if (setChampionIdentitySet.size > 0) {
-                const rawIdentity = this._normalizeChampionIdentity(rawName);
-                if (!setChampionIdentitySet.has(rawIdentity)) {
-                    continue;
-                }
-            } else if (latestSet) {
-                const rawSetNumber = this._detectRawUnitSetNumber(val, rawJSON, rawShopDataLookup);
-                if (rawSetNumber && rawSetNumber !== latestSet) {
-                    continue;
-                }
-            }
-
-            const tier = val.tier || 1;
-            const cleanName = rawName.replace(/^TFT\d+_/, '');
-            const displayName = this._toDisplayName(cleanName) || cleanName;
-            const championReference = this._findChampionReference(championReferenceMap, rawName, cleanName, displayName);
-            const unitOverride = this._getUnitOverride(cleanName, rawName, setOverrides);
-            const roleName = this._resolveRoleName({
-                cleanName,
+            const alias = hashDictionary[traitId] || traitId;
+            const resolvedName = traitNamesByAlias[alias] || traitNamesByAlias[traitId] || alias;
+            result.push({ traitId, resolvedName });
+            return result;
+        }, []);
+        const hasExcludedLinkedTraits = allLinkedTraits.some(({ resolvedName }) =>
+            engine._isExcludedTraitName(resolvedName, setOverrides)
+        );
+        const linkedTraits = allLinkedTraits.filter(({ resolvedName }) =>
+            !engine._isExcludedTraitName(resolvedName, setOverrides)
+        );
+        const linkedTraitNames = linkedTraits.map(({ resolvedName }) => resolvedName);
+        const autoDetectedVariantOverride = !unitOverride?.variants?.length && !unitOverride?.selectionGroups?.length
+            ? engine._buildDetectedVariantOverrides({
                 rawName,
-                roleId: val.CharacterRole || 'Unknown',
+                baseRole: roleName,
+                baseTraits: linkedTraitNames,
+                hasExcludedLinkedTraits,
+                rawChampionRecordMap,
                 hashDictionary,
-                championReference,
+                traitNamesByAlias,
                 setOverrides
-            });
-
-            const allLinkedTraits = (val.mLinkedTraits || []).reduce((result, traitLink) => {
-                const traitId = traitLink?.TraitData;
-                if (!traitId) return result;
-
-                const alias = hashDictionary[traitId] || traitId;
-                const resolvedName = traitNamesByAlias[alias] || traitNamesByAlias[traitId] || alias;
-                result.push({ traitId, resolvedName });
-                return result;
-            }, []);
-            const hasExcludedLinkedTraits = allLinkedTraits.some(({ resolvedName }) =>
-                this._isExcludedTraitName(resolvedName, setOverrides)
-            );
-            const linkedTraits = allLinkedTraits.filter(({ resolvedName }) =>
-                !this._isExcludedTraitName(resolvedName, setOverrides)
-            );
-            const linkedTraitNames = linkedTraits.map(({ resolvedName }) => resolvedName);
-            const autoDetectedVariantOverride = !unitOverride?.variants?.length && !unitOverride?.selectionGroups?.length
-                ? this._buildDetectedVariantOverrides({
-                    rawName,
-                    baseRole: roleName,
-                    baseTraits: linkedTraitNames,
-                    hasExcludedLinkedTraits,
-                    rawChampionRecordMap,
-                    hashDictionary,
-                    traitNamesByAlias,
-                    setOverrides
-                })
-                : null;
-            const mergedUnitOverride = this._mergeUnitOverrides(unitOverride, autoDetectedVariantOverride);
-            const overrideContributionTraits = Object.entries(mergedUnitOverride?.traitContributions || {})
-                .filter(([, count]) => Number(count) > 0)
-                .map(([trait]) => trait);
-            const effectiveTraitNames = this._applyUnitTraitOverrides(
-                [...linkedTraitNames, ...overrideContributionTraits],
-                mergedUnitOverride
-            );
-            const effectiveTraitSet = new Set(effectiveTraitNames);
-            const linkedTraitIds = linkedTraits
-                .filter(({ resolvedName }) => effectiveTraitSet.has(resolvedName))
-                .map(({ traitId }) => traitId);
-            const traitContributions = this._buildTraitContributionMap(effectiveTraitNames, mergedUnitOverride);
-            const variants = this._buildUnitVariants(effectiveTraitNames, roleName, mergedUnitOverride);
-            const conditionalEffects = this._normalizeConditionalEffects(mergedUnitOverride?.conditionalEffects);
-            const conditionalProfiles = this._buildConditionalProfiles(
-                effectiveTraitNames,
-                mergedUnitOverride?.conditionalProfiles
-            );
-            const resolvedRoleName = this._deriveStableVariantRole(roleName, variants);
-            effectiveTraitNames.forEach((traitName) => traits.add(traitName));
-            conditionalEffects.forEach((effect) => {
+            })
+            : null;
+        const mergedUnitOverride = engine._mergeUnitOverrides(unitOverride, autoDetectedVariantOverride);
+        const overrideContributionTraits = Object.entries(mergedUnitOverride?.traitContributions || {})
+            .filter(([, count]) => Number(count) > 0)
+            .map(([trait]) => trait);
+        const effectiveTraitNames = engine._applyUnitTraitOverrides(
+            [...linkedTraitNames, ...overrideContributionTraits],
+            mergedUnitOverride
+        );
+        const effectiveTraitSet = new Set(effectiveTraitNames);
+        const linkedTraitIds = linkedTraits
+            .filter(({ resolvedName }) => effectiveTraitSet.has(resolvedName))
+            .map(({ traitId }) => traitId);
+        const traitContributions = engine._buildTraitContributionMap(effectiveTraitNames, mergedUnitOverride);
+        const variants = engine._buildUnitVariants(effectiveTraitNames, roleName, mergedUnitOverride);
+        const conditionalEffects = engine._normalizeConditionalEffects(mergedUnitOverride?.conditionalEffects);
+        const conditionalProfiles = engine._buildConditionalProfiles(
+            effectiveTraitNames,
+            mergedUnitOverride?.conditionalProfiles
+        );
+        const resolvedRoleName = engine._deriveStableVariantRole(roleName, variants);
+        effectiveTraitNames.forEach((traitName) => traits.add(traitName));
+        conditionalEffects.forEach((effect) => {
+            Object.keys(effect.traitContributions).forEach((traitName) => traits.add(traitName));
+        });
+        conditionalProfiles.forEach((profile) => {
+            profile.traits.forEach((traitName) => traits.add(traitName));
+            Object.keys(profile.traitContributions).forEach((traitName) => traits.add(traitName));
+        });
+        variants.forEach((variant) => {
+            variant.traits.forEach((traitName) => traits.add(traitName));
+            (variant.conditionalEffects || []).forEach((effect) => {
                 Object.keys(effect.traitContributions).forEach((traitName) => traits.add(traitName));
             });
-            conditionalProfiles.forEach((profile) => {
+            (variant.conditionalProfiles || []).forEach((profile) => {
                 profile.traits.forEach((traitName) => traits.add(traitName));
                 Object.keys(profile.traitContributions).forEach((traitName) => traits.add(traitName));
             });
-            variants.forEach((variant) => {
-                variant.traits.forEach((traitName) => traits.add(traitName));
-                (variant.conditionalEffects || []).forEach((effect) => {
-                    Object.keys(effect.traitContributions).forEach((traitName) => traits.add(traitName));
-                });
-                (variant.conditionalProfiles || []).forEach((profile) => {
-                    profile.traits.forEach((traitName) => traits.add(traitName));
-                    Object.keys(profile.traitContributions).forEach((traitName) => traits.add(traitName));
-                });
-                if (variant.role && variant.role !== 'Unknown') {
-                    roles.add(variant.role);
-                }
-            });
-            if (resolvedRoleName && resolvedRoleName !== 'Unknown') {
-                roles.add(resolvedRoleName);
+            if (variant.role && variant.role !== 'Unknown') {
+                roles.add(variant.role);
             }
-            const rawShopIcon = this._resolveRawChampionIcon(
-                val,
-                rawJSON,
-                rawShopDataLookup,
-                rawName,
-                cleanName,
-                displayName,
-                source
-            );
-            const championIcon = this._findChampionIcon(championAssets, rawName, cleanName, displayName);
-            const preferredMetadataIcon = championReference?.record?.iconUrl
+        });
+        if (resolvedRoleName && resolvedRoleName !== 'Unknown') {
+            roles.add(resolvedRoleName);
+        }
+        const rawShopIcon = engine._resolveRawChampionIcon(
+            val,
+            rawJSON,
+            rawShopDataLookup,
+            rawName,
+            cleanName,
+            displayName,
+            source
+        );
+        const championIcon = engine._findChampionIcon(championAssets, rawName, cleanName, displayName);
+        const preferredMetadataIcon = championReference?.record?.iconUrl
+            ? {
+                url: championReference.record.iconUrl,
+                rank: engine._rankChampionIconAsset(championReference.record.iconUrl)
+            }
+            : championIcon
                 ? {
-                    url: championReference.record.iconUrl,
-                    rank: this._rankChampionIconAsset(championReference.record.iconUrl)
+                    url: championIcon.url,
+                    rank: championIcon.rank ?? engine._rankChampionIconAsset(championIcon.url)
                 }
-                : championIcon
-                    ? {
-                        url: championIcon.url,
-                        rank: championIcon.rank ?? this._rankChampionIconAsset(championIcon.url)
-                    }
-                    : null;
-            const rawIconBeatsMetadata = rawShopIcon && (
-                this._shouldPreferRawAsset(rawShopIcon.url, preferredMetadataIcon?.url, latestSet) ||
-                (
-                    this._assetMatchesSet(rawShopIcon.url, latestSet) &&
-                    this._assetMatchesSet(preferredMetadataIcon?.url, latestSet) &&
-                    rawShopIcon.rank > (preferredMetadataIcon?.rank ?? -1)
-                )
-            );
-            const resolvedIconUrl = rawIconBeatsMetadata
-                ? rawShopIcon.url
-                : (preferredMetadataIcon?.url || rawShopIcon?.url || null);
-            if (championReference?.record?.displayName) {
-                matchedChampionReferenceNames.add(championReference.record.displayName);
-            }
-
-            units.push({
-                id: cleanName,
-                displayName,
-                cost: tier,
-                role: resolvedRoleName,
-                ...(Number.isFinite(Number(mergedUnitOverride?.slotCost))
-                    ? { slotCost: Number(mergedUnitOverride.slotCost) }
-                    : {}),
-                traits: effectiveTraitNames,
-                traitContributions,
-                ...(conditionalEffects.length > 0 ? { conditionalEffects } : {}),
-                ...(conditionalProfiles.length > 0 ? { conditionalProfiles } : {}),
-                traitIds: linkedTraitIds,
-                ...(variants.length > 0 ? { variants } : {}),
-                ...(resolvedIconUrl ? { iconUrl: resolvedIconUrl } : {})
-            });
+                : null;
+        const rawIconBeatsMetadata = rawShopIcon && (
+            engine._shouldPreferRawAsset(rawShopIcon.url, preferredMetadataIcon?.url, latestSet)
+            || (
+                engine._assetMatchesSet(rawShopIcon.url, latestSet)
+                && engine._assetMatchesSet(preferredMetadataIcon?.url, latestSet)
+                && rawShopIcon.rank > (preferredMetadataIcon?.rank ?? -1)
+            )
+        );
+        const resolvedIconUrl = rawIconBeatsMetadata
+            ? rawShopIcon.url
+            : (preferredMetadataIcon?.url || rawShopIcon?.url || null);
+        if (championReference?.record?.displayName) {
+            matchedChampionReferenceNames.add(championReference.record.displayName);
         }
 
-        const sortedTraits = Array.from(traits).sort();
-        const missingChampionIcons = units
-            .filter((unit) => !unit.iconUrl)
-            .map((unit) => unit.displayName);
+        units.push({
+            id: cleanName,
+            displayName,
+            cost: tier,
+            role: resolvedRoleName,
+            ...(Number.isFinite(Number(mergedUnitOverride?.slotCost))
+                ? { slotCost: Number(mergedUnitOverride.slotCost) }
+                : {}),
+            traits: effectiveTraitNames,
+            traitContributions,
+            ...(conditionalEffects.length > 0 ? { conditionalEffects } : {}),
+            ...(conditionalProfiles.length > 0 ? { conditionalProfiles } : {}),
+            traitIds: linkedTraitIds,
+            ...(variants.length > 0 ? { variants } : {}),
+            ...(resolvedIconUrl ? { iconUrl: resolvedIconUrl } : {})
+        });
+    }
 
-        const parsedData = {
-            units,
-            traits: sortedTraits,
-            roles: Array.from(roles).sort(),
-            traitBreakpoints,
-            traitIcons,
-            hashMap: hashDictionary,
-            setNumber: latestSet,
-            dataSource: source,
-            setOverrides,
-            assetValidation: {
-                championAssetCount: setChampionRecords.length,
-                matchedChampionCount: matchedChampionReferenceNames.size,
-                totalUnits: units.length,
-                missingChampionIcons,
-                unmatchedChampionAssets: Math.max(0, setChampionRecords.length - matchedChampionReferenceNames.size),
-                traitIconCount: Object.keys(traitIcons).length,
-                totalTraits: sortedTraits.length
-            }
-        };
+    return {
+        units,
+        traits,
+        roles
+    };
+}
+
+function buildParsedDataPayload(context, parsedUnits) {
+    const sortedTraits = Array.from(parsedUnits.traits).sort();
+    const missingChampionIcons = parsedUnits.units
+        .filter((unit) => !unit.iconUrl)
+        .map((unit) => unit.displayName);
+
+    return {
+        units: parsedUnits.units,
+        traits: sortedTraits,
+        roles: Array.from(parsedUnits.roles).sort(),
+        traitBreakpoints: context.traitBreakpoints,
+        traitIcons: context.traitIcons,
+        hashMap: context.hashDictionary,
+        setNumber: context.latestSet,
+        dataSource: context.source,
+        setOverrides: context.setOverrides,
+        assetValidation: {
+            championAssetCount: context.setChampionRecords.length,
+            matchedChampionCount: context.matchedChampionReferenceNames.size,
+            totalUnits: parsedUnits.units.length,
+            missingChampionIcons,
+            unmatchedChampionAssets: Math.max(0, context.setChampionRecords.length - context.matchedChampionReferenceNames.size),
+            traitIconCount: Object.keys(context.traitIcons).length,
+            totalTraits: sortedTraits.length
+        }
+    };
+}
+
+module.exports = {
+    parseData(rawJSON, cdragonJSON, assetSources = {}, parseOptions = {}) {
+        const context = buildParseContext(this, rawJSON, cdragonJSON, assetSources, parseOptions);
+        mergeTraitMetadata(this, context);
+        const parsedUnits = buildParsedUnits(this, rawJSON, context);
+        const parsedData = buildParsedDataPayload(context, parsedUnits);
 
         return {
             ...parsedData,

@@ -220,80 +220,74 @@ function createMainRuntime(options = {}) {
     }
 
     function registerIpcHandlers() {
-        handleTrustedIpc(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
-            try {
-                const response = await dataService.fetchData(requestedSource);
-                if (response?.success && response.dataFingerprint) {
-                    void migrateFingerprintWithStrictNormalization(response.dataFingerprint);
+        const handlerMap = {
+            [IPC_CHANNELS.FETCH_DATA]: async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
+                try {
+                    const response = await dataService.fetchData(requestedSource);
+                    if (response?.success && response.dataFingerprint) {
+                        void migrateFingerprintWithStrictNormalization(response.dataFingerprint);
+                    }
+                    return response;
+                } catch (error) {
+                    return { success: false, error: error.toString() };
                 }
-                return response;
-            } catch (error) {
-                return { success: false, error: error.toString() };
+            },
+            [IPC_CHANNELS.GET_SEARCH_ESTIMATE]: async (_event, params) => {
+                return await searchService.getSearchEstimate(params);
+            },
+            [IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS]: async (_event, params) => {
+                if (typeof searchService.normalizePayload === 'function') {
+                    return searchService.normalizePayload(params);
+                }
+
+                const fallbackParams = normalizeSearchParams(params);
+                return {
+                    params: fallbackParams,
+                    comparisonKey: serializeSearchParams(fallbackParams),
+                    dataFingerprint: dataService.getDataCache()?.dataFingerprint || null
+                };
+            },
+            [IPC_CHANNELS.SEARCH_BOARDS]: async (_event, params) => {
+                return await searchService.searchBoards(params);
+            },
+            [IPC_CHANNELS.CANCEL_SEARCH]: async () => {
+                return await searchService.cancelSearch();
+            },
+            [IPC_CHANNELS.LIST_CACHE]: async () => {
+                try {
+                    const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
+                    const entries = await cacheService.listCacheEntries(activeDataFingerprint);
+                    return { success: true, entries };
+                } catch (error) {
+                    return { success: false, error: error.toString() };
+                }
+            },
+            [IPC_CHANNELS.DELETE_CACHE_ENTRY]: async (_event, key) => {
+                try {
+                    await cacheService.deleteCacheEntry(key);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.toString() };
+                }
+            },
+            [IPC_CHANNELS.CLEAR_ALL_CACHE]: async () => {
+                try {
+                    const deleted = await cacheService.clearAllCache();
+                    return { success: true, deleted };
+                } catch (error) {
+                    return { success: false, error: error.toString() };
+                }
             }
-        });
+        };
 
-        handleTrustedIpc(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
-            return await searchService.getSearchEstimate(params);
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, async (_event, params) => {
-            if (typeof searchService.normalizePayload === 'function') {
-                return searchService.normalizePayload(params);
-            }
-
-            const fallbackParams = normalizeSearchParams(params);
-            return {
-                params: fallbackParams,
-                comparisonKey: serializeSearchParams(fallbackParams),
-                dataFingerprint: dataService.getDataCache()?.dataFingerprint || null
-            };
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
-            return await searchService.searchBoards(params);
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.CANCEL_SEARCH, async () => {
-            return await searchService.cancelSearch();
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.LIST_CACHE, async () => {
-            try {
-                const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
-                const entries = await cacheService.listCacheEntries(activeDataFingerprint);
-                return { success: true, entries };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (_event, key) => {
-            try {
-                await cacheService.deleteCacheEntry(key);
-                return { success: true };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
-            try {
-                const deleted = await cacheService.clearAllCache();
-                return { success: true, deleted };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
+        Object.entries(handlerMap).forEach(([channel, handler]) => {
+            handleTrustedIpc(channel, handler);
         });
 
         return () => {
-            ipcMain.removeHandler(IPC_CHANNELS.FETCH_DATA);
-            ipcMain.removeHandler(IPC_CHANNELS.GET_SEARCH_ESTIMATE);
-            ipcMain.removeHandler(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS);
-            ipcMain.removeHandler(IPC_CHANNELS.SEARCH_BOARDS);
-            ipcMain.removeHandler(IPC_CHANNELS.CANCEL_SEARCH);
-            ipcMain.removeHandler(IPC_CHANNELS.LIST_CACHE);
-            ipcMain.removeHandler(IPC_CHANNELS.DELETE_CACHE_ENTRY);
-            ipcMain.removeHandler(IPC_CHANNELS.CLEAR_ALL_CACHE);
+            Object.keys(handlerMap).forEach((channel) => {
+                ipcMain.removeHandler(channel);
+            });
         };
     }
 
