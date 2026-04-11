@@ -5,6 +5,7 @@
         'createVariantLockUi',
         'createQueryUi',
         'createResultsInteractions',
+        'createResultsSpotlight',
         'createResultsUi',
         'createHistoryUi',
         'createDataController',

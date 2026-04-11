@@ -10,6 +10,7 @@ function createResultsUiForSortMode(sortMode) {
         'results-view-state.js',
         'results-tooltip.js',
         'results-interactions.js',
+        'results-spotlight.js',
         'results-renderers.js',
         'results-ui.js'
     ].map((fileName) => ({
@@ -70,6 +71,7 @@ function createResultsUiForSummary(summarySink) {
         'results-view-state.js',
         'results-tooltip.js',
         'results-interactions.js',
+        'results-spotlight.js',
         'results-renderers.js',
         'results-ui.js'
     ].map((fileName) => ({
