@@ -3,14 +3,10 @@ const { normalizeSearchParams } = require('../searchParams.js');
 const {
     buildTraitIndex,
     buildMustIncludeTraitTargets,
-    calculateSynergyScore,
     scoreBoard,
     resolveSearchSpaceError
 } = require('./search-state.js');
-const {
-    evaluateBoardSelection,
-    createBoardResult
-} = require('./search-evaluator.js');
+const { createBoardResult } = require('./search-evaluator.js');
 const {
     buildRemainingUnitPotential,
     buildRemainingTraitPotential,
@@ -39,6 +35,11 @@ const {
 const {
     runSearchDfs
 } = require('./search-dfs-runner.js');
+const {
+    createSearchScoreCalculator,
+    createResolvedBoardSelectionEvaluator,
+    buildSearchCandidateEvaluationContext
+} = require('./search-evaluation-context.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -187,29 +188,21 @@ module.exports = {
             availableIndices,
             unitInfo
         });
-        const evaluateResolvedBoardSelection = ({
-            selectedUnitIndices,
-            selectedVariantIndices,
-            baseTraitCounts,
-            minOccupiedSlots
-        }) => evaluateBoardSelection({
-            selectedUnitIndices,
-            selectedVariantIndices,
-            baseTraitCounts,
-            minOccupiedSlots,
+        const calculateBoardSynergyScore = createSearchScoreCalculator({
+            allTraitNames,
+            traitBreakpoints: traitBPs,
+            onlyActive,
+            tierRank,
+            includeUnique
+        });
+        const evaluateResolvedBoardSelection = createResolvedBoardSelectionEvaluator({
             boardSize,
             unitInfo,
             activeUnitFlags,
             mustIncludeTraitIndices,
             mustIncludeTraitTargets,
             allTraitNames,
-            calculateSynergyScore: (resolvedCounts) => calculateSynergyScore(resolvedCounts, {
-                allTraitNames,
-                traitBreakpoints: traitBPs,
-                onlyActive,
-                tierRank,
-                includeUnique
-            }),
+            calculateSynergyScore: calculateBoardSynergyScore,
             isCompiledConditionSatisfied: this.isCompiledConditionSatisfied.bind(this),
             findFirstSatisfiedProfile: this.findFirstSatisfiedProfile.bind(this),
             traitCountsToRecord: this.traitCountsToRecord.bind(this)
@@ -249,7 +242,7 @@ module.exports = {
                     mustIncludeTraitTargets,
                     remainingTraitPotentialFrom
                 },
-                evaluationContext: {
+                evaluationContext: buildSearchCandidateEvaluationContext({
                     meetsTankRequirement,
                     meetsCarryRequirement,
                     mustHaveTotalCost,
@@ -257,13 +250,7 @@ module.exports = {
                     mustHaveComplexUnitCount,
                     mustIncludeTraitIndices,
                     mustIncludeTraitTargets,
-                    calculateSynergyScore: (counts) => calculateSynergyScore(counts, {
-                        allTraitNames,
-                        traitBreakpoints: traitBPs,
-                        onlyActive,
-                        tierRank,
-                        includeUnique
-                    }),
+                    calculateSynergyScore: calculateBoardSynergyScore,
                     scoreBoard,
                     topBoardTracker,
                     buildSortedBoardUnits: this.buildSortedBoardUnits.bind(this),
@@ -272,7 +259,7 @@ module.exports = {
                     allTraitNames,
                     mustHaveVariantUnitIndices,
                     evaluateBoardSelection: evaluateResolvedBoardSelection
-                }
+                })
             });
             progressTracker.complete();
         } else {
