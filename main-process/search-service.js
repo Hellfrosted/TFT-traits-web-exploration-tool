@@ -1,13 +1,16 @@
-function createSearchResponse({
-    success = true,
-    cancelled = false,
-    fromCache = false,
-    results = [],
-    error = null,
-    searchId = null
-} = {}) {
-    return { success, cancelled, fromCache, results, error, searchId };
-}
+const {
+    createSearchResponse,
+    createSearchContext,
+    createMissingDataResponse,
+    createBusySearchResponse,
+    createCachedSearchResponse,
+    createCancelledSearchResponse,
+    createWorkerProgressPayload,
+    shouldPersistSearchResults,
+    createWorkerDoneResponse,
+    createWorkerErrorResponse,
+    createWorkerExitResponse
+} = require('./search-service-state.js');
 
 function createSearchService({
     engine,
@@ -68,17 +71,11 @@ function createSearchService({
     async function searchBoards(params) {
         const dataCache = getDataCache();
         if (!dataCache) {
-            return createSearchResponse({
-                success: false,
-                error: 'No TFT data loaded yet. Fetch data first.'
-            });
+            return createMissingDataResponse();
         }
 
         if (activeSearch) {
-            return createSearchResponse({
-                success: false,
-                error: 'A search is already in progress. Please cancel it first.'
-            });
+            return createBusySearchResponse();
         }
 
         const normalizedParams = normalizeForActiveData(params);
@@ -86,15 +83,7 @@ function createSearchService({
         const searchFingerprint = searchDataCache.dataFingerprint;
         const cacheKey = cacheService.getCacheKey(searchFingerprint, normalizedParams);
         const { preparedContext } = cacheService.getPreparedSearchContext(searchDataCache, normalizedParams);
-        const searchContext = {
-            searchId: nextSearchId++,
-            cancelled: false,
-            worker: null,
-            settle: null,
-            completed: false,
-            terminated: false,
-            terminatePromise: null
-        };
+        const searchContext = createSearchContext(nextSearchId++);
         activeSearch = searchContext;
 
         const cleanup = () => {
@@ -107,16 +96,11 @@ function createSearchService({
             const cached = await cacheService.readCache(cacheKey, searchFingerprint);
             if (searchContext.cancelled) {
                 cleanup();
-                return createSearchResponse({ cancelled: true, searchId: searchContext.searchId });
+                return createCancelledSearchResponse(searchContext.searchId);
             }
             if (cached) {
                 cleanup();
-                return createSearchResponse({
-                    success: true,
-                    fromCache: true,
-                    results: cached,
-                    searchId: searchContext.searchId
-                });
+                return createCachedSearchResponse(cached, searchContext.searchId);
             }
 
             return await new Promise((resolve) => {
@@ -163,7 +147,7 @@ function createSearchService({
                 });
                 if (searchContext.cancelled) {
                     void terminateWorker();
-                    safeResolve(createSearchResponse({ cancelled: true, searchId: searchContext.searchId }));
+                    safeResolve(createCancelledSearchResponse(searchContext.searchId));
                     return;
                 }
 
@@ -171,47 +155,27 @@ function createSearchService({
                     if (msg.type === 'progress') {
                         const mainWindow = getMainWindow();
                         if (mainWindow && !mainWindow.isDestroyed()) {
-                            mainWindow.webContents.send(ipcChannels.SEARCH_PROGRESS, {
-                                searchId: searchContext.searchId,
-                                pct: msg.pct,
-                                checked: msg.checked,
-                                total: msg.total
-                            });
+                            mainWindow.webContents.send(
+                                ipcChannels.SEARCH_PROGRESS,
+                                createWorkerProgressPayload(searchContext.searchId, msg)
+                            );
                         }
                     } else if (msg.type === 'done') {
                         searchContext.completed = true;
                         if (searchContext.cancelled) {
                             void terminateWorker();
-                            safeResolve(createSearchResponse({ cancelled: true, searchId: searchContext.searchId }));
+                            safeResolve(createCancelledSearchResponse(searchContext.searchId));
                             return;
                         }
-                        if (msg.success) {
-                            if (msg.results.length > 0 && !msg.results[0].error) {
-                                safeResolve(createSearchResponse({
-                                    success: true,
-                                    fromCache: false,
-                                    results: msg.results,
-                                    searchId: searchContext.searchId
-                                }));
-                                void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
-                                    .catch(() => {})
-                                    .finally(() => {
-                                        void terminateWorker();
-                                    });
-                                return;
-                            }
-                            safeResolve(createSearchResponse({
-                                success: true,
-                                fromCache: false,
-                                results: msg.results,
-                                searchId: searchContext.searchId
-                            }));
-                        } else {
-                            safeResolve(createSearchResponse({
-                                success: false,
-                                error: msg.error,
-                                searchId: searchContext.searchId
-                            }));
+                        const response = createWorkerDoneResponse(msg, searchContext.searchId);
+                        safeResolve(response);
+                        if (shouldPersistSearchResults(msg.results)) {
+                            void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
+                                .catch(() => {})
+                                .finally(() => {
+                                    void terminateWorker();
+                                });
+                            return;
                         }
                         void terminateWorker();
                     }
@@ -219,13 +183,7 @@ function createSearchService({
 
                 searchContext.worker.on('error', (error) => {
                     safeResolve(
-                        searchContext.cancelled
-                            ? createSearchResponse({ cancelled: true, searchId: searchContext.searchId })
-                            : createSearchResponse({
-                                success: false,
-                                error: error.toString(),
-                                searchId: searchContext.searchId
-                            })
+                        createWorkerErrorResponse(error, searchContext.searchId, searchContext.cancelled)
                     );
                 });
 
@@ -234,29 +192,13 @@ function createSearchService({
                     if (searchContext.completed) {
                         return;
                     }
-                    if (searchContext.cancelled) {
-                        safeResolve(createSearchResponse({ cancelled: true, searchId: searchContext.searchId }));
-                        return;
-                    }
-                    if (code === 0) {
-                        safeResolve(createSearchResponse({
-                            success: false,
-                            error: 'Search worker exited before returning a result.',
-                            searchId: searchContext.searchId
-                        }));
-                        return;
-                    }
-                    safeResolve(createSearchResponse({
-                        success: false,
-                        error: `Worker exited with code ${code}`,
-                        searchId: searchContext.searchId
-                    }));
+                    safeResolve(createWorkerExitResponse(code, searchContext.searchId, searchContext.cancelled));
                 });
             });
         } catch (error) {
             cleanup();
             if (searchContext.cancelled) {
-                return createSearchResponse({ cancelled: true, searchId: searchContext.searchId });
+                return createCancelledSearchResponse(searchContext.searchId);
             }
             return createSearchResponse({
                 success: false,
@@ -274,13 +216,13 @@ function createSearchService({
                 if (activeSearch === searchContext) {
                     activeSearch = null;
                 }
-                searchContext.settle?.(createSearchResponse({ cancelled: true }));
+                searchContext.settle?.(createCancelledSearchResponse());
                 return { success: true };
             }
             try {
                 await searchContext.worker.terminate();
             } finally {
-                searchContext.settle?.(createSearchResponse({ cancelled: true }));
+                searchContext.settle?.(createCancelledSearchResponse());
             }
             return { success: true };
         }
