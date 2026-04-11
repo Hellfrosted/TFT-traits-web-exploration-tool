@@ -45,7 +45,7 @@ describe('search param normalization', () => {
         });
 
         assert.equal(normalized.boardSize, 1);
-        assert.equal(normalized.maxResults, 10000);
+        assert.equal(normalized.maxResults, 1000);
         assert.deepEqual(normalized.mustIncludeTraits, ['Challenger']);
         assert.deepEqual(normalized.extraEmblems, ['Replicator']);
         assert.deepEqual(normalized.tankRoles, ['Tank']);

@@ -8,7 +8,8 @@
 
         return {
             ...renderers,
-            getSortedResults: model.getSortedResults
+            getSortedResults: model.getSortedResults,
+            __test: renderers.__test
         };
     };
 })();

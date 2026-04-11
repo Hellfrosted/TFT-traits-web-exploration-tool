@@ -307,7 +307,12 @@
 
         function prepareSearchRun(shell) {
             app.queryUi.clampNumericInput('boardSize', 1, 20, 9);
-            app.queryUi.clampNumericInput('maxResults', 1, 10000, state.searchLimits.DEFAULT_MAX_RESULTS || 500);
+            app.queryUi.clampNumericInput(
+                'maxResults',
+                1,
+                state.searchLimits.MAX_RESULTS || 1000,
+                state.searchLimits.DEFAULT_MAX_RESULTS || 500
+            );
 
             state.currentResults = [];
             state.activeSearchEstimate = null;

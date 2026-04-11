@@ -5,6 +5,7 @@
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
         const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
+        const getMaxResultsLimit = () => state.searchLimits.MAX_RESULTS || 1000;
         const getDefaultBoardSize = () => 9;
         let nextDraftEstimateRequestId = 0;
 
@@ -576,7 +577,7 @@
                 if (!input) return;
                 input.addEventListener('change', () => {
                     if (id === 'boardSize') clampNumericInput('boardSize', 1, 20, 9);
-                    if (id === 'maxResults') clampNumericInput('maxResults', 1, 10000, getDefaultMaxResults());
+                    if (id === 'maxResults') clampNumericInput('maxResults', 1, getMaxResultsLimit(), getDefaultMaxResults());
                     refreshDraftQuerySummary();
                 });
             });

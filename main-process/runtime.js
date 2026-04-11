@@ -152,14 +152,18 @@ function createMainRuntime(options = {}) {
     }
 
     async function handleAppReady() {
+        let storageReady = false;
         try {
             cacheService.ensureCacheDir();
-            await migrateAllCachedParamsWithBaseNormalization();
+            storageReady = true;
         } catch (error) {
             console.error('Failed to initialize local app storage:', error.message);
         }
         windowService.createWindow();
         windowService.scheduleSmokeTimeout();
+        if (storageReady) {
+            void migrateAllCachedParamsWithBaseNormalization();
+        }
     }
 
     function handleAllWindowsClosed() {

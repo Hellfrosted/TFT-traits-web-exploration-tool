@@ -4,7 +4,7 @@ const UI_LIMITS = {
     MIN_BOARD_SIZE: 1,
     MAX_BOARD_SIZE: 20,
     MIN_RESULTS: 1,
-    MAX_RESULTS: 10000
+    MAX_RESULTS: LIMITS.MAX_RESULTS || 1000
 };
 
 function normalizeStringList(values) {

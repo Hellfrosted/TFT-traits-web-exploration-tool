@@ -14,6 +14,7 @@
             lastSearchParams: null,
             activeData: null,
             selectedBoardIndex: -1,
+            currentResultsPage: 0,
             isFetchingData: false,
             nextDataFetchRequestId: 0,
             activeDataFetchRequestId: 0,

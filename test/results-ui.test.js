@@ -159,5 +159,36 @@ describe('results UI sorting', () => {
         assert.doesNotMatch(summaries.at(-1), /~-\s*boards/);
         assert.match(summaries.at(-1), />6</);
     });
+
+    it('derives a bounded visible result page for large result sets', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const boards = Array.from({ length: 250 }, (_value, index) => ({
+            units: [`Unit-${index + 1}`],
+            totalCost: index + 1,
+            synergyScore: index + 1
+        }));
+
+        const page = resultsUi.__test.getVisibleResultsPage(boards, 1, 100);
+
+        assert.equal(page.page, 1);
+        assert.equal(page.totalPages, 3);
+        assert.equal(page.startIndex, 100);
+        assert.equal(page.endIndex, 200);
+        assert.equal(page.items.length, 100);
+        assert.equal(page.items[0].units[0], 'Unit-101');
+    });
+
+    it('falls back to the current page start when the selected board is off-page', () => {
+        const resultsUi = createResultsUiForSummary(() => {});
+        const pageData = {
+            startIndex: 100,
+            endIndex: 200
+        };
+
+        assert.equal(resultsUi.__test.resolveSelectedBoardIndex(150, pageData, 250), 150);
+        assert.equal(resultsUi.__test.resolveSelectedBoardIndex(7, pageData, 250), 100);
+        assert.equal(resultsUi.__test.resolveSelectedBoardIndex(-1, pageData, 250), 100);
+        assert.equal(resultsUi.__test.resolveSelectedBoardIndex(0, pageData, 0), -1);
+    });
 });
 

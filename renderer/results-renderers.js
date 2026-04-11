@@ -12,7 +12,7 @@
         }
 
         function resolveResultsShell() {
-            return resolveShellElements(['boardSpotlight', 'resBody']).elements;
+            return resolveShellElements(['boardSpotlight', 'resBody', 'resultsPager']).elements;
         }
 
         function renderEmptySummary(message) {
@@ -142,6 +142,110 @@
             return wrapper;
         }
 
+        function getResultsPageSize() {
+            const pageSize = Number.parseInt(state.searchLimits?.RESULTS_PAGE_SIZE, 10);
+            return Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 100;
+        }
+
+        function clampResultsPage(page, totalPages) {
+            const safeTotalPages = Math.max(1, Number.parseInt(totalPages, 10) || 1);
+            const numericPage = Number.parseInt(page, 10);
+            if (!Number.isFinite(numericPage) || numericPage < 0) {
+                return 0;
+            }
+            return Math.min(numericPage, safeTotalPages - 1);
+        }
+
+        function getVisibleResultsPage(results = [], page = 0, pageSize = getResultsPageSize()) {
+            const safeResults = Array.isArray(results) ? results : [];
+            const safePageSize = Math.max(1, Number.parseInt(pageSize, 10) || getResultsPageSize());
+            const totalPages = Math.max(1, Math.ceil(safeResults.length / safePageSize));
+            const resolvedPage = clampResultsPage(page, totalPages);
+            const startIndex = resolvedPage * safePageSize;
+            const endIndex = Math.min(startIndex + safePageSize, safeResults.length);
+
+            return {
+                page: resolvedPage,
+                pageSize: safePageSize,
+                totalPages,
+                startIndex,
+                endIndex,
+                items: safeResults.slice(startIndex, endIndex)
+            };
+        }
+
+        function resolveSelectedBoardIndex(selectedBoardIndex, pageData, totalResults) {
+            if (!totalResults) {
+                return -1;
+            }
+
+            if (
+                Number.isInteger(selectedBoardIndex)
+                && selectedBoardIndex >= pageData.startIndex
+                && selectedBoardIndex < pageData.endIndex
+            ) {
+                return selectedBoardIndex;
+            }
+
+            return pageData.startIndex;
+        }
+
+        function clearResultsPager() {
+            const { resultsPager } = resolveResultsShell();
+            if (resultsPager) {
+                clearNode(resultsPager);
+            }
+        }
+
+        function renderResultsPager(results, pageData) {
+            const { resultsPager } = resolveResultsShell();
+            if (!resultsPager) return;
+
+            clearNode(resultsPager);
+            if (!Array.isArray(results) || results.length === 0 || pageData.totalPages <= 1) {
+                return;
+            }
+
+            const status = document.createElement('div');
+            status.className = 'results-pager-status';
+            status.textContent = `Showing ${pageData.startIndex + 1}-${pageData.endIndex} of ${results.length} boards`;
+
+            const controls = document.createElement('div');
+            controls.className = 'results-pager-controls';
+
+            const previousButton = document.createElement('button');
+            previousButton.type = 'button';
+            previousButton.className = 'btn-outline results-pager-btn';
+            previousButton.textContent = 'Previous';
+            previousButton.disabled = pageData.page === 0;
+            previousButton.addEventListener('click', () => {
+                renderResults(results, {
+                    page: pageData.page - 1
+                });
+            });
+
+            const pageLabel = document.createElement('span');
+            pageLabel.className = 'results-pager-label';
+            pageLabel.textContent = `Page ${pageData.page + 1} / ${pageData.totalPages}`;
+
+            const nextButton = document.createElement('button');
+            nextButton.type = 'button';
+            nextButton.className = 'btn-outline results-pager-btn';
+            nextButton.textContent = 'Next';
+            nextButton.disabled = pageData.page >= pageData.totalPages - 1;
+            nextButton.addEventListener('click', () => {
+                renderResults(results, {
+                    page: pageData.page + 1
+                });
+            });
+
+            controls.appendChild(previousButton);
+            controls.appendChild(pageLabel);
+            controls.appendChild(nextButton);
+            resultsPager.appendChild(status);
+            resultsPager.appendChild(controls);
+        }
+
         function renderBoardSpotlight(board, rankIndex) {
             tooltipController.hideTraitTooltip();
             if (!board) {
@@ -227,26 +331,57 @@
             spotlight.appendChild(inline);
         }
 
-        function renderResults(results) {
+        function bindRowSelection(row, results, index, selectedRowRef) {
+            const selectRow = () => {
+                if (selectedRowRef.current) {
+                    selectedRowRef.current.classList.remove('result-row-selected');
+                    selectedRowRef.current.setAttribute('aria-selected', 'false');
+                }
+                state.selectedBoardIndex = index;
+                selectedRowRef.current = row;
+                selectedRowRef.current.classList.add('result-row-selected');
+                selectedRowRef.current.setAttribute('aria-selected', 'true');
+                renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
+            };
+
+            row.addEventListener('click', selectRow);
+            row.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+                event.preventDefault();
+                selectRow();
+            });
+        }
+
+        function renderResults(results, options = {}) {
             const { resBody: tbody } = resolveResultsShell();
             if (!tbody) return;
             tooltipController.hideTraitTooltip();
             clearNode(tbody);
-            state.selectedBoardIndex = results.length > 0 ? 0 : -1;
+            state.currentResultsPage = 0;
 
             if (!results || results.length === 0) {
+                state.selectedBoardIndex = -1;
                 renderEmptySummary('No results');
                 setResultsBodyMessage(app, tbody, 'No results found for these constraints.', 'results-message-row results-message-row-error');
                 renderEmptySpotlight('No boards matched the current filters. Relax constraints or widen the search.');
+                clearResultsPager();
                 return;
             }
 
             if (results[0].error) {
+                state.selectedBoardIndex = -1;
                 renderEmptySummary('Search error');
                 setResultsBodyMessage(app, tbody, results[0].error, 'results-message-row results-message-row-error');
                 renderEmptySpotlight('Search failed before a board could be inspected.');
+                clearResultsPager();
                 return;
             }
+
+            const pageData = getVisibleResultsPage(results, options.page, getResultsPageSize());
+            state.currentResultsPage = pageData.page;
+            state.selectedBoardIndex = resolveSelectedBoardIndex(state.selectedBoardIndex, pageData, results.length);
 
             const bestValue = results.reduce((best, board) => Math.max(best, model.getBoardMetric(board) / Math.max(board.totalCost, 1)), 0);
             const lowestCost = results.reduce((best, board) => Math.min(best, board.totalCost), Number.POSITIVE_INFINITY);
@@ -270,13 +405,18 @@
                 </div>
             `);
 
-            let selectedRow = null;
+            const selectedRowRef = {
+                current: null
+            };
             const fragment = document.createDocumentFragment();
-            results.forEach((board, index) => {
+            pageData.items.forEach((board, pageIndex) => {
+                const index = pageData.startIndex + pageIndex;
                 const row = document.createElement('tr');
                 row.className = index === state.selectedBoardIndex ? 'result-row-selected' : '';
+                row.tabIndex = 0;
+                row.setAttribute('aria-selected', index === state.selectedBoardIndex ? 'true' : 'false');
                 if (index === state.selectedBoardIndex) {
-                    selectedRow = row;
+                    selectedRowRef.current = row;
                 }
 
                 const traits = model.buildBoardTraitSummary(board, { showInactive: true });
@@ -316,19 +456,12 @@
                 row.appendChild(twoStarCell);
                 row.appendChild(unitsCell);
 
-                row.addEventListener('click', () => {
-                    if (selectedRow) {
-                        selectedRow.classList.remove('result-row-selected');
-                    }
-                    state.selectedBoardIndex = index;
-                    selectedRow = row;
-                    selectedRow.classList.add('result-row-selected');
-                    renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
-                });
+                bindRowSelection(row, results, index, selectedRowRef);
                 fragment.appendChild(row);
             });
             tbody.appendChild(fragment);
 
+            renderResultsPager(results, pageData);
             tooltipController.bindTooltipListeners();
             renderBoardSpotlight(results[state.selectedBoardIndex], state.selectedBoardIndex);
         }
@@ -340,7 +473,11 @@
             renderSearchingSpotlight,
             renderResultsMessageRow,
             renderBoardSpotlight,
-            renderResults
+            renderResults,
+            __test: {
+                getVisibleResultsPage,
+                resolveSelectedBoardIndex
+            }
         };
     };
 })();

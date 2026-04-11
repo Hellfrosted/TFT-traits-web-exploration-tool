@@ -199,6 +199,32 @@ label {
   gap: 6px;
 }
 
+.results-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  margin-bottom: 8px;
+}
+
+.results-pager-status,
+.results-pager-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.results-pager-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.results-pager-btn {
+  width: auto;
+  min-width: 88px;
+}
+
 .data-stat,
 .summary-card {
   padding: 6px 8px;

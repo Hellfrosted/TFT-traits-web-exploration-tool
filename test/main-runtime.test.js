@@ -5,6 +5,16 @@ const { EventEmitter } = require('node:events');
 const { createMainRuntime } = require('../main-process/runtime.js');
 const { createMainRuntime: createMainRuntimeFromEntry } = require('../main.js');
 
+function createDeferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}
+
 class FakeApp extends EventEmitter {
     constructor() {
         super();
@@ -120,7 +130,7 @@ function createRuntimeUnderTest(options = {}) {
             resolveCacheEntryPath: () => 'storage-root\\cache\\entry.json',
             resolveDataFallbackPath: () => 'storage-root\\data.json'
         },
-        createSearchCacheService: () => ({
+        createSearchCacheService: options.createSearchCacheService || (() => ({
             ensureCacheDir: () => {
                 ensureCacheDirCalls += 1;
             },
@@ -138,7 +148,7 @@ function createRuntimeUnderTest(options = {}) {
                 serviceCalls.clearAllCache += 1;
                 return 0;
             }
-        }),
+        })),
         createDataService: () => ({
             fetchData: async () => {
                 serviceCalls.fetchData += 1;
@@ -254,6 +264,39 @@ describe('main runtime', () => {
         assert.equal(fakeProcess.listenerCount('uncaughtException'), 0);
         assert.equal(fakeProcess.listenerCount('unhandledRejection'), 0);
         assert.equal(fakeApp.listenerCount('window-all-closed'), 0);
+    });
+
+    it('does not block window creation on background cache migration during startup', async () => {
+        const migration = createDeferred();
+        const { runtime, serviceCalls, getCounts } = createRuntimeUnderTest({
+            createSearchCacheService: () => ({
+                ensureCacheDir: () => {},
+                migrateCanonicalParams: async () => {
+                    serviceCalls.migrateCanonicalParams += 1;
+                    return await migration.promise;
+                },
+                listCacheEntries: async () => [],
+                deleteCacheEntry: async () => {},
+                clearAllCache: async () => 0
+            })
+        });
+
+        const started = runtime.start();
+        const readyState = await Promise.race([
+            started.readyPromise.then(() => 'resolved'),
+            new Promise((resolve) => setTimeout(() => resolve('pending'), 10))
+        ]);
+
+        assert.equal(readyState, 'resolved');
+        assert.equal(serviceCalls.migrateCanonicalParams, 1);
+        assert.deepEqual(getCounts(), {
+            ensureCacheDirCalls: 0,
+            createWindowCalls: 1,
+            scheduleSmokeTimeoutCalls: 1
+        });
+
+        migration.resolve();
+        await started.readyPromise;
     });
 
     it('allows a trusted main-frame file:// sender to reach the handler', async () => {

@@ -451,6 +451,48 @@ describe('renderer query UI', () => {
         assert.equal(searchButton.innerText, 'Searching...');
     });
 
+    it('clamps maxResults inputs to the shared renderer limit', () => {
+        const maxResultsInput = {
+            value: '500000',
+            addEventListener: () => {}
+        };
+        const sandbox = {
+            console,
+            window: {
+                TFTRenderer: {
+                    shared: {
+                        escapeHtml: (value) => String(value ?? '')
+                    }
+                }
+            },
+            document: {
+                getElementById: (id) => {
+                    if (id === 'maxResults') return maxResultsInput;
+                    return null;
+                },
+                querySelector: () => null
+            }
+        };
+
+        const createQueryUi = loadQueryUiFactory(sandbox);
+        const queryUi = createQueryUi({
+            state: {
+                searchLimits: {
+                    DEFAULT_MAX_RESULTS: 500,
+                    MAX_RESULTS: 1000
+                },
+                selectors: {},
+                variantLockControls: new Map(),
+                listeners: {}
+            }
+        });
+
+        const clamped = queryUi.clampNumericInput('maxResults', 1, 1000, 500);
+
+        assert.equal(clamped, 1000);
+        assert.equal(maxResultsInput.value, 1000);
+    });
+
     it('applies derived default role filters without overwriting non-empty selectors unless forced', () => {
         const tankRoles = createSelector([]);
         const carryRoles = createSelector(['ExistingCarry']);
