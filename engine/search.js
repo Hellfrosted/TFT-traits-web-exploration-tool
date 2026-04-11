@@ -14,7 +14,6 @@ const {
 const {
     buildRemainingUnitPotential,
     buildRemainingTraitPotential,
-    shouldPruneSearchBranch,
     shouldEmitProgress
 } = require('./search-dfs-state.js');
 const {
@@ -28,11 +27,6 @@ const {
     finalizeTopBoards
 } = require('./search-results.js');
 const {
-    applyUnitSelectionState,
-    rollbackUnitSelectionState,
-    evaluateSearchCandidate
-} = require('./search-visit.js');
-const {
     countPreparedSearchSpaceCandidates
 } = require('./search-space-counter.js');
 const {
@@ -42,6 +36,9 @@ const {
     detectSearchFeatures,
     createProgressTracker
 } = require('./search-runtime-state.js');
+const {
+    runSearchDfs
+} = require('./search-dfs-runner.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -190,7 +187,6 @@ module.exports = {
             availableIndices,
             unitInfo
         });
-        const currentVariantUnitIndices = [];
         const evaluateResolvedBoardSelection = ({
             selectedUnitIndices,
             selectedVariantIndices,
@@ -218,62 +214,49 @@ module.exports = {
             findFirstSatisfiedProfile: this.findFirstSatisfiedProfile.bind(this),
             traitCountsToRecord: this.traitCountsToRecord.bind(this)
         });
-        const dfs = (
-            startIdx,
-            currentMinSlots,
-            tankThreePlusCount,
-            tankFourPlusCount,
-            carryFourPlusCount,
-            currentCost,
-            currentComplexUnitCount,
-            currentSlotFlex,
-            currentIdxList
-        ) => {
-            if (shouldPruneSearchBranch({
-                startIdx,
-                currentMinSlots,
-                currentSlotFlex,
+
+        if (
+            remainingSlots <= LIMITS.MAX_REMAINING_SLOTS &&
+            (!Number.isFinite(totalCombinations) || totalCombinations <= LIMITS.COMBINATION_LIMIT)
+        ) {
+            runSearchDfs({
                 boardSize,
-                requireTank,
-                requireCarry,
-                tankThreePlusCount,
-                tankFourPlusCount,
-                carryFourPlusCount,
-                meetsTankRequirement,
-                meetsCarryRequirement,
-                remainingTankThreePlusFrom,
-                remainingTankFourPlusFrom,
-                remainingCarryFourPlusFrom,
-                remainingMaxSlotsFrom,
-                useMustIncludePruning,
-                mustIncludeTraitIndices,
-                mustIncludeTraitTargets,
+                availableIndices,
+                unitInfo,
                 currentTraitCounts,
-                remainingTraitPotentialFrom
-            })) {
-                return;
-            }
-
-            if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
-                progressTracker.markChecked();
-
-                evaluateSearchCandidate({
-                    currentMinSlots,
-                    boardSize,
-                    tankThreePlusCount,
-                    tankFourPlusCount,
-                    carryFourPlusCount,
+                activeUnitFlags,
+                progressTracker,
+                initialState: {
+                    currentMinSlots: mustHaveInitialMinSlots,
+                    tankThreePlusCount: mustHaveInitialTankThreePlusCount,
+                    tankFourPlusCount: mustHaveInitialTankFourPlusCount,
+                    carryFourPlusCount: mustHaveInitialCarryFourPlusCount,
+                    currentCost: 0,
+                    currentComplexUnitCount: 0,
+                    currentSlotFlex: mustHaveInitialSlotFlex
+                },
+                pruneState: {
+                    requireTank,
+                    requireCarry,
+                    meetsTankRequirement,
+                    meetsCarryRequirement,
+                    remainingTankThreePlusFrom,
+                    remainingTankFourPlusFrom,
+                    remainingCarryFourPlusFrom,
+                    remainingMaxSlotsFrom,
+                    useMustIncludePruning,
+                    mustIncludeTraitIndices,
+                    mustIncludeTraitTargets,
+                    remainingTraitPotentialFrom
+                },
+                evaluationContext: {
                     meetsTankRequirement,
                     meetsCarryRequirement,
                     mustHaveTotalCost,
-                    currentCost,
                     mustHaveUnitIndices,
-                    currentIdxList,
                     mustHaveComplexUnitCount,
-                    currentComplexUnitCount,
                     mustIncludeTraitIndices,
                     mustIncludeTraitTargets,
-                    currentTraitCounts,
                     calculateSynergyScore: (counts) => calculateSynergyScore(counts, {
                         allTraitNames,
                         traitBreakpoints: traitBPs,
@@ -288,68 +271,9 @@ module.exports = {
                     traitCountsToRecord: this.traitCountsToRecord.bind(this),
                     allTraitNames,
                     mustHaveVariantUnitIndices,
-                    currentVariantUnitIndices,
                     evaluateBoardSelection: evaluateResolvedBoardSelection
-                });
-            }
-
-            if (currentMinSlots === boardSize) {
-                return;
-            }
-
-            for (let i = startIdx; i < availableIndices.length; i++) {
-                const idx = availableIndices[i];
-                const info = unitInfo[idx];
-                const nextMinSlots = currentMinSlots + info.minSlotCost;
-                if (nextMinSlots > boardSize) {
-                    continue;
                 }
-
-                applyUnitSelectionState({
-                    idx,
-                    info,
-                    currentTraitCounts,
-                    activeUnitFlags,
-                    currentIdxList,
-                    currentVariantUnitIndices
-                });
-                dfs(
-                    i + 1,
-                    nextMinSlots,
-                    tankThreePlusCount + info.qualifyingTankThreePlus,
-                    tankFourPlusCount + info.qualifyingTankFourPlus,
-                    carryFourPlusCount + info.qualifyingCarryFourPlus,
-                    currentCost + info.cost,
-                    currentComplexUnitCount + info.hasComplexEvaluation,
-                    currentSlotFlex + info.slotFlex,
-                    currentIdxList
-                );
-                rollbackUnitSelectionState({
-                    idx,
-                    info,
-                    currentTraitCounts,
-                    activeUnitFlags,
-                    currentIdxList,
-                    currentVariantUnitIndices
-                });
-            }
-        };
-
-        if (
-            remainingSlots <= LIMITS.MAX_REMAINING_SLOTS &&
-            (!Number.isFinite(totalCombinations) || totalCombinations <= LIMITS.COMBINATION_LIMIT)
-        ) {
-            dfs(
-                0,
-                mustHaveInitialMinSlots,
-                mustHaveInitialTankThreePlusCount,
-                mustHaveInitialTankFourPlusCount,
-                mustHaveInitialCarryFourPlusCount,
-                0,
-                0,
-                mustHaveInitialSlotFlex,
-                []
-            );
+            });
             progressTracker.complete();
         } else {
             const reason = resolveSearchSpaceError(totalCombinations, LIMITS);
