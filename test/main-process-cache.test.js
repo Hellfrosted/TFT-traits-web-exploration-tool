@@ -95,7 +95,7 @@ describe('main-process cache service', () => {
         assert.equal(operations[1][2], 'C:\\cache\\entry.json');
     });
 
-    it('prunes obsolete/corrupt cache entries while preserving valid fingerprints', async () => {
+    it('prunes obsolete, corrupt, and inactive-fingerprint cache entries while preserving the active fingerprint', async () => {
         const sandboxRoot = makeTempDir('tft-cache-service-');
 
         try {
@@ -115,6 +115,7 @@ describe('main-process cache service', () => {
             const storagePaths = getStoragePaths({ userDataPath });
             const obsoletePath = resolveCacheEntryPath(storagePaths, obsoleteKey);
             const corruptPath = resolveCacheEntryPath(storagePaths, corruptKey);
+            const alsoKeepPath = resolveCacheEntryPath(storagePaths, alsoKeepKey);
             await fsp.writeFile(obsoletePath, JSON.stringify({
                 searchVersion: 3,
                 dataFingerprint: 'obsolete',
@@ -130,9 +131,9 @@ describe('main-process cache service', () => {
             const allListed = await service.listCacheEntries();
             assert.equal(activeListed.length, 1);
             assert.equal(activeListed[0].key, keepKey);
-            assert.equal(inactiveListed.length, 1);
-            assert.equal(inactiveListed[0].key, alsoKeepKey);
-            assert.deepEqual(new Set(allListed.map((entry) => entry.key)), new Set([keepKey, alsoKeepKey]));
+            assert.deepEqual(inactiveListed, []);
+            assert.deepEqual(new Set(allListed.map((entry) => entry.key)), new Set([keepKey]));
+            assert.equal(fs.existsSync(alsoKeepPath), false);
             assert.equal(fs.existsSync(obsoletePath), false);
             assert.equal(fs.existsSync(corruptPath), false);
         } finally {
@@ -151,6 +152,7 @@ describe('main-process cache service', () => {
             const pruneParams = { boardSize: 8, maxResults: 10 };
             const keepKey = service.getCacheKey('keep-fingerprint', keepParams);
             const pruneKey = service.getCacheKey('keep-fingerprint', pruneParams);
+            const storagePaths = getStoragePaths({ userDataPath });
 
             await service.writeCache(keepKey, 'keep-fingerprint', keepParams, [{ units: ['A'] }]);
             await service.writeCache(pruneKey, 'keep-fingerprint', pruneParams, [{ units: ['B'] }]);
@@ -162,10 +164,14 @@ describe('main-process cache service', () => {
 
             await service.writeCache(keepKey, 'keep-fingerprint', keepParams, [{ units: ['A'] }]);
             await service.writeCache(pruneKey, 'keep-fingerprint', pruneParams, [{ units: ['B'] }]);
+            await service.writeDataFallback('pbe', { source: 'pbe', units: [] });
+            await service.writeDataFallback('latest', { source: 'latest', units: [] });
             const deletedCount = await service.clearAllCache();
-            assert.equal(deletedCount, 2);
+            assert.equal(deletedCount, 4);
             const afterClear = await service.listCacheEntries('keep-fingerprint');
             assert.deepEqual(afterClear, []);
+            assert.equal(fs.existsSync(resolveDataFallbackPath(storagePaths, 'pbe')), false);
+            assert.equal(fs.existsSync(resolveDataFallbackPath(storagePaths, 'latest')), false);
         } finally {
             fs.rmSync(sandboxRoot, { recursive: true, force: true });
         }

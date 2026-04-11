@@ -68,6 +68,19 @@ function createSearchCacheStore({
         return files.length;
     }
 
+    async function clearDataFallbackFiles() {
+        ensureCacheDir();
+        const files = (await fsp.readdir(storagePaths.storageRoot))
+            .filter((file) => /^data_fallback_.+\.json$/.test(file))
+            .map((file) => path.join(storagePaths.storageRoot, file));
+
+        for (const filePath of files) {
+            await fsp.unlink(filePath);
+        }
+
+        return files.length;
+    }
+
     async function writeDataFallback(source, rawData) {
         ensureCacheDir();
         const filePath = resolveDataFallbackPath(storagePaths, source);
@@ -87,6 +100,7 @@ function createSearchCacheStore({
         listCacheFiles,
         deleteCacheEntryFile,
         clearCacheFiles,
+        clearDataFallbackFiles,
         writeDataFallback,
         readDataFallback,
         readJsonFile

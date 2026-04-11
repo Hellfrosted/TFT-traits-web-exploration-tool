@@ -45,7 +45,11 @@ function createDataService({
         // Only the newest fetch invocation may mutate shared main-process state.
         if (fetchToken === latestRequestedFetchToken) {
             dataCache = fetchedData;
-            await cacheService.pruneCache(dataCache.dataFingerprint);
+            try {
+                await cacheService.pruneCache(dataCache.dataFingerprint);
+            } catch (error) {
+                console.warn('Failed to prune search cache after fetch commit:', error.message || String(error));
+            }
         }
 
         // Stale fetches still return their payload to the original caller.

@@ -199,4 +199,43 @@ describe('main-process data service', () => {
             { source: 'pbe', fingerprint: 'pbe-fingerprint' }
         ]);
     });
+
+    it('keeps committed data when cache pruning fails after a successful fetch', async () => {
+        const warnings = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => {
+            warnings.push(args.join(' '));
+        };
+
+        try {
+            const dataService = createDataService({
+                dataEngine: {
+                    normalizeDataSource: (source) => source,
+                    fetchAndParse: async ({ source }) => createParsedData({
+                        source,
+                        fingerprint: 'fresh-fingerprint',
+                        unitId: 'FreshUnit'
+                    })
+                },
+                cacheService: {
+                    readDataFallback: async () => null,
+                    writeDataFallback: async () => {},
+                    pruneCache: async () => {
+                        throw new Error('disk busy');
+                    }
+                },
+                defaultDataSource: 'pbe'
+            });
+
+            const response = await dataService.fetchData('pbe');
+
+            assert.equal(response.dataFingerprint, 'fresh-fingerprint');
+            assert.equal(dataService.getDataCache().dataFingerprint, 'fresh-fingerprint');
+            assert.equal(warnings.length, 1);
+            assert.match(warnings[0], /Failed to prune search cache after fetch commit:/);
+            assert.match(warnings[0], /disk busy/);
+        } finally {
+            console.warn = originalWarn;
+        }
+    });
 });

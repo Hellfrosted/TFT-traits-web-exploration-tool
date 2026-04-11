@@ -128,7 +128,7 @@
 
             clearAllButton.addEventListener('click', async () => {
                 const confirmed = await showConfirm(
-                    'Are you sure you want to delete all cached search results? This action cannot be undone.',
+                    'Are you sure you want to delete all cached search results and fallback snapshots? This action cannot be undone.',
                     'Clear All Cache'
                 );
                 if (!confirmed) {

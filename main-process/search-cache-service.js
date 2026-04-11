@@ -228,14 +228,18 @@ function createSearchCacheService({
         return null;
     }
 
-    async function pruneCache(_activeDataFingerprint) {
+    async function pruneCache(activeDataFingerprint = null) {
         try {
             clearSearchMemoryCaches();
             const files = await cacheStore.listCacheFiles();
             await Promise.all(files.map(async (file) => {
                 try {
                     const parsed = await cacheStore.readJsonFile(file.filePath);
-                    if ((parsed?.searchVersion ?? 1) !== searchCacheVersion) {
+                    const hasCurrentVersion = (parsed?.searchVersion ?? 1) === searchCacheVersion;
+                    const hasActiveFingerprint = !activeDataFingerprint
+                        || parsed?.dataFingerprint === activeDataFingerprint;
+
+                    if (!hasCurrentVersion || !hasActiveFingerprint) {
                         await fsp.unlink(file.filePath);
                     }
                 } catch {
@@ -284,7 +288,9 @@ function createSearchCacheService({
 
     async function clearAllCache() {
         clearSearchMemoryCaches();
-        return await cacheStore.clearCacheFiles();
+        const deletedCacheEntries = await cacheStore.clearCacheFiles();
+        const deletedFallbackSnapshots = await cacheStore.clearDataFallbackFiles();
+        return deletedCacheEntries + deletedFallbackSnapshots;
     }
 
     return {
