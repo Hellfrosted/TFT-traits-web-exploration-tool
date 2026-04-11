@@ -50,6 +50,7 @@
                 reportMissingDialogDependencies();
                 return false;
             };
+        const outcomesUi = ns.createSearchOutcomesUi(app, { showAlert });
 
         function buildSearchMeta() {
             return searchUiState.buildSearchMeta();
@@ -103,10 +104,6 @@
             }
 
             return null;
-        }
-
-        function renderSearchResultsRow(tbody, message, className = 'results-message-row results-message-row-error') {
-            setResultsBodyMessage(app, tbody, message, className);
         }
 
         function getSearchControlUiState(searching, searchLabel = buildSearchButtonLabel()) {
@@ -239,11 +236,7 @@
         }
 
         function renderMissingDataState(tbody) {
-            applyInterruptedSearchUiState(
-                tbody,
-                null,
-                getInterruptedSearchUiState('missingData')
-            );
+            outcomesUi.handleMissingDataState(tbody);
         }
 
         async function normalizeCurrentSearchParams() {
@@ -267,86 +260,31 @@
         }
 
         function getInterruptedSearchUiState(type, options = {}) {
-            return searchUiState.getInterruptedSearchUiState(type, options);
-        }
-
-        function getUnexpectedSearchFailureUiState(error) {
-            return searchUiState.getUnexpectedSearchFailureUiState(error);
-        }
-
-        function applyInterruptedSearchUiState(tbody, params, uiState) {
-            if (uiState?.clearResults) {
-                state.currentResults = [];
-            }
-            if (uiState?.statusMessage) {
-                app.queryUi.setStatusMessage(uiState.statusMessage);
-            }
-            if (uiState?.alertMessage) {
-                void showAlert(uiState.alertMessage, uiState.alertTitle || 'Attention');
-            }
-
-            app.results.renderEmptySummary(uiState?.emptySummary || 'Search error');
-            app.queryUi.renderQuerySummary(params, uiState?.querySummaryMeta || 'Search failed');
-            renderSearchResultsRow(
-                tbody,
-                uiState?.rowMessage || 'Search failed unexpectedly.',
-                uiState?.rowClassName || 'results-message-row results-message-row-error'
-            );
+            return outcomesUi.getInterruptedSearchUiState(type, options);
         }
 
         function handleLargeBoardState(tbody, params, maxRemainingSlots) {
-            applyInterruptedSearchUiState(
-                tbody,
-                params,
-                getInterruptedSearchUiState('largeBoard', { maxRemainingSlots })
-            );
+            outcomesUi.handleLargeBoardState(tbody, params, maxRemainingSlots);
         }
 
         function handleAbortedSearchState(tbody, params) {
-            applyInterruptedSearchUiState(
-                tbody,
-                params,
-                getInterruptedSearchUiState('aborted')
-            );
+            outcomesUi.handleAbortedSearchState(tbody, params);
         }
 
         function handleCancelledSearchState(tbody, params) {
-            applyInterruptedSearchUiState(
-                tbody,
-                params,
-                getInterruptedSearchUiState('cancelled')
-            );
+            outcomesUi.handleCancelledSearchState(tbody, params);
         }
 
         function handleFailedSearchState(tbody, params, errorMessage) {
-            applyInterruptedSearchUiState(
-                tbody,
-                params,
-                getInterruptedSearchUiState('failed', { errorMessage })
-            );
+            outcomesUi.handleFailedSearchState(tbody, params, errorMessage);
         }
 
         function getSearchResultsUiState(results, fromCache = false, elapsed = '0.0') {
-            return searchUiState.getSearchResultsUiState(results, fromCache, elapsed);
+            return outcomesUi.getSearchResultsUiState(results, fromCache, elapsed);
         }
 
         function applySearchResults(response, params, elapsed) {
-            const results = response.results;
-            const fromCache = response.fromCache;
-            const uiState = getSearchResultsUiState(results, fromCache, elapsed);
-
-            state.currentResults = results && results.length > 0 && !results[0].error ? results : [];
-            state.currentResultsFingerprint = state.activeData?.dataFingerprint || null;
-
-            app.queryUi.setStatusMessage(uiState.statusMessage);
-            app.queryUi.renderQuerySummary(params, uiState.querySummaryMeta);
-
-            if (uiState.shouldUpdateHistory) {
-                app.history.updateHistoryList();
-            }
-
-            const sorted = state.currentResults.length > 0 ? app.results.getSortedResults(state.currentResults) : results;
-            app.results.renderResults(sorted);
+            outcomesUi.applySearchResults(response, params, elapsed);
         }
 
         async function requestCancelSearch() {
@@ -446,12 +384,7 @@
                 applySearchResults(response, params, elapsed);
             } catch (error) {
                 console.error(error);
-                const uiState = getUnexpectedSearchFailureUiState(error);
-                app.queryUi.setStatusMessage(uiState.statusMessage);
-                void showAlert(uiState.alertMessage, uiState.alertTitle);
-                app.results.renderEmptySummary(uiState.emptySummary);
-                app.queryUi.renderQuerySummary(state.lastSearchParams, uiState.querySummaryMeta);
-                renderSearchResultsRow(tbody, uiState.rowMessage);
+                outcomesUi.renderUnexpectedSearchFailure(tbody, state.lastSearchParams, error);
             } finally {
                 setSearchState(false);
             }
@@ -505,7 +438,7 @@
                 applySearchControlUi,
                 getInterruptedSearchUiState,
                 getActiveSearchUiState,
-                getUnexpectedSearchFailureUiState
+                getUnexpectedSearchFailureUiState: outcomesUi.getUnexpectedSearchFailureUiState
             }
         };
     };
