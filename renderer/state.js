@@ -13,6 +13,7 @@
             currentResultsFingerprint: null,
             lastSearchParams: null,
             activeData: null,
+            currentSortMode: 'mostTraits',
             selectedBoardIndex: -1,
             currentResultsPage: 0,
             isFetchingData: false,

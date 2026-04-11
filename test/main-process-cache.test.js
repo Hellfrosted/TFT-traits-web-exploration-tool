@@ -95,6 +95,45 @@ describe('main-process cache service', () => {
         assert.equal(operations[1][2], 'C:\\cache\\entry.json');
     });
 
+    it('writes fallback snapshots through a temp file before renaming into place', async () => {
+        const operations = [];
+        const storagePaths = {
+            cacheDir: 'C:\\cache',
+            storageRoot: 'C:\\cache-root'
+        };
+        const service = createSearchCacheService({
+            storagePaths,
+            ensureStorageDirs: () => {},
+            resolveCacheEntryPath: () => 'C:\\cache\\entry.json',
+            resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
+            engine: {
+                prepareSearchContext: () => ({ prepared: true })
+            },
+            fsp: {
+                writeFile: async (filePath, payload) => {
+                    operations.push(['writeFile', filePath, payload]);
+                },
+                rename: async (fromPath, toPath) => {
+                    operations.push(['rename', fromPath, toPath]);
+                },
+                unlink: async () => {},
+                readdir: async () => []
+            },
+            crypto,
+            limits: LIMITS,
+            searchCacheVersion: 4
+        });
+
+        await service.writeDataFallback('pbe', { source: 'pbe', units: [] });
+
+        assert.equal(operations.length, 2);
+        assert.equal(operations[0][0], 'writeFile');
+        assert.match(operations[0][1], /data_fallback_pbe\.json\..+\.tmp$/);
+        assert.equal(operations[1][0], 'rename');
+        assert.equal(operations[1][1], operations[0][1]);
+        assert.equal(operations[1][2], 'C:\\cache-root\\data_fallback_pbe.json');
+    });
+
     it('prunes obsolete, corrupt, and inactive-fingerprint cache entries while preserving the active fingerprint', async () => {
         const sandboxRoot = makeTempDir('tft-cache-service-');
 
@@ -166,8 +205,11 @@ describe('main-process cache service', () => {
             await service.writeCache(pruneKey, 'keep-fingerprint', pruneParams, [{ units: ['B'] }]);
             await service.writeDataFallback('pbe', { source: 'pbe', units: [] });
             await service.writeDataFallback('latest', { source: 'latest', units: [] });
-            const deletedCount = await service.clearAllCache();
-            assert.equal(deletedCount, 4);
+            const clearSummary = await service.clearAllCache();
+            assert.deepEqual(clearSummary, {
+                deleted: 4,
+                failures: []
+            });
             const afterClear = await service.listCacheEntries('keep-fingerprint');
             assert.deepEqual(afterClear, []);
             assert.equal(fs.existsSync(resolveDataFallbackPath(storagePaths, 'pbe')), false);
@@ -361,6 +403,29 @@ describe('main-process cache service', () => {
             assert.deepEqual(fp1Entries[0].params.variantLocks, { Known: 'variant-a' });
 
             assert.deepEqual(fp2Entries[0].params.mustInclude, ['Known', 'Unknown']);
+        } finally {
+            fs.rmSync(sandboxRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('can limit cache listing to the newest entries', async () => {
+        const sandboxRoot = makeTempDir('tft-cache-service-');
+
+        try {
+            const userDataPath = path.join(sandboxRoot, 'userData');
+            fs.mkdirSync(userDataPath, { recursive: true });
+            const service = createService(userDataPath);
+            const firstKey = service.getCacheKey('keep-fingerprint', { boardSize: 9, maxResults: 10 });
+            const secondKey = service.getCacheKey('keep-fingerprint', { boardSize: 8, maxResults: 10 });
+
+            await service.writeCache(firstKey, 'keep-fingerprint', { boardSize: 9, maxResults: 10 }, [{ units: ['A'] }]);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            await service.writeCache(secondKey, 'keep-fingerprint', { boardSize: 8, maxResults: 10 }, [{ units: ['B'] }]);
+
+            const limitedEntries = await service.listCacheEntries('keep-fingerprint', { limit: 1 });
+
+            assert.equal(limitedEntries.length, 1);
+            assert.equal(limitedEntries[0].key, secondKey);
         } finally {
             fs.rmSync(sandboxRoot, { recursive: true, force: true });
         }

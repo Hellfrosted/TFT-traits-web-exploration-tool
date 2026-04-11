@@ -77,7 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     fetchData: (source) => ipcRenderer.invoke(IPC_CHANNELS.FETCH_DATA, source),
     searchBoards: (params) => ipcRenderer.invoke(IPC_CHANNELS.SEARCH_BOARDS, params),
     cancelSearch: () => ipcRenderer.invoke(IPC_CHANNELS.CANCEL_SEARCH),
-    listCache: () => ipcRenderer.invoke(IPC_CHANNELS.LIST_CACHE),
+    listCache: (options) => ipcRenderer.invoke(IPC_CHANNELS.LIST_CACHE, options),
     deleteCacheEntry: (key) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_CACHE_ENTRY, key),
     clearAllCache: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_ALL_CACHE),
     getSearchEstimate: (params) => ipcRenderer.invoke(IPC_CHANNELS.GET_SEARCH_ESTIMATE, params),

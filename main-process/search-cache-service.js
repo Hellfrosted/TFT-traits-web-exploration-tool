@@ -1,6 +1,28 @@
 const { serializeSearchParams: defaultSerializeSearchParams } = require('../searchParams.js');
 const { createSearchCacheStore } = require('./search-cache-store.js');
 
+function touchMemoryCacheEntry(cache, key, value) {
+    if (cache.has(key)) {
+        cache.delete(key);
+    }
+    cache.set(key, value);
+    return value;
+}
+
+function trimMemoryCache(cache, maxEntries) {
+    if (!Number.isFinite(maxEntries) || maxEntries <= 0) {
+        return;
+    }
+
+    while (cache.size > maxEntries) {
+        const oldestKey = cache.keys().next().value;
+        if (oldestKey === undefined) {
+            break;
+        }
+        cache.delete(oldestKey);
+    }
+}
+
 function createSearchCacheService({
     storagePaths,
     ensureStorageDirs,
@@ -24,6 +46,17 @@ function createSearchCacheService({
         fsp
     });
     const { ensureCacheDir } = cacheStore;
+    const memoryCacheEntryLimits = {
+        results: Number.isFinite(limits?.SEARCH_RESULT_MEMORY_CACHE_MAX_ENTRIES)
+            ? limits.SEARCH_RESULT_MEMORY_CACHE_MAX_ENTRIES
+            : 100,
+        estimates: Number.isFinite(limits?.SEARCH_ESTIMATE_MEMORY_CACHE_MAX_ENTRIES)
+            ? limits.SEARCH_ESTIMATE_MEMORY_CACHE_MAX_ENTRIES
+            : 250,
+        preparedContexts: Number.isFinite(limits?.PREPARED_CONTEXT_MEMORY_CACHE_MAX_ENTRIES)
+            ? limits.PREPARED_CONTEXT_MEMORY_CACHE_MAX_ENTRIES
+            : 100
+    };
 
     function getCacheKey(dataFingerprint, params) {
         const normalized = JSON.stringify({
@@ -48,7 +81,10 @@ function createSearchCacheService({
         let preparedContext = preparedSearchContextMemoryCache.get(contextKey);
         if (!preparedContext) {
             preparedContext = engine.prepareSearchContext(dataCacheSnapshot, normalizedParams);
-            preparedSearchContextMemoryCache.set(contextKey, preparedContext);
+            touchMemoryCacheEntry(preparedSearchContextMemoryCache, contextKey, preparedContext);
+            trimMemoryCache(preparedSearchContextMemoryCache, memoryCacheEntryLimits.preparedContexts);
+        } else {
+            touchMemoryCacheEntry(preparedSearchContextMemoryCache, contextKey, preparedContext);
         }
         return {
             contextKey,
@@ -57,11 +93,16 @@ function createSearchCacheService({
     }
 
     function getCachedEstimate(key) {
-        return searchEstimateMemoryCache.get(key) || null;
+        const estimate = searchEstimateMemoryCache.get(key) || null;
+        if (estimate) {
+            touchMemoryCacheEntry(searchEstimateMemoryCache, key, estimate);
+        }
+        return estimate;
     }
 
     function setCachedEstimate(key, estimate) {
-        searchEstimateMemoryCache.set(key, estimate);
+        touchMemoryCacheEntry(searchEstimateMemoryCache, key, estimate);
+        trimMemoryCache(searchEstimateMemoryCache, memoryCacheEntryLimits.estimates);
         return estimate;
     }
 
@@ -72,6 +113,7 @@ function createSearchCacheService({
             memoryEntry.dataFingerprint === dataFingerprint &&
             memoryEntry.searchVersion === searchCacheVersion
         ) {
+            touchMemoryCacheEntry(searchResultMemoryCache, key, memoryEntry);
             return memoryEntry.results;
         }
 
@@ -83,11 +125,12 @@ function createSearchCacheService({
                 parsed.dataFingerprint === dataFingerprint &&
                 (parsed.searchVersion ?? 1) === searchCacheVersion
             ) {
-                searchResultMemoryCache.set(key, {
+                touchMemoryCacheEntry(searchResultMemoryCache, key, {
                     dataFingerprint,
                     searchVersion: searchCacheVersion,
                     results: parsed.results
                 });
+                trimMemoryCache(searchResultMemoryCache, memoryCacheEntryLimits.results);
                 return parsed.results;
             }
             return null;
@@ -101,11 +144,12 @@ function createSearchCacheService({
 
     async function writeCache(key, dataFingerprint, params, results) {
         ensureCacheDir();
-        searchResultMemoryCache.set(key, {
+        touchMemoryCacheEntry(searchResultMemoryCache, key, {
             dataFingerprint,
             searchVersion: searchCacheVersion,
             results
         });
+        trimMemoryCache(searchResultMemoryCache, memoryCacheEntryLimits.results);
         try {
             await cacheStore.writeCacheEntry(key, {
                 searchVersion: searchCacheVersion,
@@ -223,6 +267,17 @@ function createSearchCacheService({
         } catch (error) {
             if (error.code !== 'ENOENT') {
                 console.warn('Failed to read data fallback:', error.message);
+                try {
+                    const quarantinedPath = await cacheStore.quarantineDataFallback(source);
+                    if (quarantinedPath) {
+                        console.warn(`Quarantined malformed data fallback snapshot for ${source}: ${quarantinedPath}`);
+                    }
+                } catch (quarantineError) {
+                    console.warn(
+                        `Failed to quarantine malformed data fallback snapshot for ${source}:`,
+                        quarantineError.message || String(quarantineError)
+                    );
+                }
             }
         }
         return null;
@@ -251,7 +306,10 @@ function createSearchCacheService({
         }
     }
 
-    async function listCacheEntries(activeDataFingerprint = null) {
+    async function listCacheEntries(activeDataFingerprint = null, options = {}) {
+        const limit = Number.isFinite(options?.limit) && options.limit > 0
+            ? Math.trunc(options.limit)
+            : null;
         const files = await cacheStore.listCacheFiles();
         const entries = [];
         for (const file of files) {
@@ -276,7 +334,7 @@ function createSearchCacheService({
             }
         }
         entries.sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
-        return entries;
+        return limit ? entries.slice(0, limit) : entries;
     }
 
     async function deleteCacheEntry(key) {
@@ -290,7 +348,13 @@ function createSearchCacheService({
         clearSearchMemoryCaches();
         const deletedCacheEntries = await cacheStore.clearCacheFiles();
         const deletedFallbackSnapshots = await cacheStore.clearDataFallbackFiles();
-        return deletedCacheEntries + deletedFallbackSnapshots;
+        return {
+            deleted: deletedCacheEntries.deleted + deletedFallbackSnapshots.deleted,
+            failures: [
+                ...deletedCacheEntries.failures,
+                ...deletedFallbackSnapshots.failures
+            ]
+        };
     }
 
     return {

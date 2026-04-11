@@ -86,9 +86,11 @@ function createRuntimeUnderTest(options = {}) {
         searchBoards: 0,
         cancelSearch: 0,
         listCacheEntries: 0,
+        listCacheOptions: [],
         deleteCacheEntry: 0,
         clearAllCache: 0,
-        migrateCanonicalParams: 0
+        migrateCanonicalParams: 0,
+        rendererErrors: []
     };
 
     const runtime = createMainRuntime({
@@ -96,6 +98,16 @@ function createRuntimeUnderTest(options = {}) {
             app: fakeApp,
             BrowserWindow: function BrowserWindow() {},
             ipcMain: fakeIpcMain
+        },
+        fsp: options.fsp || {
+            readFile: async () => {
+                const error = new Error('missing');
+                error.code = 'ENOENT';
+                throw error;
+            },
+            writeFile: async () => {},
+            rename: async () => {},
+            unlink: async () => {}
         },
         processRef: fakeProcess,
         constants: {
@@ -130,6 +142,7 @@ function createRuntimeUnderTest(options = {}) {
             resolveCacheEntryPath: () => 'storage-root\\cache\\entry.json',
             resolveDataFallbackPath: () => 'storage-root\\data.json'
         },
+        setTimeoutFn: options.setTimeoutFn,
         createSearchCacheService: options.createSearchCacheService || (() => ({
             ensureCacheDir: () => {
                 ensureCacheDirCalls += 1;
@@ -137,8 +150,9 @@ function createRuntimeUnderTest(options = {}) {
             migrateCanonicalParams: async () => {
                 serviceCalls.migrateCanonicalParams += 1;
             },
-            listCacheEntries: async () => {
+            listCacheEntries: async (_activeDataFingerprint, requestOptions = {}) => {
                 serviceCalls.listCacheEntries += 1;
+                serviceCalls.listCacheOptions.push(requestOptions);
                 return [];
             },
             deleteCacheEntry: async () => {
@@ -146,7 +160,10 @@ function createRuntimeUnderTest(options = {}) {
             },
             clearAllCache: async () => {
                 serviceCalls.clearAllCache += 1;
-                return 0;
+                return {
+                    deleted: 0,
+                    failures: []
+                };
             }
         })),
         createDataService: () => ({
@@ -185,7 +202,9 @@ function createRuntimeUnderTest(options = {}) {
             scheduleSmokeTimeout: () => {
                 scheduleSmokeTimeoutCalls += 1;
             },
-            notifyRendererError: () => {},
+            notifyRendererError: (message) => {
+                serviceCalls.rendererErrors.push(message);
+            },
             getMainWindow: () => mainWindow
         }),
         appRoot: 'C:\\Users\\tester\\dev\\repo'
@@ -286,6 +305,7 @@ describe('main runtime', () => {
             started.readyPromise.then(() => 'resolved'),
             new Promise((resolve) => setTimeout(() => resolve('pending'), 10))
         ]);
+        await Promise.resolve();
 
         assert.equal(readyState, 'resolved');
         assert.equal(serviceCalls.migrateCanonicalParams, 1);
@@ -420,5 +440,34 @@ describe('main runtime', () => {
         );
 
         assert.equal(serviceCalls.normalizeSearchParams, 0);
+    });
+
+    it('passes bounded cache-list options through to the cache service', async () => {
+        const { runtime, fakeIpcMain, serviceCalls, createInvokeEvent } = createRuntimeUnderTest();
+        runtime.registerIpcHandlers();
+
+        const handler = fakeIpcMain.handlers.get('list-cache');
+        const response = await handler(createInvokeEvent(), { limit: 5 });
+
+        assert.deepEqual(response, { success: true, entries: [] });
+        assert.equal(serviceCalls.listCacheEntries, 1);
+        assert.deepEqual(serviceCalls.listCacheOptions, [{ limit: 5 }]);
+    });
+
+    it('exits after reporting fatal process errors', () => {
+        const { runtime, fakeApp, fakeProcess, serviceCalls } = createRuntimeUnderTest({
+            setTimeoutFn: (callback) => {
+                callback();
+                return { unref() {} };
+            }
+        });
+
+        runtime.registerProcessHandlers();
+        fakeProcess.emit('uncaughtException', new Error('fatal boom'));
+
+        assert.deepEqual(fakeApp.exitCalls, [1]);
+        assert.equal(serviceCalls.rendererErrors.length, 1);
+        assert.match(serviceCalls.rendererErrors[0], /fatal boom/i);
+        assert.match(serviceCalls.rendererErrors[0], /will now close/i);
     });
 });

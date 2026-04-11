@@ -55,6 +55,8 @@ npm run lint
 npm run validate:data
 ```
 
+`npm run test:smoke` boots the actual Electron app once and exits through the built-in smoke mode.
+
 `npm run validate:data` hits live Community Dragon endpoints for both `pbe` and `latest`, so treat it as a live parser smoke test rather than an offline unit test.
 
 For maintainer-oriented notes about architecture, cache behavior, and local workflow, see [DEVELOPING.md](DEVELOPING.md).

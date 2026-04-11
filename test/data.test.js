@@ -324,6 +324,68 @@ describe('DataEngine.fetchAndParse', () => {
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', nextMorning), true);
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', afterNextRollover), false);
     });
+
+    it('falls back to a fresh cached snapshot when Community Dragon is unreachable', async () => {
+        const rawChar = {
+            '{TraitSentinel}': { mName: 'Sentinel' },
+            '{RoleTank}': { mName: 'Tank' },
+            'Characters/Set13Champion': {
+                mCharacterName: 'TFT13_Skarner',
+                unitTagsString: 'Champion',
+                tier: 3,
+                CharacterRole: '{RoleTank}',
+                mLinkedTraits: [{ TraitData: '{TraitSentinel}' }]
+            }
+        };
+        const rawTraits = {
+            sets: {
+                '13': {
+                    traits: [{ apiName: 'Sentinel', name: 'Sentinel', effects: [{ minUnits: 2 }] }]
+                }
+            }
+        };
+
+        const parsed = await DataEngine.fetchAndParse({
+            source: 'latest',
+            fetchJson: async () => {
+                throw new Error('network down');
+            },
+            fetchText: async () => {
+                throw new Error('network down');
+            },
+            readFallback: async () => ({
+                source: 'latest',
+                fetchedAt: Date.now(),
+                rawChar,
+                rawTraits
+            })
+        });
+
+        assert.equal(parsed.usedCachedSnapshot, true);
+        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+    });
+
+    it('rejects stale cached snapshots when Community Dragon is unreachable', async () => {
+        const staleFetchedAt = Date.now() - NETWORK.DATA_CACHE_TTL_MS_BY_SOURCE.latest - 1;
+
+        await assert.rejects(
+            DataEngine.fetchAndParse({
+                source: 'latest',
+                fetchJson: async () => {
+                    throw new Error('network down');
+                },
+                fetchText: async () => {
+                    throw new Error('network down');
+                },
+                readFallback: async () => ({
+                    source: 'latest',
+                    fetchedAt: staleFetchedAt,
+                    rawChar: { stale: true }
+                })
+            }),
+            /no fresh offline data available/i
+        );
+    });
 });
 
 describe('DataEngine._fetchWithRetry', () => {

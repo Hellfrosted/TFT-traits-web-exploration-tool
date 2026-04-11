@@ -26,6 +26,8 @@ function createMainRuntime(options = {}) {
     const processRef = options.processRef || process;
     const argv = options.argv || processRef.argv || [];
     const appRoot = options.appRoot || path.join(__dirname, '..');
+    const setTimeoutFn = options.setTimeoutFn || setTimeout;
+    const fatalExitDelayMs = Number.isFinite(options.fatalExitDelayMs) ? options.fatalExitDelayMs : 150;
     const {
         app,
         BrowserWindow,
@@ -84,7 +86,68 @@ function createMainRuntime(options = {}) {
         getMainWindow: windowService.getMainWindow,
         getDataCache: dataService.getDataCache
     });
+    const cacheMigrationStatePath = path.join(storagePaths.storageRoot, 'cache-migration-state.json');
     const strictlyMigratedFingerprints = new Set();
+    let fatalExitScheduled = false;
+    let cacheMigrationState = null;
+    let cacheMigrationStatePromise = null;
+
+    async function writeJsonFileAtomically(filePath, payload) {
+        const tempPath = `${filePath}.${processRef.pid || 'runtime'}.${Date.now()}.tmp`;
+        await fsp.writeFile(tempPath, payload, 'utf-8');
+        try {
+            await fsp.rename(tempPath, filePath);
+        } catch (renameError) {
+            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
+                throw renameError;
+            }
+            await fsp.unlink(filePath).catch(() => {});
+            await fsp.rename(tempPath, filePath);
+        }
+    }
+
+    function normalizeCacheMigrationState(rawState) {
+        const strictFingerprints = Array.isArray(rawState?.strictFingerprints)
+            ? rawState.strictFingerprints.filter((value) => typeof value === 'string' && value)
+            : [];
+        strictFingerprints.forEach((value) => strictlyMigratedFingerprints.add(value));
+        return {
+            version: Number.isFinite(rawState?.version) ? rawState.version : null,
+            strictFingerprints
+        };
+    }
+
+    async function loadCacheMigrationState() {
+        if (cacheMigrationState) {
+            return cacheMigrationState;
+        }
+        if (cacheMigrationStatePromise) {
+            return await cacheMigrationStatePromise;
+        }
+
+        cacheMigrationStatePromise = (async () => {
+            try {
+                const rawState = JSON.parse(await fsp.readFile(cacheMigrationStatePath, 'utf-8'));
+                cacheMigrationState = normalizeCacheMigrationState(rawState);
+            } catch (error) {
+                if (error?.code !== 'ENOENT') {
+                    console.warn('Failed to read cache migration state:', error.message || String(error));
+                }
+                cacheMigrationState = normalizeCacheMigrationState(null);
+            } finally {
+                cacheMigrationStatePromise = null;
+            }
+
+            return cacheMigrationState;
+        })();
+
+        return await cacheMigrationStatePromise;
+    }
+
+    async function saveCacheMigrationState(nextState) {
+        cacheMigrationState = normalizeCacheMigrationState(nextState);
+        await writeJsonFileAtomically(cacheMigrationStatePath, JSON.stringify(cacheMigrationState));
+    }
 
     async function migrateAllCachedParamsWithBaseNormalization() {
         if (typeof cacheService.migrateCanonicalParams !== 'function') {
@@ -92,8 +155,16 @@ function createMainRuntime(options = {}) {
         }
 
         try {
+            const migrationState = await loadCacheMigrationState();
+            if (migrationState.version === SEARCH_CACHE_VERSION) {
+                return;
+            }
             await cacheService.migrateCanonicalParams({
                 canonicalizeByFingerprint: (_dataFingerprint, params) => normalizeSearchParams(params)
+            });
+            await saveCacheMigrationState({
+                ...migrationState,
+                version: SEARCH_CACHE_VERSION
             });
         } catch (error) {
             console.warn('Failed to migrate cached search params during startup:', error.message || String(error));
@@ -111,6 +182,10 @@ function createMainRuntime(options = {}) {
         }
 
         try {
+            const migrationState = await loadCacheMigrationState();
+            if (strictlyMigratedFingerprints.has(dataFingerprint)) {
+                return;
+            }
             await cacheService.migrateCanonicalParams({
                 canonicalizeByFingerprint: (entryFingerprint, params) => {
                     const baseNormalized = normalizeSearchParams(params);
@@ -127,19 +202,42 @@ function createMainRuntime(options = {}) {
                 }
             });
             strictlyMigratedFingerprints.add(dataFingerprint);
+            await saveCacheMigrationState({
+                ...migrationState,
+                version: migrationState.version ?? SEARCH_CACHE_VERSION,
+                strictFingerprints: [...strictlyMigratedFingerprints].sort()
+            });
         } catch (error) {
             console.warn(`Failed to migrate cached params for fingerprint ${dataFingerprint}:`, error.message || String(error));
         }
     }
 
+    function scheduleFatalExit() {
+        if (fatalExitScheduled) {
+            return;
+        }
+        fatalExitScheduled = true;
+        const timer = setTimeoutFn(() => {
+            app.exit(1);
+        }, fatalExitDelayMs);
+        if (typeof timer?.unref === 'function') {
+            timer.unref();
+        }
+    }
+
+    function handleFatalProcessError(prefix, detail) {
+        console.error(prefix, detail);
+        const detailText = detail?.message || detail?.toString?.() || String(detail);
+        windowService.notifyRendererError(`${detailText} The app will now close to avoid a corrupted state.`);
+        scheduleFatalExit();
+    }
+
     function handleUncaughtException(error) {
-        console.error('[FATAL] Uncaught exception:', error);
-        windowService.notifyRendererError(`Unexpected error: ${error.message}`);
+        handleFatalProcessError('[FATAL] Uncaught exception:', error);
     }
 
     function handleUnhandledRejection(reason) {
-        console.error('[FATAL] Unhandled promise rejection:', reason);
-        windowService.notifyRendererError(`Unhandled error: ${reason}`);
+        handleFatalProcessError('[FATAL] Unhandled promise rejection:', reason);
     }
 
     function registerProcessHandlers() {
@@ -261,10 +359,10 @@ function createMainRuntime(options = {}) {
             return await searchService.cancelSearch();
         });
 
-        handleTrustedIpc(IPC_CHANNELS.LIST_CACHE, async () => {
+        handleTrustedIpc(IPC_CHANNELS.LIST_CACHE, async (_event, options = null) => {
             try {
                 const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
-                const entries = await cacheService.listCacheEntries(activeDataFingerprint);
+                const entries = await cacheService.listCacheEntries(activeDataFingerprint, options || {});
                 return { success: true, entries };
             } catch (error) {
                 return { success: false, error: error.toString() };
@@ -282,8 +380,12 @@ function createMainRuntime(options = {}) {
 
         handleTrustedIpc(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
             try {
-                const deleted = await cacheService.clearAllCache();
-                return { success: true, deleted };
+                const summary = await cacheService.clearAllCache();
+                return {
+                    success: true,
+                    deleted: summary.deleted,
+                    failures: summary.failures || []
+                };
             } catch (error) {
                 return { success: false, error: error.toString() };
             }

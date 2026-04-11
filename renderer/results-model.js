@@ -364,7 +364,7 @@
         };
 
         function getActiveSortMode() {
-            return document.getElementById('sortMode')?.value || 'mostTraits';
+            return state.currentSortMode || 'mostTraits';
         }
 
         function getSortedResults(results) {

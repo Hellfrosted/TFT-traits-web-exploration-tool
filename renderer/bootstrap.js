@@ -96,7 +96,11 @@
         }
 
         function bindSortModeListener(sortMode) {
+            if (sortMode) {
+                state.currentSortMode = sortMode.value || state.currentSortMode || 'mostTraits';
+            }
             sortMode?.addEventListener('change', () => {
+                state.currentSortMode = sortMode.value || 'mostTraits';
                 if (state.currentResults.length === 0) return;
                 app.results.renderResults(app.results.getSortedResults(state.currentResults));
             });

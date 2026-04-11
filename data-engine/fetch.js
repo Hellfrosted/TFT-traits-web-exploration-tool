@@ -156,11 +156,18 @@ module.exports = {
                     }
                 }
             } catch (fetchErr) {
-                if (cachedSnapshot) {
+                if (cachedSnapshot && this._isRawDataSnapshotFresh(cachedSnapshot, source)) {
                     console.warn('Using cached raw data snapshot (CDragon unreachable)');
                     rawData = cachedSnapshot;
+                    usedCachedSnapshot = true;
                 } else {
-                    throw new Error(`Network error and no offline data available: ${fetchErr.message}`, { cause: fetchErr });
+                    const staleSnapshotMessage = cachedSnapshot
+                        ? ' Cached offline snapshot is stale.'
+                        : '';
+                    throw new Error(
+                        `Network error and no fresh offline data available:${staleSnapshotMessage} ${fetchErr.message}`.trim(),
+                        { cause: fetchErr }
+                    );
                 }
             }
         }

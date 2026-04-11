@@ -27,6 +27,44 @@ function createSearchCacheStore({
         }
     }
 
+    async function deleteFileIfPresent(filePath) {
+        try {
+            await fsp.unlink(filePath);
+            return { deleted: true, error: null };
+        } catch (error) {
+            if (error?.code === 'ENOENT') {
+                return { deleted: false, error: null };
+            }
+
+            return { deleted: false, error };
+        }
+    }
+
+    async function clearFilePaths(filePaths = []) {
+        const failures = [];
+        let deleted = 0;
+
+        for (const filePath of filePaths) {
+            const result = await deleteFileIfPresent(filePath);
+            if (result.deleted) {
+                deleted += 1;
+                continue;
+            }
+
+            if (result.error) {
+                failures.push({
+                    filePath,
+                    message: result.error.message || String(result.error)
+                });
+            }
+        }
+
+        return {
+            deleted,
+            failures
+        };
+    }
+
     async function readJsonFile(filePath) {
         const data = await fsp.readFile(filePath, 'utf-8');
         return JSON.parse(data);
@@ -62,10 +100,7 @@ function createSearchCacheStore({
 
     async function clearCacheFiles() {
         const files = await listCacheFiles();
-        for (const file of files) {
-            await fsp.unlink(file.filePath);
-        }
-        return files.length;
+        return await clearFilePaths(files.map((file) => file.filePath));
     }
 
     async function clearDataFallbackFiles() {
@@ -74,22 +109,34 @@ function createSearchCacheStore({
             .filter((file) => /^data_fallback_.+\.json$/.test(file))
             .map((file) => path.join(storagePaths.storageRoot, file));
 
-        for (const filePath of files) {
-            await fsp.unlink(filePath);
-        }
-
-        return files.length;
+        return await clearFilePaths(files);
     }
 
     async function writeDataFallback(source, rawData) {
         ensureCacheDir();
         const filePath = resolveDataFallbackPath(storagePaths, source);
-        await fsp.writeFile(filePath, JSON.stringify(rawData));
+        await writeCachePayload(filePath, JSON.stringify(rawData));
     }
 
     async function readDataFallback(source) {
         const filePath = resolveDataFallbackPath(storagePaths, source);
         return await readJsonFile(filePath);
+    }
+
+    async function quarantineDataFallback(source, suffix = 'corrupt') {
+        ensureCacheDir();
+        const filePath = resolveDataFallbackPath(storagePaths, source);
+        const quarantinedPath = `${filePath}.${suffix}.${Date.now()}`;
+        try {
+            await fsp.rename(filePath, quarantinedPath);
+            return quarantinedPath;
+        } catch (error) {
+            if (error?.code === 'ENOENT') {
+                return null;
+            }
+
+            throw error;
+        }
     }
 
     return {
@@ -103,6 +150,7 @@ function createSearchCacheStore({
         clearDataFallbackFiles,
         writeDataFallback,
         readDataFallback,
+        quarantineDataFallback,
         readJsonFile
     };
 }

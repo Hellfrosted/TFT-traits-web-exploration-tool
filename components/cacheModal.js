@@ -146,6 +146,17 @@
                     return;
                 }
 
+                if (Array.isArray(result.failures) && result.failures.length > 0) {
+                    const failureSummary = result.failures
+                        .slice(0, 3)
+                        .map((failure) => `${failure.filePath}: ${failure.message}`)
+                        .join('\n');
+                    await showAlert(
+                        `Deleted ${result.deleted || 0} cache files, but some entries could not be removed:\n${failureSummary}`,
+                        'Partial Cache Clear'
+                    );
+                }
+
                 refreshHistorySidebar();
                 await renderCacheList();
             });

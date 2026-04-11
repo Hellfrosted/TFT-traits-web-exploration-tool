@@ -117,7 +117,7 @@
 
             let res;
             try {
-                res = await state.electronBridge.listCache();
+                res = await state.electronBridge.listCache({ limit: 5 });
             } catch (error) {
                 renderHistoryEmptyState(listEl, getHistoryListStateMessage(null, error));
                 return;

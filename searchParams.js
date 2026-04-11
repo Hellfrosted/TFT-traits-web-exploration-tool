@@ -1,4 +1,5 @@
 const { LIMITS } = require('./constants.js');
+const normalizationMetadataCache = new WeakMap();
 
 const UI_LIMITS = {
     MIN_BOARD_SIZE: 1,
@@ -127,10 +128,14 @@ function getUnitsFromDataCache(dataCache) {
     return [];
 }
 
-function normalizeSearchParamsForData(params = {}, dataCache = null) {
-    const normalized = normalizeSearchParams(params);
+function getNormalizationMetadata(dataCache) {
     if (!dataCache || typeof dataCache !== 'object') {
-        return normalized;
+        return null;
+    }
+
+    const cachedMetadata = normalizationMetadataCache.get(dataCache);
+    if (cachedMetadata) {
+        return cachedMetadata;
     }
 
     const units = getUnitsFromDataCache(dataCache);
@@ -154,6 +159,28 @@ function normalizeSearchParamsForData(params = {}, dataCache = null) {
             allowedVariantsByUnit.set(unitId, allowedVariants);
         }
     });
+
+    const metadata = {
+        allowedUnitIds,
+        allowedTraits,
+        allowedRoles,
+        allowedVariantsByUnit
+    };
+    normalizationMetadataCache.set(dataCache, metadata);
+    return metadata;
+}
+
+function normalizeSearchParamsForData(params = {}, dataCache = null) {
+    const normalized = normalizeSearchParams(params);
+    if (!dataCache || typeof dataCache !== 'object') {
+        return normalized;
+    }
+
+    const metadata = getNormalizationMetadata(dataCache);
+    const allowedUnitIds = metadata?.allowedUnitIds || new Set();
+    const allowedTraits = metadata?.allowedTraits || new Set();
+    const allowedRoles = metadata?.allowedRoles || new Set();
+    const allowedVariantsByUnit = metadata?.allowedVariantsByUnit || new Map();
 
     const filteredVariantLocks = {};
     Object.keys(normalized.variantLocks || {}).forEach((unitId) => {

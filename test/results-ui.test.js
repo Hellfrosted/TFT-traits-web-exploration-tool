@@ -40,12 +40,7 @@ function createResultsUiForSortMode(sortMode) {
             }
         },
         document: {
-            getElementById: (id) => {
-                if (id === 'sortMode') {
-                    return { value: sortMode };
-                }
-                return null;
-            },
+            getElementById: () => null,
             querySelector: () => null,
             addEventListener: () => {},
             body: {
@@ -59,7 +54,9 @@ function createResultsUiForSortMode(sortMode) {
     });
 
     return sandbox.window.TFTRenderer.createResultsUi({
-        state: {},
+        state: {
+            currentSortMode: sortMode
+        },
         queryUi: {
             setResultsSummary: () => {}
         }
