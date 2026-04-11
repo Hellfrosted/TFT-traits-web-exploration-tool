@@ -7,11 +7,20 @@
         const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
         const getDefaultBoardSize = () => 9;
         let nextDraftEstimateRequestId = 0;
+        const shellElementCache = new Map();
 
-        function resolveQueryElements(ids) {
+        function resolveQueryElements(ids, { fresh = false } = {}) {
             const elements = {};
             (Array.isArray(ids) ? ids : []).forEach((id) => {
-                elements[id] = document.getElementById(id);
+                const cachedElement = shellElementCache.get(id);
+                if (!fresh && cachedElement) {
+                    elements[id] = cachedElement;
+                    return;
+                }
+
+                const element = document.getElementById(id);
+                shellElementCache.set(id, element);
+                elements[id] = element;
             });
             return elements;
         }
@@ -105,12 +114,12 @@
             return source === 'latest' ? 'Live' : 'PBE';
         }
 
-        function getDefaultRoleFilterValues() {
-            if (!state.activeData?.roles) return null;
+        function getDefaultRoleFilterValues(activeData = state.activeData) {
+            if (!activeData?.roles) return null;
 
             return {
-                tankRoles: state.resolveDefaultTankRoles(state.activeData.roles),
-                carryRoles: state.resolveDefaultCarryRoles(state.activeData.roles)
+                tankRoles: state.resolveDefaultTankRoles(activeData.roles),
+                carryRoles: state.resolveDefaultCarryRoles(activeData.roles)
             };
         }
 
@@ -127,18 +136,18 @@
             }
         }
 
-        function applyDefaultRoleFilters(force = false) {
-            const defaultRoleValues = getDefaultRoleFilterValues();
+        function applyDefaultRoleFilters(force = false, activeData = state.activeData) {
+            const defaultRoleValues = getDefaultRoleFilterValues(activeData);
             if (!defaultRoleValues) return;
 
             applyDefaultRoleSelectorValues(state.selectors.tankRoles, defaultRoleValues.tankRoles, force);
             applyDefaultRoleSelectorValues(state.selectors.carryRoles, defaultRoleValues.carryRoles, force);
         }
 
-        function getVariantCapableUnits() {
-            if (!state.activeData?.unitMap) return [];
+        function getVariantCapableUnits(activeData = state.activeData) {
+            if (!activeData?.unitMap) return [];
 
-            return [...state.activeData.unitMap.values()]
+            return [...activeData.unitMap.values()]
                 .filter((unit) => Array.isArray(unit.variants) && unit.variants.length > 0)
                 .sort((a, b) => (a.displayName || a.id).localeCompare(b.displayName || b.id));
         }
@@ -209,14 +218,14 @@
             return { row, select };
         }
 
-        function renderVariantLockControls(preservedLocks = null) {
+        function renderVariantLockControls(preservedLocks = null, activeData = state.activeData) {
             const {
                 variantLocksSection: section,
                 variantLocksContainer: container
             } = resolveSummaryShell();
             if (!section || !container) return;
 
-            const variantUnits = getVariantCapableUnits();
+            const variantUnits = getVariantCapableUnits(activeData);
             const locks = preservedLocks || getCurrentVariantLocks();
             resetVariantLockSection(container);
 

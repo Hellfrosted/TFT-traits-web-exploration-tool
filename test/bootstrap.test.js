@@ -100,7 +100,30 @@ function createBootstrapHarness(missingIds = ['searchBtn'], options = {}) {
                         };
                     },
                     setResultsBodyMessage: () => false,
-                    reportRendererIssue
+                    reportRendererIssue,
+                    createDialogInvoker(app, reporterState, {
+                        methodName,
+                        issueKey = 'missingDialogDependency',
+                        statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+                        fallbackValue = false
+                    } = {}) {
+                        return (...args) => {
+                            const dialogFn = app?.state?.dependencies?.[methodName];
+                            if (typeof dialogFn === 'function') {
+                                return dialogFn(...args);
+                            }
+
+                            const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+                            reportRendererIssue(app, reporterState, issueKey, {
+                                consoleMessage: `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+                                consoleDetail: { title, message },
+                                statusMessage: typeof statusMessage === 'function'
+                                    ? statusMessage({ methodName, title, message })
+                                    : statusMessage
+                            });
+                            return Promise.resolve(fallbackValue);
+                        };
+                    }
                 }
             },
             addEventListener: () => {},
@@ -307,6 +330,17 @@ describe('renderer bootstrap', () => {
                 searchBtn: createButtonTarget()
             }
         });
+        let resolveFailureStatus;
+        const failureStatusPromise = new Promise((resolve) => {
+            resolveFailureStatus = resolve;
+        });
+        const originalSetStatusMessage = app.queryUi.setStatusMessage;
+        app.queryUi.setStatusMessage = (message) => {
+            originalSetStatusMessage(message);
+            if (message === 'Renderer init failed: fetch blew up') {
+                resolveFailureStatus();
+            }
+        };
 
         app.data.fetchData = async () => {
             throw new Error('fetch blew up');
@@ -314,7 +348,7 @@ describe('renderer bootstrap', () => {
 
         bootstrap.initializeUiShell();
         fetchBtn.click();
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await failureStatusPromise;
 
         assert.equal(statusMessages.at(-1), 'Renderer init failed: fetch blew up');
     });

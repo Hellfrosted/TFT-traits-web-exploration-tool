@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { setTimeout: delay } = require('node:timers/promises');
 const vm = require('node:vm');
 
 function loadSearchControllerFactory(sandbox) {
@@ -89,12 +90,12 @@ function createResolveShellElements(shell) {
     };
 }
 
-async function waitFor(check, message, attempts = 10) {
+async function waitFor(check, message, attempts = 50) {
     for (let index = 0; index < attempts; index += 1) {
         if (check()) {
             return;
         }
-        await Promise.resolve();
+        await delay(0);
     }
 
     assert.fail(message);
@@ -102,6 +103,69 @@ async function waitFor(check, message, attempts = 10) {
 
 function createSandbox(shell, overrides = {}) {
     const consoleApi = overrides.console || console;
+    const shared = {
+        resolveShellElements: createResolveShellElements(shell),
+        setResultsBodyMessage(app, tbody, message, className = 'results-message-row') {
+            if (!tbody || typeof app?.results?.renderResultsMessageRow !== 'function') {
+                return false;
+            }
+
+            tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+            return true;
+        },
+        reportRendererIssue(app, reporterState, issueKey, options = {}) {
+            if (reporterState && issueKey) {
+                if (reporterState[issueKey]) {
+                    return false;
+                }
+                reporterState[issueKey] = true;
+            }
+
+            if (options.consoleDetail !== null && options.consoleDetail !== undefined) {
+                consoleApi.error(options.consoleMessage, options.consoleDetail);
+            } else {
+                consoleApi.error(options.consoleMessage);
+            }
+            app.queryUi?.setStatusMessage?.(options.statusMessage || '');
+            if (options.querySummary) {
+                app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
+            }
+
+            return true;
+        },
+        createDialogInvoker(app, reporterState, {
+            methodName,
+            issueKey = 'missingDialogDependency',
+            statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+            fallbackValue = false
+        } = {}) {
+            return (...args) => {
+                const dialogFn = app?.state?.dependencies?.[methodName];
+                if (typeof dialogFn === 'function') {
+                    return dialogFn(...args);
+                }
+
+                const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+                shared.reportRendererIssue(app, reporterState, issueKey, {
+                    consoleMessage: `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+                    consoleDetail: { title, message },
+                    statusMessage: typeof statusMessage === 'function'
+                        ? statusMessage({ methodName, title, message })
+                        : statusMessage
+                });
+                return Promise.resolve(fallbackValue);
+            };
+        },
+        formatBoardEstimate: (value) => {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue) || numericValue <= 0) {
+                return '-';
+            }
+
+            return String(numericValue);
+        }
+    };
+
     return {
         console: consoleApi,
         showAlert: overrides.showAlert || (() => {}),
@@ -111,45 +175,7 @@ function createSandbox(shell, overrides = {}) {
         },
         window: {
             TFTRenderer: {
-                shared: {
-                    resolveShellElements: createResolveShellElements(shell),
-                    setResultsBodyMessage(app, tbody, message, className = 'results-message-row') {
-                        if (!tbody || typeof app?.results?.renderResultsMessageRow !== 'function') {
-                            return false;
-                        }
-
-                        tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
-                        return true;
-                    },
-                    reportRendererIssue(app, reporterState, issueKey, options = {}) {
-                        if (reporterState && issueKey) {
-                            if (reporterState[issueKey]) {
-                                return false;
-                            }
-                            reporterState[issueKey] = true;
-                        }
-
-                        if (options.consoleDetail !== null && options.consoleDetail !== undefined) {
-                            consoleApi.error(options.consoleMessage, options.consoleDetail);
-                        } else {
-                            consoleApi.error(options.consoleMessage);
-                        }
-                        app.queryUi?.setStatusMessage?.(options.statusMessage || '');
-                        if (options.querySummary) {
-                            app.queryUi?.renderQuerySummary?.(options.querySummary.params ?? null, options.querySummary.meta ?? '');
-                        }
-
-                        return true;
-                    },
-                    formatBoardEstimate: (value) => {
-                        const numericValue = Number(value);
-                        if (!Number.isFinite(numericValue) || numericValue <= 0) {
-                            return '-';
-                        }
-
-                        return String(numericValue);
-                    }
-                }
+                shared
             }
         }
     };

@@ -57,7 +57,7 @@ function toCanonicalPayload(params = {}) {
 }
 
 function createShared(overrides = {}) {
-    return {
+    const shared = {
         formatSnapshotAge: () => '',
         resolveShellElements: () => ({
             elements: {},
@@ -78,6 +78,33 @@ function createShared(overrides = {}) {
             }
 
             return true;
+        }
+    };
+
+    return {
+        ...shared,
+        createDialogInvoker(app, reporterState, {
+            methodName,
+            issueKey = 'missingDialogDependency',
+            statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+            fallbackValue = false
+        } = {}) {
+            return (...args) => {
+                const dialogFn = app?.state?.dependencies?.[methodName];
+                if (typeof dialogFn === 'function') {
+                    return dialogFn(...args);
+                }
+
+                const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+                shared.reportRendererIssue(app, reporterState, issueKey, {
+                    consoleMessage: `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+                    consoleDetail: { title, message },
+                    statusMessage: typeof statusMessage === 'function'
+                        ? statusMessage({ methodName, title, message })
+                        : statusMessage
+                });
+                return Promise.resolve(fallbackValue);
+            };
         },
         ...overrides
     };
@@ -366,9 +393,112 @@ describe('renderer data controller', () => {
         const controller = createDataController(app);
         await assert.doesNotReject(controller.fetchData());
 
-        assert.equal(app.state.activeData.unitMap.has('MissFortune'), true);
+        assert.equal(app.state.activeData, null);
         assert.equal(Object.keys(app.state.selectors).length, 0);
         assert.equal(statusMessages.at(-1), 'Renderer dependency mismatch: selector controls unavailable.');
+    });
+
+    it('does not commit a fetched dataset when selector shell validation fails', async () => {
+        const statusMessages = [];
+        let setupCalls = 0;
+        const malformedContainer = {
+            querySelector: (selector) => ({
+                '.pills': {},
+                input: {}
+            }[selector] || null)
+        };
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => id === 'mustIncludeContainer' ? malformedContainer : null
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared()
+                }
+            }
+        };
+
+        const createDataController = loadDataControllerFactory(sandbox);
+        const app = {
+            state: {
+                selectors: {},
+                dependencies: {
+                    setupMultiSelect: () => {
+                        setupCalls += 1;
+                        return createSelector([], true);
+                    },
+                    showAlert: () => {}
+                },
+                hasElectronAPI: true,
+                electronBridge: {
+                    fetchData: async () => ({
+                        success: true,
+                        dataSource: 'pbe',
+                        setNumber: '17',
+                        dataFingerprint: 'next-fingerprint',
+                        snapshotFetchedAt: Date.now(),
+                        usedCachedSnapshot: false,
+                        count: 1,
+                        units: [{ id: 'MissFortune', displayName: 'Miss Fortune', variants: [] }],
+                        traits: ['Conduit'],
+                        roles: ['Carry'],
+                        traitBreakpoints: { Conduit: [2] },
+                        traitIcons: {},
+                        assetValidation: null,
+                        hashMap: {}
+                    })
+                },
+                activeData: {
+                    unitMap: new Map([['Baseline', { id: 'Baseline' }]]),
+                    dataSource: 'pbe',
+                    dataFingerprint: 'baseline-fingerprint'
+                },
+                lastSearchParams: null
+            },
+            queryUi: {
+                getSelectedDataSource: () => 'pbe',
+                getDataSourceLabel: () => 'PBE',
+                getCurrentVariantLocks: () => ({}),
+                syncFetchButtonState: () => {},
+                syncSearchButtonState: () => {},
+                setStatusMessage: (message) => statusMessages.push(message),
+                summarizeAssetValidation: () => '',
+                setDataStats: () => {},
+                renderQuerySummary: () => {},
+                getAssetCoverageLabel: () => 'N/A',
+                renderVariantLockControls: () => {},
+                applyDefaultRoleFilters: () => {},
+                bindDraftQueryListeners: () => {},
+                refreshDraftQuerySummary: () => {},
+                getCurrentSearchParams: () => ({
+                    boardSize: 9,
+                    maxResults: 500,
+                    mustInclude: [],
+                    mustExclude: [],
+                    mustIncludeTraits: [],
+                    mustExcludeTraits: [],
+                    extraEmblems: [],
+                    tankRoles: [],
+                    carryRoles: [],
+                    variantLocks: {},
+                    onlyActive: true,
+                    tierRank: true,
+                    includeUnique: false
+                }),
+                normalizeSearchParams: async (params) => toCanonicalPayload(params)
+            },
+            history: {
+                updateHistoryList: () => {}
+            }
+        };
+
+        const controller = createDataController(app);
+        await assert.doesNotReject(controller.fetchData());
+
+        assert.equal(setupCalls, 0);
+        assert.equal(app.state.activeData.dataFingerprint, 'baseline-fingerprint');
+        assert.equal(statusMessages.at(-1), 'Renderer shell mismatch: selector controls unavailable.');
     });
 
     it('derives refresh query restore state through the extracted helper', () => {

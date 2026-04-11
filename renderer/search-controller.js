@@ -9,46 +9,15 @@
             missingDialogDependencies: false
         };
 
-        function reportMissingDialogDependencies() {
-            reportRendererIssue(app, reporterState, 'missingDialogDependencies', {
-                consoleMessage: '[Renderer Dependency Missing] Dialog helpers are unavailable.',
-                statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.',
-                querySummary: {
-                    params: state.lastSearchParams || null,
-                    meta: 'Dependency mismatch'
-                }
-            });
-        }
+        const showAlert = createDialogInvoker(app, reporterState, {
+            methodName: 'showAlert',
+            issueKey: 'missingDialogDependencies'
+        });
 
-        const showAlert = typeof createDialogInvoker === 'function'
-            ? createDialogInvoker(app, reporterState, {
-                methodName: 'showAlert',
-                issueKey: 'missingDialogDependencies'
-            })
-            : function fallbackShowAlert(message, title = 'Attention') {
-                const alertFn = state.dependencies?.showAlert;
-                if (typeof alertFn === 'function') {
-                    return alertFn(message, title);
-                }
-
-                reportMissingDialogDependencies();
-                return Promise.resolve(false);
-            };
-
-        const showConfirm = typeof createDialogInvoker === 'function'
-            ? createDialogInvoker(app, reporterState, {
-                methodName: 'showConfirm',
-                issueKey: 'missingDialogDependencies'
-            })
-            : async function fallbackShowConfirm(message, title = 'Confirmation') {
-                const confirmFn = state.dependencies?.showConfirm;
-                if (typeof confirmFn === 'function') {
-                    return await confirmFn(message, title);
-                }
-
-                reportMissingDialogDependencies();
-                return false;
-            };
+        const showConfirm = createDialogInvoker(app, reporterState, {
+            methodName: 'showConfirm',
+            issueKey: 'missingDialogDependencies'
+        });
 
         function normalizeSearchProgress(progress = null) {
             if (Number.isFinite(progress)) {
@@ -552,6 +521,56 @@
             }
         }
 
+        async function submitSearch(params = null) {
+            if (params) {
+                app.queryUi.applySearchParams(params);
+            }
+            return await handleSearchClick();
+        }
+
+        async function executeSearchRun(tbody, params) {
+            renderActiveSearchUi();
+
+            if (!state.electronBridge?.getSearchEstimate) {
+                throw new Error('Electron preload bridge is unavailable.');
+            }
+            const estimate = await state.electronBridge.getSearchEstimate(params);
+            state.activeSearchEstimate = estimate;
+            renderActiveSearchUi();
+
+            const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
+            if (estimate.remainingSlots > maxRemainingSlots) {
+                handleLargeBoardState(tbody, params, maxRemainingSlots);
+                return;
+            }
+
+            if (!await confirmLargeSearchVolume(estimate)) {
+                handleAbortedSearchState(tbody, params);
+                return;
+            }
+
+            const startTime = Date.now();
+            if (!state.electronBridge?.searchBoards) {
+                throw new Error('Electron preload bridge is unavailable.');
+            }
+            const response = await state.electronBridge.searchBoards(params);
+            if (response?.searchId !== null && response?.searchId !== undefined) {
+                state.activeSearchId = response.searchId;
+            }
+            if (response.cancelled) {
+                handleCancelledSearchState(tbody, params);
+                return;
+            }
+
+            if (!response.success) {
+                handleFailedSearchState(tbody, params, response.error || 'Search failed unexpectedly.');
+                return;
+            }
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            applySearchResults(response, params, elapsed);
+        }
+
         async function handleSearchClick() {
             if (state.isSearching) return;
             if (state.isFetchingData) {
@@ -578,46 +597,7 @@
             try {
                 const params = await normalizeCurrentSearchParams();
                 state.lastSearchParams = params;
-                renderActiveSearchUi();
-
-                if (!state.electronBridge?.getSearchEstimate) {
-                    throw new Error('Electron preload bridge is unavailable.');
-                }
-                const estimate = await state.electronBridge.getSearchEstimate(params);
-                state.activeSearchEstimate = estimate;
-                renderActiveSearchUi();
-
-                const maxRemainingSlots = state.searchLimits.MAX_REMAINING_SLOTS ?? 7;
-                if (estimate.remainingSlots > maxRemainingSlots) {
-                    handleLargeBoardState(tbody, params, maxRemainingSlots);
-                    return;
-                }
-
-                if (!await confirmLargeSearchVolume(estimate)) {
-                    handleAbortedSearchState(tbody, params);
-                    return;
-                }
-
-                const startTime = Date.now();
-                if (!state.electronBridge?.searchBoards) {
-                    throw new Error('Electron preload bridge is unavailable.');
-                }
-                const response = await state.electronBridge.searchBoards(params);
-                if (response?.searchId !== null && response?.searchId !== undefined) {
-                    state.activeSearchId = response.searchId;
-                }
-                if (response.cancelled) {
-                    handleCancelledSearchState(tbody, params);
-                    return;
-                }
-
-                if (!response.success) {
-                    handleFailedSearchState(tbody, params, response.error || 'Search failed unexpectedly.');
-                    return;
-                }
-
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                applySearchResults(response, params, elapsed);
+                await executeSearchRun(tbody, params);
             } catch (error) {
                 console.error(error);
                 const uiState = getUnexpectedSearchFailureUiState(error);
@@ -670,6 +650,7 @@
             setCancellingSearch,
             setSearchState,
             requestCancelSearch,
+            submitSearch,
             handleSearchClick,
             subscribeProgressUpdates,
             __test: {

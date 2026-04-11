@@ -5,13 +5,22 @@
     ns.createDataController = function createDataController(app) {
         const { state } = app;
         const reporterState = {
-            missingSetupDependency: false
+            missingSetupDependency: false,
+            malformedSelectorShell: false
         };
 
         function reportMissingSetupDependency() {
             reportRendererIssue(app, reporterState, 'missingSetupDependency', {
                 consoleMessage: '[Renderer Dependency Missing] setupMultiSelect is unavailable.',
                 statusMessage: 'Renderer dependency mismatch: selector controls unavailable.'
+            });
+        }
+
+        function reportMalformedSelectorShell(containerId, missingParts = []) {
+            reportRendererIssue(app, reporterState, 'malformedSelectorShell', {
+                consoleMessage: '[Renderer Shell Mismatch] Multi-select shell is incomplete.',
+                consoleDetail: { containerId, missingParts },
+                statusMessage: 'Renderer shell mismatch: selector controls unavailable.'
             });
         }
 
@@ -25,24 +34,10 @@
             return null;
         }
 
-        const showAlert = typeof createDialogInvoker === 'function'
-            ? createDialogInvoker(app, null, {
-                methodName: 'showAlert',
-                statusMessage: ({ title }) => `Renderer dependency mismatch: unable to show "${title}".`
-            })
-            : function fallbackShowAlert(message, title = 'Attention') {
-                const alertFn = state.dependencies?.showAlert;
-                if (typeof alertFn === 'function') {
-                    return alertFn(message, title);
-                }
-
-                reportRendererIssue(app, null, null, {
-                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
-                    consoleDetail: { title, message },
-                    statusMessage: `Renderer dependency mismatch: unable to show "${title}".`
-                });
-                return Promise.resolve(false);
-            };
+        const showAlert = createDialogInvoker(app, null, {
+            methodName: 'showAlert',
+            statusMessage: ({ title }) => `Renderer dependency mismatch: unable to show "${title}".`
+        });
 
         function collectUnitTraitLabels(unit) {
             const traitNames = new Set();
@@ -167,7 +162,37 @@
             ];
         }
 
-        function initializeSelectors(res, preservedVariantLocks) {
+        function getSelectorShellIssues(selectorSetupConfigs = []) {
+            if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+                return [];
+            }
+
+            return selectorSetupConfigs.reduce((issues, config) => {
+                const container = document.getElementById(config.containerId);
+                if (container && typeof container.querySelector !== 'function') {
+                    return issues;
+                }
+                if (!container) {
+                    issues.push({
+                        containerId: config.containerId,
+                        missingParts: ['container']
+                    });
+                    return issues;
+                }
+
+                const missingParts = [];
+                if (!container.querySelector('.pills')) missingParts.push('.pills');
+                if (!container.querySelector('input')) missingParts.push('input');
+                if (!container.querySelector('.dropdown')) missingParts.push('.dropdown');
+                if (missingParts.length > 0) {
+                    issues.push({ containerId: config.containerId, missingParts });
+                }
+
+                return issues;
+            }, []);
+        }
+
+        function initializeSelectors(res, preservedVariantLocks, activeData) {
             const setupMultiSelect = getSetupMultiSelect();
             if (!setupMultiSelect) {
                 return false;
@@ -176,18 +201,45 @@
             const unitOptions = createUnitOptions(res.units);
             const traitOptions = createTraitOptions(res);
             const selectorSetupConfigs = getSelectorSetupConfigs(unitOptions, traitOptions, res.roles);
+            const selectorShellIssues = getSelectorShellIssues(selectorSetupConfigs);
+            if (selectorShellIssues.length > 0) {
+                reportMalformedSelectorShell(
+                    selectorShellIssues[0].containerId,
+                    selectorShellIssues[0].missingParts
+                );
+                return false;
+            }
+
+            const nextSelectors = {};
+            let unavailableSelector = null;
 
             selectorSetupConfigs.forEach((config) => {
-                state.selectors[config.key] = setupMultiSelect(
+                if (unavailableSelector) {
+                    return;
+                }
+
+                const selector = setupMultiSelect(
                     config.containerId,
                     config.options,
                     config.isUnit
                 );
-            });
+                if (selector?.ready === false) {
+                    unavailableSelector = config;
+                    return;
+                }
 
-            app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
+                nextSelectors[config.key] = selector;
+            });
+            if (unavailableSelector) {
+                reportMalformedSelectorShell(unavailableSelector.containerId, ['controller']);
+                Object.values(nextSelectors).forEach((selector) => selector.destroy?.());
+                return false;
+            }
+
+            state.selectors = nextSelectors;
+            app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks, activeData);
             Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
-            app.queryUi.applyDefaultRoleFilters();
+            app.queryUi.applyDefaultRoleFilters(false, activeData);
             return true;
         }
 
@@ -383,12 +435,11 @@
                 }
                 if (res.success) {
                     const successState = getSuccessfulFetchState(res, source, previousFingerprint);
-                    state.activeData = successState.activeData;
-
-                    renderLoadedDataStatus(res, successState.setLabel, successState.cacheSummary);
-                    if (!initializeSelectors(res, preservedVariantLocks)) {
+                    if (!initializeSelectors(res, preservedVariantLocks, successState.activeData)) {
                         return;
                     }
+                    state.activeData = successState.activeData;
+                    renderLoadedDataStatus(res, successState.setLabel, successState.cacheSummary);
                     await restoreQueryState(previousEffectiveQuery, {
                         hadVisibleResults,
                         dataChanged: successState.dataChanged,

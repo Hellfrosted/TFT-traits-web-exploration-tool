@@ -7,24 +7,9 @@
         const reporterState = {
             missingDialogDependency: false
         };
-        const showAlert = typeof createDialogInvoker === 'function'
-            ? createDialogInvoker(app, reporterState, {
-                methodName: 'showAlert'
-            })
-            : function fallbackShowAlert(message, title = 'Attention') {
-                const alertFn = state.dependencies?.showAlert;
-                if (typeof alertFn === 'function') {
-                    return alertFn(message, title);
-                }
-
-                reportRendererIssue(app, reporterState, 'missingDialogDependency', {
-                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
-                    consoleDetail: { title, message },
-                    statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.'
-                });
-
-                return Promise.resolve(false);
-            };
+        const showAlert = createDialogInvoker(app, reporterState, {
+            methodName: 'showAlert'
+        });
 
         function publishRendererReadyState(isReady) {
             const root = document.documentElement;
@@ -180,24 +165,51 @@
             publishRendererReadyState(true);
         }
 
+        function waitForRendererBootstrapReady(timeoutMs = 1500) {
+            if (document.readyState !== 'loading') {
+                return Promise.resolve();
+            }
+
+            return new Promise((resolve) => {
+                let resolved = false;
+                let timeoutHandle = null;
+
+                const finish = () => {
+                    if (resolved) {
+                        return;
+                    }
+                    resolved = true;
+                    if (timeoutHandle) {
+                        clearTimeout(timeoutHandle);
+                        timeoutHandle = null;
+                    }
+                    document.removeEventListener('DOMContentLoaded', finish);
+                    window.removeEventListener('load', finish);
+                    resolve();
+                };
+
+                document.addEventListener('DOMContentLoaded', finish, { once: true });
+                window.addEventListener('load', finish, { once: true });
+                timeoutHandle = setTimeout(finish, timeoutMs);
+            });
+        }
+
         function scheduleRendererBootstrap() {
             if (state.listeners.bootScheduled) return;
             state.listeners.bootScheduled = true;
 
-            const runBootstrap = () => {
+            if (document.readyState !== 'loading') {
                 bootstrapRenderer().catch((error) => {
                     reportRendererInitFailure(error);
                 });
-            };
-
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', runBootstrap, { once: true });
-                window.addEventListener('load', runBootstrap, { once: true });
-                setTimeout(runBootstrap, 1500);
                 return;
             }
 
-            runBootstrap();
+            waitForRendererBootstrapReady()
+                .then(() => bootstrapRenderer())
+                .catch((error) => {
+                    reportRendererInitFailure(error);
+                });
         }
 
         function installErrorHandlers() {

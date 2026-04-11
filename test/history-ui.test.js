@@ -15,7 +15,7 @@ function loadHistoryUiFactory(sandbox) {
 }
 
 function createShared(overrides = {}) {
-    return {
+    const shared = {
         escapeHtml: (value) => String(value ?? ''),
         summarizeParams: () => '',
         formatTimestamp: () => '',
@@ -33,9 +33,46 @@ function createShared(overrides = {}) {
             }
 
             return true;
+        }
+    };
+
+    return {
+        ...shared,
+        createDialogInvoker(app, reporterState, {
+            methodName,
+            issueKey = 'missingDialogDependency',
+            statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+            fallbackValue = false
+        } = {}) {
+            return (...args) => {
+                const dialogFn = app?.state?.dependencies?.[methodName];
+                if (typeof dialogFn === 'function') {
+                    return dialogFn(...args);
+                }
+
+                const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+                shared.reportRendererIssue(app, reporterState, issueKey, {
+                    consoleMessage: `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+                    consoleDetail: { title, message },
+                    statusMessage: typeof statusMessage === 'function'
+                        ? statusMessage({ methodName, title, message })
+                        : statusMessage
+                });
+                return Promise.resolve(fallbackValue);
+            };
         },
         ...overrides
     };
+}
+
+function createDeferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
 }
 
 function createDomElement(tagName) {
@@ -318,8 +355,78 @@ describe('renderer history UI', () => {
         assert.equal(searchClicks, 1);
     });
 
+    it('ignores stale history refresh responses that resolve out of order', async () => {
+        const historyList = createDomElement('div');
+        const firstList = createDeferred();
+        const secondList = createDeferred();
+        let listCacheCalls = 0;
+        const sandbox = {
+            console,
+            document: {
+                getElementById: (id) => id === 'historyList' ? historyList : null,
+                createElement: (tagName) => createDomElement(tagName)
+            },
+            window: {
+                TFTRenderer: {
+                    shared: createShared({
+                        summarizeParams: (params) => `Inc: ${params.mustInclude.join(', ')}`,
+                        formatTimestamp: () => '12:00'
+                    })
+                }
+            }
+        };
+
+        const createHistoryUi = loadHistoryUiFactory(sandbox);
+        const app = {
+            state: {
+                isSearching: false,
+                isFetchingData: false,
+                dependencies: {
+                    showAlert: () => {}
+                },
+                electronBridge: {
+                    listCache: async () => {
+                        listCacheCalls += 1;
+                        return await (listCacheCalls === 1 ? firstList.promise : secondList.promise);
+                    }
+                },
+                activeData: null,
+                selectors: {}
+            },
+            queryUi: {}
+        };
+
+        const historyUi = createHistoryUi(app);
+        const firstRefresh = historyUi.updateHistoryList();
+        const secondRefresh = historyUi.updateHistoryList();
+
+        secondList.resolve({
+            success: true,
+            entries: [{
+                params: { boardSize: 9, mustInclude: ['Newest'] },
+                resultCount: 2,
+                timestamp: 1234
+            }]
+        });
+        await secondRefresh;
+
+        firstList.resolve({
+            success: true,
+            entries: [{
+                params: { boardSize: 9, mustInclude: ['Stale'] },
+                resultCount: 1,
+                timestamp: 1233
+            }]
+        });
+        await firstRefresh;
+
+        assert.equal(historyList.children.length, 1);
+        assert.equal(historyList.children[0].children[1].textContent, 'Inc: Newest');
+    });
+
     it('normalizes replayed params before applying and launching a replay search', async () => {
         let searchClicks = 0;
+        let submitSearchCalls = 0;
         const appliedParams = [];
         const renderedSummaries = [];
         const resolvedHashMaps = [];
@@ -376,6 +483,11 @@ describe('renderer history UI', () => {
                     dataFingerprint: 'fp'
                 }),
                 renderQuerySummary: (params, meta) => renderedSummaries.push({ params, meta })
+            },
+            search: {
+                submitSearch: async () => {
+                    submitSearchCalls += 1;
+                }
             }
         };
 
@@ -393,7 +505,8 @@ describe('renderer history UI', () => {
             maxResults: 500,
             mustInclude: ['Canonical']
         }]);
-        assert.equal(searchClicks, 1);
+        assert.equal(searchClicks, 0);
+        assert.equal(submitSearchCalls, 1);
         assert.equal(resolvedHashMaps.length, 2);
         assert.deepEqual(renderedSummaries, [{
             params: {

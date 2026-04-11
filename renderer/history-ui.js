@@ -1,29 +1,27 @@
 (function initializeHistoryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, summarizeParams, formatTimestamp, reportRendererIssue, createDialogInvoker } = ns.shared;
+    const { escapeHtml, summarizeParams, formatTimestamp, createDialogInvoker } = ns.shared;
 
     ns.createHistoryUi = function createHistoryUi(app) {
         const { state } = app;
         const reporterState = {
             missingDialogDependency: false
         };
-        const showAlert = typeof createDialogInvoker === 'function'
-            ? createDialogInvoker(app, reporterState, {
-                methodName: 'showAlert'
-            })
-            : function fallbackShowAlert(message, title = 'Attention') {
-                const alertFn = state.dependencies?.showAlert;
-                if (typeof alertFn === 'function') {
-                    return alertFn(message, title);
-                }
+        let nextHistoryRefreshRequestId = 0;
+        let activeHistoryRefreshRequestId = 0;
+        const showAlert = createDialogInvoker(app, reporterState, {
+            methodName: 'showAlert'
+        });
 
-                reportRendererIssue(app, reporterState, 'missingDialogDependency', {
-                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
-                    consoleDetail: { title, message },
-                    statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.'
-                });
-                return Promise.resolve(false);
-            };
+        function beginHistoryRefresh() {
+            const requestId = ++nextHistoryRefreshRequestId;
+            activeHistoryRefreshRequestId = requestId;
+            return requestId;
+        }
+
+        function isActiveHistoryRefresh(requestId) {
+            return requestId === activeHistoryRefreshRequestId;
+        }
 
         function resolveHistoryShell() {
             return {
@@ -115,14 +113,21 @@
                 return;
             }
 
+            const requestId = beginHistoryRefresh();
             let res;
             try {
                 res = await state.electronBridge.listCache();
             } catch (error) {
+                if (!isActiveHistoryRefresh(requestId)) {
+                    return;
+                }
                 renderHistoryEmptyState(listEl, getHistoryListStateMessage(null, error));
                 return;
             }
 
+            if (!isActiveHistoryRefresh(requestId)) {
+                return;
+            }
             const stateMessage = getHistoryListStateMessage(res);
             if (stateMessage) {
                 renderHistoryEmptyState(listEl, stateMessage);
@@ -154,6 +159,13 @@
             app.queryUi.applySearchParams(canonicalParams);
             resolveReplayRolePills();
             app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
+            if (typeof app.search?.submitSearch === 'function') {
+                Promise.resolve(app.search.submitSearch()).catch((error) => {
+                    console.error('[History Replay Search Failed]', error);
+                });
+                return;
+            }
+
             const { searchBtn } = resolveHistoryShell();
             searchBtn?.click();
         }
@@ -173,7 +185,7 @@
         async function loadSearchFromHistory(entry) {
             const replayBusyMessage = getHistoryReplayBusyMessage();
             if (replayBusyMessage) {
-                void showAlert(replayBusyMessage);
+                void showAlert(replayBusyMessage, 'Attention');
                 return;
             }
 
