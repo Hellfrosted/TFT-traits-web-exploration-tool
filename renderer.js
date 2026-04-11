@@ -11,6 +11,7 @@
         'createHistoryUi',
         'createDataController',
         'createSearchOperations',
+        'createSearchShellUi',
         'createSearchOutcomesUi',
         'createSearchController',
         'createBootstrap',

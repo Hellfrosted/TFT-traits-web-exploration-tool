@@ -9,6 +9,10 @@ function loadSearchControllerFactory(sandbox) {
         path.join(__dirname, '..', 'renderer', 'search-ui-state.js'),
         'utf8'
     );
+    const searchShellUiSource = fs.readFileSync(
+        path.join(__dirname, '..', 'renderer', 'search-shell-ui.js'),
+        'utf8'
+    );
     const searchOperationsSource = fs.readFileSync(
         path.join(__dirname, '..', 'renderer', 'search-operations.js'),
         'utf8'
@@ -23,6 +27,7 @@ function loadSearchControllerFactory(sandbox) {
     );
 
     vm.runInNewContext(searchUiStateSource, sandbox, { filename: 'renderer/search-ui-state.js' });
+    vm.runInNewContext(searchShellUiSource, sandbox, { filename: 'renderer/search-shell-ui.js' });
     vm.runInNewContext(searchOperationsSource, sandbox, { filename: 'renderer/search-operations.js' });
     vm.runInNewContext(searchOutcomesUiSource, sandbox, { filename: 'renderer/search-outcomes-ui.js' });
     vm.runInNewContext(controllerSource, sandbox, { filename: 'renderer/search-controller.js' });
