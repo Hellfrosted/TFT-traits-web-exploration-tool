@@ -3,6 +3,7 @@
     const createVariantLockUi = ns.createVariantLockUi;
     const createQuerySummaryUi = ns.createQuerySummaryUi;
     const createQueryControlState = ns.createQueryControlState;
+    const createQueryShellUi = ns.createQueryShellUi;
 
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
@@ -15,80 +16,10 @@
             getDefaultBoardSize,
             getDefaultMaxResults
         });
-
-        function resolveQueryElements(ids) {
-            const elements = {};
-            (Array.isArray(ids) ? ids : []).forEach((id) => {
-                elements[id] = document.getElementById(id);
-            });
-            return elements;
-        }
-
-        function resolveSummaryShell() {
-            return resolveQueryElements([
-                'resultsSummary',
-                'resultsQuerySummary',
-                'dataStats',
-                'status',
-                'dataSourceSelect',
-                'fetchBtn',
-                'searchBtn',
-                'variantLocksSection',
-                'variantLocksContainer'
-            ]);
-        }
-
-        function resolveQueryControls() {
-            return resolveQueryElements([
-                'boardSize',
-                'maxResults',
-                'onlyActiveToggle',
-                'tierRankToggle',
-                'includeUniqueToggle'
-            ]);
-        }
-
-        function setResultsSummary(content) {
-            const { resultsSummary: summary } = resolveSummaryShell();
-            if (summary) {
-                summary.innerHTML = content;
-            }
-        }
-
-        function setQuerySummary(content) {
-            const { resultsQuerySummary: summary } = resolveSummaryShell();
-            if (summary) {
-                summary.innerHTML = content;
-            }
-        }
-
-        function setDataStats(units = '-', traits = '-', roles = '-', assets = '-') {
-            const { dataStats: stats } = resolveSummaryShell();
-            if (!stats) return;
-
-            stats.innerHTML = querySummaryUi.buildDataStatsMarkup({
-                units,
-                traits,
-                roles,
-                assets
-            });
-        }
-
-        function setStatusMessage(message) {
-            const { status } = resolveSummaryShell();
-            if (status) {
-                status.innerText = message;
-            }
-        }
-
-        function getSelectedDataSource() {
-            const { dataSourceSelect: sourceSelect } = resolveSummaryShell();
-            return sourceSelect?.value || state.defaultDataSource;
-        }
-
-        function getDataSourceLabel(source) {
-            return source === 'latest' ? 'Live' : 'PBE';
-        }
+        const queryShellUi = createQueryShellUi(app, {
+            querySummaryUi,
+            queryControlState
+        });
 
         function getDefaultRoleFilterValues() {
             if (!state.activeData?.roles) return null;
@@ -120,7 +51,7 @@
             applyDefaultRoleSelectorValues(state.selectors.carryRoles, defaultRoleValues.carryRoles, force);
         }
         const variantLockUi = createVariantLockUi(app, {
-            resolveSummaryShell,
+            resolveSummaryShell: queryShellUi.resolveSummaryShell,
             refreshDraftQuerySummary
         });
 
@@ -132,32 +63,10 @@
             return querySummaryUi.summarizeAssetValidation(assetValidation);
         }
 
-        function syncFetchButtonState() {
-            const { fetchBtn } = resolveSummaryShell();
-            if (!fetchBtn) return;
-            const uiState = queryControlState.getFetchButtonUiState({
-                isSearching: state.isSearching,
-                isFetchingData: state.isFetchingData
-            });
-            queryControlState.applyFetchButtonUi(fetchBtn, uiState);
-        }
-
-        function syncSearchButtonState() {
-            const { searchBtn } = resolveSummaryShell();
-            if (!searchBtn) return;
-
-            const uiState = queryControlState.getSearchButtonUiState({
-                isSearching: state.isSearching,
-                isFetchingData: state.isFetchingData,
-                hasActiveData: !!state.activeData
-            });
-            queryControlState.applySearchButtonUi(searchBtn, uiState);
-        }
-
         function renderQuerySummary(params = null, meta = 'Idle') {
             const metaClass = querySummaryUi.getQuerySummaryMetaClass(meta);
             const chips = params ? querySummaryUi.buildQuerySummaryChips(params) : [];
-            setQuerySummary(querySummaryUi.buildQuerySummaryMarkup({
+            queryShellUi.setQuerySummary(querySummaryUi.buildQuerySummaryMarkup({
                 chips,
                 meta,
                 metaClass
@@ -224,7 +133,7 @@
         }
 
         function getCurrentSearchParams() {
-            const controls = resolveQueryControls();
+            const controls = queryShellUi.resolveQueryControls();
             return {
                 ...queryControlState.readQueryControlValues(controls),
                 mustInclude: state.selectors.mustInclude?.getValues() || [],
@@ -270,13 +179,13 @@
                 ...defaults,
                 ...params
             };
-            const controls = resolveQueryControls();
+            const controls = queryShellUi.resolveQueryControls();
             queryControlState.applyQueryControlValues(controls, nextParams);
             applySelectorSearchParams(nextParams);
         }
 
         function clampNumericInput(id, min, max, fallback) {
-            const input = resolveQueryControls()[id];
+            const input = queryShellUi.resolveQueryControls()[id];
             return queryControlState.clampNumericInput(input, min, max, fallback);
         }
 
@@ -317,27 +226,27 @@
         function bindDraftQueryListeners() {
             if (state.listeners.draftBound) return;
             state.listeners.draftBound = true;
-            const controls = resolveQueryControls();
+            const controls = queryShellUi.resolveQueryControls();
             bindNumericDraftListeners(controls);
             bindToggleDraftListeners(controls);
             bindMultiselectDraftListener();
         }
 
         return {
-            setResultsSummary,
-            setQuerySummary,
-            setDataStats,
-            setStatusMessage,
-            getSelectedDataSource,
-            getDataSourceLabel,
+            setResultsSummary: queryShellUi.setResultsSummary,
+            setQuerySummary: queryShellUi.setQuerySummary,
+            setDataStats: queryShellUi.setDataStats,
+            setStatusMessage: queryShellUi.setStatusMessage,
+            getSelectedDataSource: queryShellUi.getSelectedDataSource,
+            getDataSourceLabel: queryShellUi.getDataSourceLabel,
             applyDefaultRoleFilters,
             getCurrentVariantLocks: variantLockUi.getCurrentVariantLocks,
             applyVariantLocks: variantLockUi.applyVariantLocks,
             renderVariantLockControls: variantLockUi.renderVariantLockControls,
             getAssetCoverageLabel,
             summarizeAssetValidation,
-            syncFetchButtonState,
-            syncSearchButtonState,
+            syncFetchButtonState: queryShellUi.syncFetchButtonState,
+            syncSearchButtonState: queryShellUi.syncSearchButtonState,
             renderQuerySummary,
             getCurrentSearchParams,
             normalizeSearchParams,

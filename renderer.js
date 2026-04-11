@@ -5,6 +5,7 @@
         'createVariantLockUi',
         'createQuerySummaryUi',
         'createQueryControlState',
+        'createQueryShellUi',
         'createQueryUi',
         'createResultsInteractions',
         'createResultsSpotlight',
