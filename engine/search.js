@@ -17,6 +17,12 @@ const {
     shouldPruneSearchBranch,
     shouldEmitProgress
 } = require('./search-dfs-state.js');
+const {
+    buildRoleRequirementState,
+    buildUnitSortRank,
+    buildUnitSearchInfo,
+    buildInitialSearchState
+} = require('./search-setup.js');
 
 module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
@@ -122,172 +128,60 @@ module.exports = {
             unitIndexById[unit.id] = index;
         });
 
-        const tankRoleSet = new Set(tankRoles || []);
-        const carryRoleSet = new Set(carryRoles || []);
-        const requireTank = tankRoleSet.size > 0;
-        const requireCarry = carryRoleSet.size > 0;
-        const meetsTankRequirement = (tankThreePlusCount, tankFourPlusCount) => (
-            !requireTank ||
-            tankFourPlusCount >= 1 ||
-            tankThreePlusCount >= 2
-        );
-        const meetsCarryRequirement = (carryFourPlusCount) => (
-            !requireCarry ||
-            carryFourPlusCount >= 1
-        );
+        const {
+            tankRoleSet,
+            carryRoleSet,
+            requireTank,
+            requireCarry,
+            meetsTankRequirement,
+            meetsCarryRequirement
+        } = buildRoleRequirementState(tankRoles, carryRoles);
 
         const numTraits = allTraitNames.length;
         const mustIncludeTraitIndices = (mustIncludeTraits || [])
             .map((traitName) => traitIndex[traitName])
             .filter((index) => index !== undefined);
         const excludedTraitSet = new Set(mustExcludeTraits || []);
-        const unitSortRank = Object.create(null);
-        validUnits
-            .map((unit) => unit.id)
-            .sort((leftId, rightId) => leftId.localeCompare(rightId))
-            .forEach((unitId, sortRank) => {
-                unitSortRank[unitId] = sortRank;
-            });
-
-        const unitInfo = validUnits.map((unit) => {
-            const baseTraitContributionEntries = this.buildTraitContributionEntries(unit, traitIndex, dataCache.hashMap);
-            let fixedTraitContributionEntries = baseTraitContributionEntries;
-            let variantProfiles = [];
-            const baseSlotCost = this.getEntitySlotCost(unit);
-            let minSlotCost = baseSlotCost;
-            let maxSlotCost = baseSlotCost;
-            const conditionalEffectEntries = this.buildConditionalEffectEntries(
-                unit.conditionalEffects,
-                traitIndex,
-                dataCache.hashMap
-            ).map((effect) => ({
-                ...effect,
-                compiledConditions: this.compileConditions(effect.conditions, traitIndex, unitIndexById, traitBPs)
-            }));
-            const conditionalProfileEntries = this.buildConditionalProfileEntries(
-                unit.conditionalProfiles,
-                traitIndex,
-                dataCache.hashMap
-            ).map((profile) => ({
-                ...profile,
-                compiledConditions: this.compileConditions(profile.conditions, traitIndex, unitIndexById, traitBPs)
-            }));
-
-            if (Array.isArray(unit.variants) && unit.variants.length > 0) {
-                const lockedVariantId = variantLocks?.[unit.id] || null;
-                const allowedVariantProfiles = unit.variants
-                    .filter((variant) => !lockedVariantId || variant.id === lockedVariantId)
-                    .filter((variant) => !variant.traits?.some((trait) => excludedTraitSet.has(trait)))
-                    .map((variant) => ({
-                        id: variant.id,
-                        label: variant.label || variant.id,
-                        role: variant.role || unit.role,
-                        slotCost: this.getEntitySlotCost(variant),
-                        traits: variant.traits || [],
-                        fullTraitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
-                        traitContributionEntries: this.buildTraitContributionEntries(variant, traitIndex, dataCache.hashMap),
-                        compiledConditions: this.compileConditions(variant.conditions, traitIndex, unitIndexById, traitBPs),
-                        conditionalProfileEntries: this.buildConditionalProfileEntries(
-                            variant.conditionalProfiles,
-                            traitIndex,
-                            dataCache.hashMap
-                        ).map((profile) => ({
-                            ...profile,
-                            compiledConditions: this.compileConditions(profile.conditions, traitIndex, unitIndexById, traitBPs)
-                        })),
-                        conditionalEffectEntries: this.buildConditionalEffectEntries(
-                            variant.conditionalEffects,
-                            traitIndex,
-                            dataCache.hashMap
-                        ).map((effect) => ({
-                            ...effect,
-                            compiledConditions: this.compileConditions(effect.conditions, traitIndex, unitIndexById, traitBPs)
-                        }))
-                    }));
-
-                const variantSummary = this.summarizeVariantProfiles(allowedVariantProfiles);
-                fixedTraitContributionEntries = variantSummary.fixedTraitContributionEntries;
-                minSlotCost = Math.min(...allowedVariantProfiles.map((variant) => variant.slotCost));
-                maxSlotCost = Math.max(...allowedVariantProfiles.map((variant) => variant.slotCost));
-                variantProfiles = variantSummary.variantProfiles.map((variant, variantIndex) => ({
-                    ...variant,
-                    slotCost: allowedVariantProfiles[variantIndex].slotCost,
-                    slotDelta: allowedVariantProfiles[variantIndex].slotCost - minSlotCost
-                }));
-            }
-
-            const traitContributionByIndex = Object.create(null);
-            fixedTraitContributionEntries.forEach(({ index, count }) => {
-                traitContributionByIndex[index] = count;
-            });
-
-            const isTank = tankRoleSet.has(unit.role);
-            const isCarry = carryRoleSet.has(unit.role);
-            return {
-                cost: unit.cost,
-                isTank,
-                isCarry,
-                minSlotCost,
-                maxSlotCost,
-                slotFlex: maxSlotCost - minSlotCost,
-                qualifyingTankThreePlus: isTank && unit.cost >= 3 ? 1 : 0,
-                qualifyingTankFourPlus: isTank && unit.cost >= 4 ? 1 : 0,
-                qualifyingCarryFourPlus: isCarry && unit.cost >= 4 ? 1 : 0,
-                baseTraitContributionEntries,
-                fixedTraitContributionEntries,
-                traitContributionByIndex,
-                conditionalProfileEntries,
-                conditionalEffectEntries,
-                variantProfiles,
-                hasComplexEvaluation: (
-                    conditionalProfileEntries.length > 0 ||
-                    conditionalEffectEntries.length > 0 ||
-                    variantProfiles.length > 0
-                ) ? 1 : 0,
-                sortRank: unitSortRank[unit.id] ?? 0,
-                id: unit.id
-            };
+        const unitSortRank = buildUnitSortRank(validUnits);
+        const unitInfo = buildUnitSearchInfo({
+            validUnits,
+            traitIndex,
+            hashMap: dataCache.hashMap,
+            traitBreakpoints: traitBPs,
+            unitIndexById,
+            variantLocks,
+            excludedTraitSet,
+            tankRoleSet,
+            carryRoleSet,
+            unitSortRank,
+            buildTraitContributionEntries: this.buildTraitContributionEntries.bind(this),
+            getEntitySlotCost: this.getEntitySlotCost.bind(this),
+            buildConditionalEffectEntries: this.buildConditionalEffectEntries.bind(this),
+            buildConditionalProfileEntries: this.buildConditionalProfileEntries.bind(this),
+            compileConditions: this.compileConditions.bind(this),
+            summarizeVariantProfiles: this.summarizeVariantProfiles.bind(this)
         });
 
-        let mustHaveInitialTankThreePlusCount = 0;
-        let mustHaveInitialTankFourPlusCount = 0;
-        let mustHaveInitialCarryFourPlusCount = 0;
-        let mustHaveInitialMinSlots = 0;
-        let mustHaveInitialSlotFlex = 0;
-        let mustHaveTotalCost = 0;
-        const initialTraitCounts = new Uint8Array(numTraits);
-        const activeUnitFlags = new Uint8Array(validUnits.length);
-        const mustHaveUnitIndices = [];
-        const mustHaveVariantUnitIndices = [];
-        let mustHaveComplexUnitCount = 0;
-
-        if (extraEmblems) {
-            extraEmblems.forEach((emblem) => {
-                const idx = traitIndex[emblem];
-                if (idx !== undefined) initialTraitCounts[idx]++;
-            });
-        }
-
-        for (let i = 0; i < validUnits.length; i++) {
-            if ((mustHaveMask & (1n << BigInt(i))) !== 0n) {
-                const info = unitInfo[i];
-                activeUnitFlags[i] = 1;
-                mustHaveInitialTankThreePlusCount += info.qualifyingTankThreePlus;
-                mustHaveInitialTankFourPlusCount += info.qualifyingTankFourPlus;
-                mustHaveInitialCarryFourPlusCount += info.qualifyingCarryFourPlus;
-                mustHaveInitialMinSlots += info.minSlotCost;
-                mustHaveInitialSlotFlex += info.slotFlex;
-                mustHaveTotalCost += info.cost;
-                mustHaveComplexUnitCount += info.hasComplexEvaluation;
-                info.fixedTraitContributionEntries.forEach(({ index, count }) => {
-                    initialTraitCounts[index] += count;
-                });
-                if (info.variantProfiles.length > 0) {
-                    mustHaveVariantUnitIndices.push(i);
-                }
-                mustHaveUnitIndices.push(i);
-            }
-        }
+        const {
+            mustHaveInitialTankThreePlusCount,
+            mustHaveInitialTankFourPlusCount,
+            mustHaveInitialCarryFourPlusCount,
+            mustHaveInitialMinSlots,
+            mustHaveInitialSlotFlex,
+            mustHaveTotalCost,
+            initialTraitCounts,
+            activeUnitFlags,
+            mustHaveUnitIndices,
+            mustHaveVariantUnitIndices,
+            mustHaveComplexUnitCount
+        } = buildInitialSearchState({
+            validUnits,
+            unitInfo,
+            mustHaveMask,
+            extraEmblems,
+            traitIndex,
+            numTraits
+        });
 
         const topBoards = [];
         const MAX_BOARDS = maxResults || LIMITS.DEFAULT_MAX_RESULTS;
