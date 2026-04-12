@@ -15,6 +15,7 @@ function createSearchContext(searchId) {
         cancelled: false,
         worker: null,
         settle: null,
+        terminate: null,
         completed: false,
         terminated: false,
         terminatePromise: null

@@ -109,17 +109,24 @@ function createSearchService({
         if (activeSearch) {
             const searchContext = activeSearch;
             searchContext.cancelled = true;
+            if (activeSearch === searchContext) {
+                activeSearch = null;
+            }
             if (!searchContext.worker) {
-                if (activeSearch === searchContext) {
-                    activeSearch = null;
-                }
-                searchContext.settle?.(createCancelledSearchResponse());
+                searchContext.settle?.(createCancelledSearchResponse(searchContext.searchId));
                 return { success: true };
             }
-            try {
-                await searchContext.worker.terminate();
-            } finally {
-                searchContext.settle?.(createCancelledSearchResponse());
+
+            searchContext.settle?.(createCancelledSearchResponse(searchContext.searchId));
+
+            if (typeof searchContext.terminate === 'function') {
+                void searchContext.terminate();
+            } else {
+                try {
+                    void Promise.resolve(searchContext.worker.terminate()).catch(() => {});
+                } catch {
+                    // The search is already resolved as cancelled; termination is best-effort here.
+                }
             }
             return { success: true };
         }
