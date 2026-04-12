@@ -1,6 +1,6 @@
 (function initializeRendererShared() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const REQUIRED_SHELL_IDS = [
+    const FALLBACK_REQUIRED_SHELL_IDS = [
         'dataSourceSelect',
         'fetchBtn',
         'status',
@@ -13,9 +13,100 @@
         'resetFiltersBtn',
         'resBody'
     ];
+    const REQUIRED_SHELL_IDS = Array.isArray(window.electronAPI?.rendererContract?.requiredShellIds)
+        ? [...window.electronAPI.rendererContract.requiredShellIds]
+        : FALLBACK_REQUIRED_SHELL_IDS;
+
+    function getMissingRequiredShellIds(ids = REQUIRED_SHELL_IDS) {
+        return (Array.isArray(ids) ? ids : [])
+            .filter((id) => !document.getElementById(id));
+    }
+
+    function resolveShellElements(ids = REQUIRED_SHELL_IDS) {
+        const elements = {};
+        const missingIds = [];
+
+        (Array.isArray(ids) ? ids : []).forEach((id) => {
+            const element = document.getElementById(id);
+            if (element) {
+                elements[id] = element;
+                return;
+            }
+
+            missingIds.push(id);
+        });
+
+        return { elements, missingIds };
+    }
+
+    function reportRendererIssue(app, reporterState, issueKey, {
+        consoleMessage,
+        consoleDetail = null,
+        statusMessage = '',
+        querySummary = null
+    } = {}) {
+        if (reporterState && issueKey) {
+            if (reporterState[issueKey]) {
+                return false;
+            }
+            reporterState[issueKey] = true;
+        }
+
+        if (consoleDetail !== null && consoleDetail !== undefined) {
+            console.error(consoleMessage, consoleDetail);
+        } else {
+            console.error(consoleMessage);
+        }
+
+        if (statusMessage && typeof app?.queryUi?.setStatusMessage === 'function') {
+            app.queryUi.setStatusMessage(statusMessage);
+        }
+
+        if (querySummary && typeof app?.queryUi?.renderQuerySummary === 'function') {
+            app.queryUi.renderQuerySummary(querySummary.params ?? null, querySummary.meta ?? '');
+        }
+
+        return true;
+    }
+
+    function createDialogInvoker(app, reporterState, {
+        methodName,
+        issueKey = 'missingDialogDependency',
+        consoleMessage = `[Renderer Dependency Missing] ${methodName} is unavailable.`,
+        statusMessage = 'Renderer dependency mismatch: dialog controls unavailable.',
+        fallbackValue = false
+    } = {}) {
+        return (...args) => {
+            const dialogFn = app?.state?.dependencies?.[methodName];
+            if (typeof dialogFn === 'function') {
+                return dialogFn(...args);
+            }
+
+            const [message, title = methodName === 'showConfirm' ? 'Confirmation' : 'Attention'] = args;
+            const resolvedStatusMessage = typeof statusMessage === 'function'
+                ? statusMessage({ methodName, title, message })
+                : statusMessage;
+            reportRendererIssue(app, reporterState, issueKey, {
+                consoleMessage,
+                consoleDetail: { title, message },
+                statusMessage: resolvedStatusMessage
+            });
+
+            return Promise.resolve(fallbackValue);
+        };
+    }
+
+    function setResultsBodyMessage(app, tbody, message, className = 'results-message-row') {
+        if (!tbody || typeof app?.results?.renderResultsMessageRow !== 'function') {
+            return false;
+        }
+
+        tbody.innerHTML = app.results.renderResultsMessageRow(message, className);
+        return true;
+    }
 
     function hasRequiredShellElements() {
-        return REQUIRED_SHELL_IDS.every((id) => !!document.getElementById(id));
+        return getMissingRequiredShellIds().length === 0;
     }
 
     function formatSnapshotAge(timestamp) {
@@ -89,6 +180,11 @@
 
     ns.shared = {
         REQUIRED_SHELL_IDS,
+        getMissingRequiredShellIds,
+        resolveShellElements,
+        reportRendererIssue,
+        createDialogInvoker,
+        setResultsBodyMessage,
         hasRequiredShellElements,
         formatSnapshotAge,
         getBoardMetric,
@@ -98,8 +194,4 @@
         summarizeParams,
         formatTimestamp
     };
-
-    window.escapeHtml = escapeHtml;
-    window.summarizeParams = summarizeParams;
-    window.formatTimestamp = formatTimestamp;
 })();

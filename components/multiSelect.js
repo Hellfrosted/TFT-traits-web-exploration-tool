@@ -1,29 +1,56 @@
 // --- Multi-select Component ---
 
-/**
- * Set up a multi-select dropdown with pill/tag UI for a given container.
- * @param {string} containerId - DOM ID of the `.multi-select-container` wrapper
- * @param {Array} options - Available options (unit objects or trait name strings)
- * @param {boolean} [isUnit=true] - Whether options are unit objects (true) or plain strings (false)
- * @returns {{getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
- */
-function setupMultiSelect(containerId, options, isUnit = true) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.warn(`MultiSelect container not found: ${containerId}`);
-        return { getValues: () => [], setValues: () => {}, resolvePills: () => {}, destroy: () => {} };
-    }
+(function initializeMultiSelectComponent() {
+    const ns = window.TFTRenderer = window.TFTRenderer || {};
+    const componentsNs = ns.components = ns.components || {};
 
-    const previousController = container._multiSelectController;
-    const preservedValues = previousController?.getValues ? previousController.getValues() : [];
-    previousController?.destroy?.();
+    /**
+     * Set up a multi-select dropdown with pill/tag UI for a given container.
+     * @param {string} containerId - DOM ID of the `.multi-select-container` wrapper
+     * @param {Array} options - Available options (unit objects or trait name strings)
+     * @param {boolean} [isUnit=true] - Whether options are unit objects (true) or plain strings (false)
+     * @returns {{ready: boolean, getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
+     */
+    function setupMultiSelect(containerId, options, isUnit = true) {
+        function createNoopController(containerRef = null) {
+            const api = {
+                ready: false,
+                getValues: () => [],
+                setValues: () => {},
+                resolvePills: () => {},
+                destroy: () => {
+                    if (containerRef?._multiSelectController === api) {
+                        delete containerRef._multiSelectController;
+                    }
+                }
+            };
+            if (containerRef) {
+                containerRef._multiSelectController = api;
+            }
+            return api;
+        }
 
-    const pillsContainer = container.querySelector('.pills');
-    const input = container.querySelector('input');
-    const dropdown = container.querySelector('.dropdown');
-    pillsContainer.innerHTML = '';
-    dropdown.innerHTML = '';
-    dropdown.classList.add('hidden');
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`MultiSelect container not found: ${containerId}`);
+            return createNoopController();
+        }
+
+        const previousController = container._multiSelectController;
+        const preservedValues = previousController?.getValues ? previousController.getValues() : [];
+        previousController?.destroy?.();
+
+        const pillsContainer = container.querySelector('.pills');
+        const input = container.querySelector('input');
+        const dropdown = container.querySelector('.dropdown');
+        if (!pillsContainer || !input || !dropdown) {
+            console.warn(`MultiSelect shell incomplete: ${containerId}`);
+            return createNoopController(container);
+        }
+
+        pillsContainer.innerHTML = '';
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
     
     let selectedValues = [];
     let filteredOptions = [];
@@ -44,6 +71,16 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         return option?.label ?? option?.displayName ?? option?.name ?? getOptionValue(option);
     }
 
+    function getOptionPillLabel(option) {
+        if (typeof option === 'string') return option;
+        return option?.pillLabel ?? getOptionLabel(option);
+    }
+
+    function getOptionDropdownMeta(option) {
+        if (typeof option === 'string') return '';
+        return String(option?.dropdownMeta ?? '').trim();
+    }
+
     function getOptionIconUrl(option) {
         if (typeof option === 'string') return null;
         return option?.iconUrl || null;
@@ -55,6 +92,8 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         optionsByValue.set(value, {
             value,
             label: getOptionLabel(option),
+            pillLabel: getOptionPillLabel(option),
+            dropdownMeta: getOptionDropdownMeta(option),
             iconUrl: getOptionIconUrl(option)
         });
     });
@@ -74,7 +113,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
     }
 
     function emitChange() {
-        container.dispatchEvent(new CustomEvent('selectionchange', {
+        container.dispatchEvent(new CustomEvent('multiselectchange', {
             bubbles: true,
             detail: { values: [...selectedValues] }
         }));
@@ -91,7 +130,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         const label = document.createElement('span');
         label.className = 'pill-label';
         const optionMeta = optionsByValue.get(normalizedValue);
-        const displayValue = optionMeta?.label || normalizedValue;
+        const displayValue = optionMeta?.pillLabel || optionMeta?.label || normalizedValue;
         const iconUrl = optionMeta?.iconUrl;
 
         if (iconUrl) {
@@ -130,9 +169,10 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         filteredOptions = options.filter(opt => {
             const name = getOptionValue(opt);
             const label = getOptionLabel(opt);
+            const meta = getOptionDropdownMeta(opt);
             const query = filter.toLowerCase();
             return (
-                (name.toLowerCase().includes(query) || label.toLowerCase().includes(query)) &&
+                (`${name} ${label} ${meta}`.toLowerCase().includes(query)) &&
                 !selectedValues.includes(name)
             );
         }).slice(0, 50);
@@ -157,6 +197,7 @@ function setupMultiSelect(containerId, options, isUnit = true) {
             const name = getOptionValue(opt);
             const displayName = getOptionLabel(opt);
             const iconUrl = getOptionIconUrl(opt);
+            const dropdownMeta = getOptionDropdownMeta(opt);
 
             if (iconUrl) {
                 const img = document.createElement('img');
@@ -167,9 +208,22 @@ function setupMultiSelect(containerId, options, isUnit = true) {
                 item.appendChild(img);
             }
 
+            const content = document.createElement('div');
+            content.className = 'dropdown-item-content';
+
             const text = document.createElement('span');
+            text.className = 'dropdown-item-label';
             text.textContent = displayName;
-            item.appendChild(text);
+            content.appendChild(text);
+
+            if (dropdownMeta) {
+                const meta = document.createElement('span');
+                meta.className = 'dropdown-item-meta';
+                meta.textContent = dropdownMeta;
+                content.appendChild(meta);
+            }
+
+            item.appendChild(content);
 
             item.addEventListener('click', () => {
                 addPill(name);
@@ -186,13 +240,18 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         pillsContainer.innerHTML = '';
         normalizeValues(values).forEach((value) => addPill(value, { emit: false }));
         emitChange();
-        renderDropdown(input.value);
+        const shouldRefreshVisibleDropdown = document.activeElement === input && input.value.trim().length > 0;
+        if (shouldRefreshVisibleDropdown) {
+            renderDropdown(input.value);
+            return;
+        }
+
+        dropdown.classList.add('hidden');
     }
 
     input.addEventListener('focus', () => renderDropdown(input.value), { signal });
     input.addEventListener('input', () => {
         renderDropdown(input.value);
-        emitChange();
     }, { signal });
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Backspace' && input.value === '' && selectedValues.length > 0) {
@@ -257,43 +316,45 @@ function setupMultiSelect(containerId, options, isUnit = true) {
         setValues(initialValues);
     }
 
-    const api = {
-        getValues: () => [...selectedValues],
-        setValues,
-        resolvePills: (hashMap) => {
-            const pills = pillsContainer.querySelectorAll('.pill');
-            pills.forEach((pill) => {
-                let currentValue = pill.dataset.value || '';
-                if (currentValue.startsWith('{') && currentValue.endsWith('}')) {
-                    const resolved = hashMap[currentValue];
-                    if (resolved) {
-                        const index = selectedValues.indexOf(currentValue);
-                        if (index !== -1) selectedValues[index] = resolved;
-                        pill.dataset.value = resolved;
-                        currentValue = resolved;
-                        const resolvedMeta = optionsByValue.get(resolved);
-                        const labelText = pill.querySelector('.pill-label-text');
-                        if (labelText) {
-                            labelText.textContent = resolvedMeta?.label || resolved;
+        const api = {
+            ready: true,
+            getValues: () => [...selectedValues],
+            setValues,
+            resolvePills: (hashMap) => {
+                const pills = pillsContainer.querySelectorAll('.pill');
+                pills.forEach((pill) => {
+                    let currentValue = pill.dataset.value || '';
+                    if (currentValue.startsWith('{') && currentValue.endsWith('}')) {
+                        const resolved = hashMap[currentValue];
+                        if (resolved) {
+                            const index = selectedValues.indexOf(currentValue);
+                            if (index !== -1) selectedValues[index] = resolved;
+                            pill.dataset.value = resolved;
+                            currentValue = resolved;
+                            const resolvedMeta = optionsByValue.get(resolved);
+                            const labelText = pill.querySelector('.pill-label-text');
+                            if (labelText) {
+                                labelText.textContent = resolvedMeta?.pillLabel || resolvedMeta?.label || resolved;
+                            }
                         }
                     }
-                }
 
-                if (!optionsByValue.has(currentValue)) {
-                    selectedValues = selectedValues.filter((value) => value !== currentValue);
-                    pill.remove();
-                }
-            });
-            emitChange();
-        },
-        destroy: () => {
-            controller.abort();
-            delete container._multiSelectController;
-        }
-    };
+                    if (!optionsByValue.has(currentValue)) {
+                        selectedValues = selectedValues.filter((value) => value !== currentValue);
+                        pill.remove();
+                    }
+                });
+                emitChange();
+            },
+            destroy: () => {
+                controller.abort();
+                delete container._multiSelectController;
+            }
+        };
 
-    container._multiSelectController = api;
-    return api;
-}
+        container._multiSelectController = api;
+        return api;
+    }
 
-window.setupMultiSelect = setupMultiSelect;
+    componentsNs.setupMultiSelect = setupMultiSelect;
+})();

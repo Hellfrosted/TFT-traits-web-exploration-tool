@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; connect-src 'self' https://raw.communitydragon.org; font-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://raw.communitydragon.org; connect-src 'self' https://raw.communitydragon.org; font-src 'self' data:;">
   <title>TFT Traits Web Exploration Tool</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -54,7 +54,7 @@
             </div>
             <div class="field-group">
               <label for="maxResults">Max Results</label>
-              <input type="number" id="maxResults" value="100" min="1" max="10000" />
+              <input type="number" id="maxResults" value="500" min="1" max="1000" />
             </div>
           </div>
         </section>
@@ -226,6 +226,8 @@
         <p class="board-spotlight-empty">No board selected.</p>
       </div>
 
+      <div id="resultsPager" class="results-pager" aria-live="polite"></div>
+
       <div class="results-table-wrap">
         <table id="resTable">
           <thead>
@@ -247,9 +249,9 @@
   </div>
 
   <div id="cacheModal" class="modal-overlay">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cacheModalTitle">
       <div class="modal-header">
-        <h3>Cached Searches</h3>
+        <h3 id="cacheModalTitle">Cached Searches</h3>
         <button class="modal-close" id="cacheModalClose">&times;</button>
       </div>
       <div class="modal-body" id="cacheModalBody">
@@ -263,7 +265,7 @@
   </div>
 
   <div id="dialogModal" class="modal-overlay">
-    <div class="modal dialog-modal">
+    <div class="modal dialog-modal" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMessage">
       <div class="modal-header dialog-header">
         <h3 id="dialogTitle" class="dialog-title">Confirmation</h3>
         <button class="modal-close" id="dialogClose">&times;</button>
@@ -278,18 +280,36 @@
     </div>
   </div>
 
+  <!-- renderer.js stays the final bootstrap entrypoint.
+       The factory scripts below resolve sibling dependencies lazily, so they no longer depend on each other's load order. -->
   <script src="./components/dialog.js"></script>
   <script src="./components/multiSelect.js"></script>
   <script src="./roleDefaults.js"></script>
   <script src="./renderer/shared.js"></script>
   <script src="./renderer/state.js"></script>
+  <script src="./renderer/variant-lock-ui.js"></script>
+  <script src="./renderer/query-summary-ui.js"></script>
+  <script src="./renderer/query-control-state.js"></script>
+  <script src="./renderer/query-shell-ui.js"></script>
+  <script src="./renderer/query-params-ui.js"></script>
   <script src="./renderer/query-ui.js"></script>
+  <script src="./renderer/results-model.js"></script>
+  <script src="./renderer/results-view-state.js"></script>
+  <script src="./renderer/results-tooltip.js"></script>
+  <script src="./renderer/results-summary-ui.js"></script>
+  <script src="./renderer/results-interactions.js"></script>
+  <script src="./renderer/results-spotlight.js"></script>
+  <script src="./renderer/results-renderers.js"></script>
   <script src="./renderer/results-ui.js"></script>
   <script src="./renderer/history-ui.js"></script>
   <script src="./renderer/data-controller.js"></script>
+  <script src="./renderer/search-ui-state.js"></script>
+  <script src="./renderer/search-shell-ui.js"></script>
+  <script src="./renderer/search-operations.js"></script>
+  <script src="./renderer/search-outcomes-ui.js"></script>
   <script src="./renderer/search-controller.js"></script>
   <script src="./renderer/bootstrap.js"></script>
-  <script src="./renderer.js"></script>
   <script src="./components/cacheModal.js"></script>
+  <script src="./renderer.js"></script>
 </body>
 </html>

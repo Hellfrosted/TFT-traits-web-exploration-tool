@@ -1,93 +1,176 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { hasRequiredShellElements } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
+        const {
+            getMissingRequiredShellIds,
+            resolveShellElements,
+            reportRendererIssue,
+            createDialogInvoker,
+            setResultsBodyMessage
+        } = ns.shared || {};
         const { state } = app;
+        const reporterState = {
+            missingDialogDependency: false
+        };
+        const showAlert = typeof createDialogInvoker === 'function'
+            ? createDialogInvoker(app, reporterState, {
+                methodName: 'showAlert'
+            })
+            : function fallbackShowAlert(message, title = 'Attention') {
+                const alertFn = state.dependencies?.showAlert;
+                if (typeof alertFn === 'function') {
+                    return alertFn(message, title);
+                }
+
+                reportRendererIssue(app, reporterState, 'missingDialogDependency', {
+                    consoleMessage: '[Renderer Dependency Missing] showAlert is unavailable.',
+                    consoleDetail: { title, message },
+                    statusMessage: 'Renderer dependency mismatch: dialog controls unavailable.'
+                });
+
+                return Promise.resolve(false);
+            };
+
+        function publishRendererReadyState(isReady) {
+            const root = document.documentElement;
+            if (root) {
+                root.dataset.tftReady = isReady ? '1' : '0';
+            }
+            window.dispatchEvent(new CustomEvent('tft-renderer-ready', {
+                detail: { ready: !!isReady }
+            }));
+        }
 
         function reportRendererInitFailure(error) {
             const errorMessage = error?.message || String(error);
             console.error('[Renderer Init Failed]', error);
             app.queryUi.setStatusMessage(`Renderer init failed: ${errorMessage}`);
+            publishRendererReadyState(false);
+        }
+
+        function getBootstrapShellUiState(hasElectronAPI = state.hasElectronAPI) {
+            if (hasElectronAPI) {
+                return {
+                    querySummaryMeta: 'Initializing UI...',
+                    spotlightMessage: 'Loading data...',
+                    statusMessage: 'Initializing UI...'
+                };
+            }
+
+            return {
+                querySummaryMeta: 'Electron bridge unavailable',
+                spotlightMessage: 'Electron preload bridge unavailable.',
+                statusMessage: 'Electron preload bridge unavailable.'
+            };
+        }
+
+        function applyBootstrapShellUiState(uiState) {
+            app.queryUi.setDataStats();
+            app.queryUi.renderQuerySummary(null, uiState.querySummaryMeta);
+            app.results.renderEmptySpotlight(uiState.spotlightMessage);
+            app.queryUi.setStatusMessage(uiState.statusMessage);
         }
 
         function resetFilters() {
-            if (state.isSearching) {
+            if (state.isSearching || state.isFetchingData) {
                 showAlert('Cancel the current search before resetting filters.');
                 return;
             }
 
-            document.getElementById('boardSize').value = 9;
-            document.getElementById('maxResults').value = 100;
-            document.getElementById('onlyActiveToggle').checked = true;
-            document.getElementById('tierRankToggle').checked = true;
-            document.getElementById('includeUniqueToggle').checked = false;
-
-            if (state.selectors.mustInclude) state.selectors.mustInclude.setValues([]);
-            if (state.selectors.mustExclude) state.selectors.mustExclude.setValues([]);
-            if (state.selectors.mustIncludeTraits) state.selectors.mustIncludeTraits.setValues([]);
-            if (state.selectors.mustExcludeTraits) state.selectors.mustExcludeTraits.setValues([]);
-            if (state.selectors.extraEmblems) state.selectors.extraEmblems.setValues([]);
-            app.queryUi.applyDefaultRoleFilters(true);
-            app.queryUi.applyVariantLocks({});
+            app.queryUi.applySearchParams(app.queryUi.getDefaultSearchParams());
 
             state.lastSearchParams = null;
             state.currentResults = [];
+            state.currentResultsFingerprint = null;
             app.results.renderEmptySummary('Awaiting execution');
             app.results.renderEmptySpotlight();
             app.queryUi.renderQuerySummary(null, 'Filters reset. Build a fresh query and compute when ready.');
-            document.getElementById('resBody').innerHTML = '<tr><td colspan="6" class="table-awaiting">Awaiting execution...</td></tr>';
+            const { elements } = resolveShellElements(['resBody']);
+            setResultsBodyMessage(app, elements.resBody, 'Awaiting execution...', 'table-awaiting');
             app.queryUi.setStatusMessage(state.activeData
                 ? `Loaded ${state.activeData.unitMap.size} parsed champions and ready for a new query.`
                 : 'Status: Unloaded');
         }
 
-        function bindStaticUiListeners() {
-            if (state.listeners.staticBound) return;
-            state.listeners.staticBound = true;
-
-            document.getElementById('fetchBtn')?.addEventListener('click', () => {
-                app.data.fetchData().catch((error) => {
+        function bindAsyncClickAction(element, action) {
+            element?.addEventListener('click', () => {
+                Promise.resolve(action()).catch((error) => {
                     reportRendererInitFailure(error);
                 });
             });
+        }
 
-            document.getElementById('sortMode')?.addEventListener('change', () => {
+        function bindSortModeListener(sortMode) {
+            if (sortMode) {
+                state.currentSortMode = sortMode.value || state.currentSortMode || 'mostTraits';
+            }
+            sortMode?.addEventListener('change', () => {
+                state.currentSortMode = sortMode.value || 'mostTraits';
                 if (state.currentResults.length === 0) return;
                 app.results.renderResults(app.results.getSortedResults(state.currentResults));
             });
+        }
 
-            document.getElementById('cancelBtn')?.addEventListener('click', async () => {
-                if (!state.electronBridge?.cancelSearch) return;
-                await state.electronBridge.cancelSearch();
-                app.queryUi.setStatusMessage('Cancelling search...');
-                app.queryUi.renderQuerySummary(state.lastSearchParams, 'Cancelling active search...');
-            });
-
-            document.getElementById('resetFiltersBtn')?.addEventListener('click', resetFilters);
-
+        function bindSearchShortcut(searchBtn) {
             document.addEventListener('keydown', (event) => {
                 const isSubmitChord = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
                 if (!isSubmitChord || state.isSearching) return;
                 event.preventDefault();
-                document.getElementById('searchBtn')?.click();
+                searchBtn?.click();
             });
+        }
 
-            document.getElementById('searchBtn')?.addEventListener('click', app.search.handleSearchClick);
+        function bindStaticUiControlListeners(elements) {
+            bindAsyncClickAction(elements.fetchBtn, () => app.data.fetchData());
+            bindSortModeListener(elements.sortMode);
+            bindAsyncClickAction(elements.cancelBtn, () => app.search.requestCancelSearch());
+            elements.resetFiltersBtn?.addEventListener('click', resetFilters);
+            elements.searchBtn?.addEventListener('click', app.search.handleSearchClick);
+        }
+
+        function bindStaticUiListeners() {
+            if (state.listeners.staticBound) return;
+            state.listeners.staticBound = true;
+            const { elements } = resolveShellElements([
+                'fetchBtn',
+                'sortMode',
+                'cancelBtn',
+                'resetFiltersBtn',
+                'searchBtn'
+            ]);
+
+            bindStaticUiControlListeners(elements);
+            bindSearchShortcut(elements.searchBtn);
         }
 
         function initializeUiShell() {
             if (state.listeners.uiInitialized) return true;
-            if (!hasRequiredShellElements()) {
+
+            if (typeof state.dependencies?.showAlert !== 'function') {
+                reportRendererIssue(app, null, null, {
+                    consoleMessage: '[Renderer Dependency Missing] Missing required dialog helper: showAlert.',
+                    statusMessage: 'Renderer dependency mismatch: missing required dialog helper (showAlert).'
+                });
+                publishRendererReadyState(false);
                 return false;
             }
 
-            app.queryUi.setDataStats();
-            app.queryUi.renderQuerySummary(null, state.hasElectronAPI ? 'Initializing UI...' : 'Electron bridge unavailable');
-            app.results.renderEmptySpotlight(state.hasElectronAPI ? 'Loading data...' : 'Electron preload bridge unavailable.');
-            app.queryUi.setStatusMessage(state.hasElectronAPI ? 'Initializing UI...' : 'Electron preload bridge unavailable.');
+            const missingIds = getMissingRequiredShellIds();
+            if (missingIds.length > 0) {
+                reportRendererIssue(app, null, null, {
+                    consoleMessage: '[Renderer Shell Incomplete] Missing required shell nodes:',
+                    consoleDetail: missingIds,
+                    statusMessage: `Renderer shell mismatch: missing required shell nodes (${missingIds.join(', ')}).`
+                });
+                publishRendererReadyState(false);
+                return false;
+            }
+
+            applyBootstrapShellUiState(getBootstrapShellUiState());
             bindStaticUiListeners();
             app.queryUi.syncFetchButtonState();
+            app.queryUi.syncSearchButtonState();
             state.listeners.uiInitialized = true;
             return true;
         }
@@ -96,14 +179,15 @@
             if (state.listeners.bootStarted) return;
             if (!initializeUiShell()) return;
             state.listeners.bootStarted = true;
-            const sourceSelect = document.getElementById('dataSourceSelect');
-            if (sourceSelect) {
-                sourceSelect.value = state.defaultDataSource;
+            const { elements } = resolveShellElements(['dataSourceSelect']);
+            if (elements.dataSourceSelect) {
+                elements.dataSourceSelect.value = state.defaultDataSource;
             }
 
             if (!state.flags.smokeTest) {
                 await app.data.fetchData();
             }
+            publishRendererReadyState(true);
         }
 
         function scheduleRendererBootstrap() {
@@ -118,31 +202,31 @@
 
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', runBootstrap, { once: true });
-            } else {
-                runBootstrap();
+                window.addEventListener('load', runBootstrap, { once: true });
+                setTimeout(runBootstrap, 1500);
+                return;
             }
 
-            window.addEventListener('load', runBootstrap, { once: true });
-            setTimeout(runBootstrap, 1500);
+            runBootstrap();
         }
 
         function installErrorHandlers() {
             window.onerror = (message, source, lineno, colno, error) => {
                 console.error('[Browser Error]', message, source, lineno, error);
                 app.queryUi.setStatusMessage(`Renderer error: ${message}`);
-                showAlert(`Uncaught UI Exception: ${message}`, 'Application Error');
+                void showAlert(`Uncaught UI Exception: ${message}`, 'Application Error');
                 return true;
             };
 
             window.addEventListener('unhandledrejection', (event) => {
                 console.error('[Unhandled Rejection]', event.reason);
                 app.queryUi.setStatusMessage(`Async error: ${event.reason?.message || event.reason}`);
-                showAlert(`Async Exception: ${event.reason}`, 'Application Error');
+                void showAlert(`Async Exception: ${event.reason}`, 'Application Error');
             });
 
             if (state.electronBridge?.onMainProcessError) {
                 const dispose = state.electronBridge.onMainProcessError((data) => {
-                    showAlert(data.message, 'Backend Error');
+                    void showAlert(data.message, 'Backend Error');
                 });
                 if (typeof dispose === 'function') {
                     state.cleanupFns.push(dispose);
@@ -158,6 +242,7 @@
         }
 
         function start() {
+            publishRendererReadyState(false);
             installErrorHandlers();
             app.search.subscribeProgressUpdates();
             scheduleRendererBootstrap();
@@ -167,7 +252,10 @@
             start,
             initializeUiShell,
             scheduleRendererBootstrap,
-            reportRendererInitFailure
+            reportRendererInitFailure,
+            __test: {
+                getBootstrapShellUiState
+            }
         };
     };
 })();
