@@ -1,9 +1,9 @@
 (function initializeResultsModelFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { renderIconImage, getBoardMetric } = ns.shared;
 
     ns.createResultsModel = function createResultsModel(app) {
         const { state } = app;
+        const { renderIconImage, getBoardMetric } = ns.shared || {};
         const boardTraitSummaryCache = new WeakMap();
 
         function getVariantAssignment(board, unitId) {

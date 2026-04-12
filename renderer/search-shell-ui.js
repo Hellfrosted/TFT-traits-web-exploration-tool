@@ -1,10 +1,24 @@
 (function initializeSearchShellUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { resolveShellElements, formatBoardEstimate, reportRendererIssue, setResultsBodyMessage } = ns.shared;
-    const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared);
+
+    function requireSearchUiState() {
+        const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared || {});
+        if (!searchUiState) {
+            throw new Error('Renderer search UI state unavailable.');
+        }
+
+        return searchUiState;
+    }
 
     ns.createSearchShellUi = function createSearchShellUi(app, hooks = {}) {
         const { state } = app;
+        const {
+            resolveShellElements,
+            formatBoardEstimate,
+            reportRendererIssue,
+            setResultsBodyMessage
+        } = ns.shared || {};
+        const searchUiState = requireSearchUiState();
         const {
             reporterState = {}
         } = hooks;

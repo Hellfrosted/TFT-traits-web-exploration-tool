@@ -11,6 +11,9 @@ function loadQuerySummaryUiFactory(sandbox) {
     );
 
     vm.runInNewContext(source, sandbox, { filename: 'renderer/query-summary-ui.js' });
+    sandbox.window.TFTRenderer.shared = sandbox.window.TFTRenderer.shared || {
+        escapeHtml: (value) => String(value ?? '')
+    };
     return sandbox.window.TFTRenderer.createQuerySummaryUi;
 }
 
@@ -19,11 +22,7 @@ describe('renderer query summary ui', () => {
         const sandbox = {
             console,
             window: {
-                TFTRenderer: {
-                    shared: {
-                        escapeHtml: (value) => String(value ?? '')
-                    }
-                }
+                TFTRenderer: {}
             }
         };
         const createQuerySummaryUi = loadQuerySummaryUiFactory(sandbox);
@@ -58,11 +57,7 @@ describe('renderer query summary ui', () => {
         const sandbox = {
             console,
             window: {
-                TFTRenderer: {
-                    shared: {
-                        escapeHtml: (value) => String(value ?? '')
-                    }
-                }
+                TFTRenderer: {}
             }
         };
         const createQuerySummaryUi = loadQuerySummaryUiFactory(sandbox);

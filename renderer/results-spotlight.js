@@ -1,8 +1,17 @@
 (function initializeResultsSpotlightFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+
+    function requireResultsViewState() {
+        const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+        if (!resultsViewState) {
+            throw new Error('Renderer results view state unavailable.');
+        }
+
+        return resultsViewState;
+    }
 
     ns.createResultsSpotlight = function createResultsSpotlight(model, tooltipController, hooks = {}) {
+        const resultsViewState = requireResultsViewState();
         const {
             resolveResultsShell,
             clearNode

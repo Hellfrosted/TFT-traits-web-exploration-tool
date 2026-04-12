@@ -6,8 +6,8 @@ const vm = require('node:vm');
 
 function loadResultsSummaryUiFactory(sandbox) {
     const sources = [
-        'results-view-state.js',
-        'results-summary-ui.js'
+        'results-summary-ui.js',
+        'results-view-state.js'
     ].map((fileName) => ({
         fileName,
         source: fs.readFileSync(

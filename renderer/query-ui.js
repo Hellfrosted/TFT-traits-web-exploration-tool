@@ -1,13 +1,22 @@
 (function initializeQueryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const createVariantLockUi = ns.createVariantLockUi;
-    const createQuerySummaryUi = ns.createQuerySummaryUi;
-    const createQueryControlState = ns.createQueryControlState;
-    const createQueryShellUi = ns.createQueryShellUi;
-    const createQueryParamsUi = ns.createQueryParamsUi;
+
+    function requireFactory(factoryName) {
+        const factory = ns[factoryName];
+        if (typeof factory !== 'function') {
+            throw new Error(`Renderer factory unavailable: ${factoryName}`);
+        }
+
+        return factory;
+    }
 
     ns.createQueryUi = function createQueryUi(app) {
         const { state } = app;
+        const createVariantLockUi = requireFactory('createVariantLockUi');
+        const createQuerySummaryUi = requireFactory('createQuerySummaryUi');
+        const createQueryControlState = requireFactory('createQueryControlState');
+        const createQueryShellUi = requireFactory('createQueryShellUi');
+        const createQueryParamsUi = requireFactory('createQueryParamsUi');
         const getDefaultMaxResults = () => state.searchLimits.DEFAULT_MAX_RESULTS || 500;
         const getMaxResultsLimit = () => state.searchLimits.MAX_RESULTS || 1000;
         const getDefaultBoardSize = () => 9;

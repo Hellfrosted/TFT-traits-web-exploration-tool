@@ -1,8 +1,8 @@
 (function initializeQuerySummaryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml } = ns.shared;
 
     ns.createQuerySummaryUi = function createQuerySummaryUi() {
+        const { escapeHtml } = ns.shared || {};
         function buildDataStatMarkup(label, value) {
             return `
                 <div class="data-stat">

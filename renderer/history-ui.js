@@ -1,8 +1,14 @@
 (function initializeHistoryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, summarizeParams, formatTimestamp, reportRendererIssue, createDialogInvoker } = ns.shared;
 
     ns.createHistoryUi = function createHistoryUi(app) {
+        const {
+            escapeHtml,
+            summarizeParams,
+            formatTimestamp,
+            reportRendererIssue,
+            createDialogInvoker
+        } = ns.shared || {};
         const { state } = app;
         const reporterState = {
             missingDialogDependency: false

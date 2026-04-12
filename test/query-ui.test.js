@@ -30,12 +30,12 @@ function loadQueryUiFactory(sandbox) {
         'utf8'
     );
 
-    vm.runInNewContext(variantLockUiSource, sandbox, { filename: 'renderer/variant-lock-ui.js' });
-    vm.runInNewContext(querySummaryUiSource, sandbox, { filename: 'renderer/query-summary-ui.js' });
-    vm.runInNewContext(queryControlStateSource, sandbox, { filename: 'renderer/query-control-state.js' });
-    vm.runInNewContext(queryShellUiSource, sandbox, { filename: 'renderer/query-shell-ui.js' });
-    vm.runInNewContext(queryParamsUiSource, sandbox, { filename: 'renderer/query-params-ui.js' });
     vm.runInNewContext(source, sandbox, { filename: 'renderer/query-ui.js' });
+    vm.runInNewContext(queryParamsUiSource, sandbox, { filename: 'renderer/query-params-ui.js' });
+    vm.runInNewContext(queryShellUiSource, sandbox, { filename: 'renderer/query-shell-ui.js' });
+    vm.runInNewContext(queryControlStateSource, sandbox, { filename: 'renderer/query-control-state.js' });
+    vm.runInNewContext(querySummaryUiSource, sandbox, { filename: 'renderer/query-summary-ui.js' });
+    vm.runInNewContext(variantLockUiSource, sandbox, { filename: 'renderer/variant-lock-ui.js' });
     return sandbox.window.TFTRenderer.createQueryUi;
 }
 

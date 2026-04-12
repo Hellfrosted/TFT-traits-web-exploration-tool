@@ -1,13 +1,31 @@
 (function initializeResultsRenderersFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { resolveShellElements, setResultsBodyMessage } = ns.shared;
-    const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
-    const createResultsInteractions = ns.createResultsInteractions;
-    const createResultsSpotlight = ns.createResultsSpotlight;
-    const createResultsSummaryUi = ns.createResultsSummaryUi;
+
+    function requireFactory(factoryName) {
+        const factory = ns[factoryName];
+        if (typeof factory !== 'function') {
+            throw new Error(`Renderer factory unavailable: ${factoryName}`);
+        }
+
+        return factory;
+    }
+
+    function requireResultsViewState() {
+        const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+        if (!resultsViewState) {
+            throw new Error('Renderer results view state unavailable.');
+        }
+
+        return resultsViewState;
+    }
 
     ns.createResultsRenderers = function createResultsRenderers(app, model, tooltipController) {
         const { state } = app;
+        const { resolveShellElements, setResultsBodyMessage } = ns.shared || {};
+        const resultsViewState = requireResultsViewState();
+        const createResultsInteractions = requireFactory('createResultsInteractions');
+        const createResultsSpotlight = requireFactory('createResultsSpotlight');
+        const createResultsSummaryUi = requireFactory('createResultsSummaryUi');
 
         function clearNode(node) {
             while (node.firstChild) {

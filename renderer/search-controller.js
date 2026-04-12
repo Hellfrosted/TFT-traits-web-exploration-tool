@@ -1,12 +1,30 @@
 (function initializeSearchControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { reportRendererIssue, createDialogInvoker } = ns.shared;
-    const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared);
-    const createSearchOperations = ns.createSearchOperations;
-    const createSearchShellUi = ns.createSearchShellUi;
+
+    function requireFactory(factoryName) {
+        const factory = ns[factoryName];
+        if (typeof factory !== 'function') {
+            throw new Error(`Renderer factory unavailable: ${factoryName}`);
+        }
+
+        return factory;
+    }
+
+    function requireSearchUiState() {
+        const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared || {});
+        if (!searchUiState) {
+            throw new Error('Renderer search UI state unavailable.');
+        }
+
+        return searchUiState;
+    }
 
     ns.createSearchController = function createSearchController(app) {
         const { state } = app;
+        const { reportRendererIssue, createDialogInvoker } = ns.shared || {};
+        const searchUiState = requireSearchUiState();
+        const createSearchOperations = requireFactory('createSearchOperations');
+        const createSearchShellUi = requireFactory('createSearchShellUi');
         const reporterState = {
             shellMismatch: false,
             missingDialogDependencies: false

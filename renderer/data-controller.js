@@ -1,8 +1,14 @@
 (function initializeDataControllerFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { formatSnapshotAge, resolveShellElements, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
 
     ns.createDataController = function createDataController(app) {
+        const {
+            formatSnapshotAge,
+            resolveShellElements,
+            reportRendererIssue,
+            createDialogInvoker,
+            setResultsBodyMessage
+        } = ns.shared || {};
         const { state } = app;
         const reporterState = {
             missingSetupDependency: false

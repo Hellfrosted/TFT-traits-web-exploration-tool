@@ -6,14 +6,14 @@ const vm = require('node:vm');
 
 function createResultsUiForSortMode(sortMode) {
     const sources = [
-        'results-model.js',
-        'results-view-state.js',
-        'results-tooltip.js',
+        'results-ui.js',
+        'results-renderers.js',
+        'results-spotlight.js',
         'results-summary-ui.js',
         'results-interactions.js',
-        'results-spotlight.js',
-        'results-renderers.js',
-        'results-ui.js'
+        'results-tooltip.js',
+        'results-model.js',
+        'results-view-state.js'
     ].map((fileName) => ({
         fileName,
         source: fs.readFileSync(
@@ -65,14 +65,14 @@ function createResultsUiForSortMode(sortMode) {
 
 function createResultsUiForSummary(summarySink) {
     const sources = [
-        'results-model.js',
-        'results-view-state.js',
-        'results-tooltip.js',
+        'results-ui.js',
+        'results-renderers.js',
+        'results-spotlight.js',
         'results-summary-ui.js',
         'results-interactions.js',
-        'results-spotlight.js',
-        'results-renderers.js',
-        'results-ui.js'
+        'results-tooltip.js',
+        'results-model.js',
+        'results-view-state.js'
     ].map((fileName) => ({
         fileName,
         source: fs.readFileSync(

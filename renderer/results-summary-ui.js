@@ -1,9 +1,18 @@
 (function initializeResultsSummaryUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { escapeHtml, formatBoardEstimate } = ns.shared;
-    const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+
+    function requireResultsViewState() {
+        const resultsViewState = ns.resultsViewState || ns.createResultsViewState?.();
+        if (!resultsViewState) {
+            throw new Error('Renderer results view state unavailable.');
+        }
+
+        return resultsViewState;
+    }
 
     ns.createResultsSummaryUi = function createResultsSummaryUi(app, model) {
+        const { escapeHtml, formatBoardEstimate } = ns.shared || {};
+        const resultsViewState = requireResultsViewState();
         function renderEmptySummary(message) {
             app.queryUi.setResultsSummary(`
                 <div class="summary-card">

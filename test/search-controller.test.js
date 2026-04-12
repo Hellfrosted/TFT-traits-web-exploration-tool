@@ -26,11 +26,11 @@ function loadSearchControllerFactory(sandbox) {
         'utf8'
     );
 
-    vm.runInNewContext(searchUiStateSource, sandbox, { filename: 'renderer/search-ui-state.js' });
-    vm.runInNewContext(searchShellUiSource, sandbox, { filename: 'renderer/search-shell-ui.js' });
-    vm.runInNewContext(searchOperationsSource, sandbox, { filename: 'renderer/search-operations.js' });
-    vm.runInNewContext(searchOutcomesUiSource, sandbox, { filename: 'renderer/search-outcomes-ui.js' });
     vm.runInNewContext(controllerSource, sandbox, { filename: 'renderer/search-controller.js' });
+    vm.runInNewContext(searchOutcomesUiSource, sandbox, { filename: 'renderer/search-outcomes-ui.js' });
+    vm.runInNewContext(searchOperationsSource, sandbox, { filename: 'renderer/search-operations.js' });
+    vm.runInNewContext(searchShellUiSource, sandbox, { filename: 'renderer/search-shell-ui.js' });
+    vm.runInNewContext(searchUiStateSource, sandbox, { filename: 'renderer/search-ui-state.js' });
     return sandbox.window.TFTRenderer.createSearchController;
 }
 

@@ -22,8 +22,8 @@ function createDomElement(tagName) {
 
 function loadResultsSpotlightFactory(sandbox) {
     const sources = [
-        'results-view-state.js',
-        'results-spotlight.js'
+        'results-spotlight.js',
+        'results-view-state.js'
     ].map((fileName) => ({
         fileName,
         source: fs.readFileSync(

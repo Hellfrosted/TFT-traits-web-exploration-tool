@@ -280,8 +280,8 @@
     </div>
   </div>
 
-  <!-- Renderer script order contract: factories and dependency contracts must load before renderer.js.
-       renderer.js validates contracts and is the final app bootstrap entrypoint. -->
+  <!-- renderer.js stays the final bootstrap entrypoint.
+       The factory scripts below resolve sibling dependencies lazily, so they no longer depend on each other's load order. -->
   <script src="./components/dialog.js"></script>
   <script src="./components/multiSelect.js"></script>
   <script src="./roleDefaults.js"></script>

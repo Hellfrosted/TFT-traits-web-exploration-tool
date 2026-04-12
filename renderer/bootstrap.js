@@ -1,8 +1,14 @@
 (function initializeBootstrapFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { getMissingRequiredShellIds, resolveShellElements, reportRendererIssue, createDialogInvoker, setResultsBodyMessage } = ns.shared;
 
     ns.createBootstrap = function createBootstrap(app) {
+        const {
+            getMissingRequiredShellIds,
+            resolveShellElements,
+            reportRendererIssue,
+            createDialogInvoker,
+            setResultsBodyMessage
+        } = ns.shared || {};
         const { state } = app;
         const reporterState = {
             missingDialogDependency: false

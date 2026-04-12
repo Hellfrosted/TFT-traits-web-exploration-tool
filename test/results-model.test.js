@@ -12,12 +12,7 @@ function loadResultsModelFactory() {
     const sandbox = {
         console,
         window: {
-            TFTRenderer: {
-                shared: {
-                    renderIconImage: () => '',
-                    getBoardMetric: (board) => board.synergyScore ?? board.traitsCount ?? 0
-                }
-            }
+            TFTRenderer: {}
         },
         document: {
             getElementById: () => ({ value: 'mostTraits' })
@@ -25,6 +20,10 @@ function loadResultsModelFactory() {
     };
 
     vm.runInNewContext(source, sandbox, { filename: 'renderer/results-model.js' });
+    sandbox.window.TFTRenderer.shared = {
+        renderIconImage: () => '',
+        getBoardMetric: (board) => board.synergyScore ?? board.traitsCount ?? 0
+    };
     return sandbox.window.TFTRenderer.createResultsModel;
 }
 

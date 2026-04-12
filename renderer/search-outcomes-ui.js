@@ -1,10 +1,19 @@
 (function initializeSearchOutcomesUiFactory() {
     const ns = window.TFTRenderer = window.TFTRenderer || {};
-    const { setResultsBodyMessage } = ns.shared;
-    const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared);
+
+    function requireSearchUiState() {
+        const searchUiState = ns.searchUiState || ns.createSearchUiState?.(ns.shared || {});
+        if (!searchUiState) {
+            throw new Error('Renderer search UI state unavailable.');
+        }
+
+        return searchUiState;
+    }
 
     ns.createSearchOutcomesUi = function createSearchOutcomesUi(app, { showAlert } = {}) {
         const { state } = app;
+        const { setResultsBodyMessage } = ns.shared || {};
+        const searchUiState = requireSearchUiState();
 
         function renderSearchResultsRow(tbody, message, className = 'results-message-row results-message-row-error') {
             setResultsBodyMessage(app, tbody, message, className);
