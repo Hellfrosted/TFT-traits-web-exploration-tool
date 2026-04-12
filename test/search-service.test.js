@@ -271,6 +271,42 @@ describe('main-process search service', () => {
         assert.equal(progressMessages[0].searchId, searchResponse.searchId);
     });
 
+    it('allows a new search immediately after cancelling a running worker before termination finishes', async () => {
+        resetWorkers();
+        const { searchService } = createSearchServiceUnderTest();
+        const termination = createDeferred();
+
+        const firstSearch = searchService.searchBoards({ boardSize: 9 });
+        const firstWorker = await waitForWorker();
+        firstWorker.terminate = async () => {
+            await termination.promise;
+            firstWorker.emit('exit', 0);
+            return 0;
+        };
+
+        const cancelResponse = await searchService.cancelSearch();
+        const secondSearch = searchService.searchBoards({ boardSize: 9 });
+        const secondWorker = await waitForWorker(2);
+
+        secondWorker.emit('message', {
+            type: 'done',
+            success: true,
+            results: [{ units: ['B'] }]
+        });
+
+        const firstResponse = await firstSearch;
+        const secondResponse = await secondSearch;
+
+        termination.resolve();
+        await Promise.resolve();
+
+        assert.equal(cancelResponse.success, true);
+        assert.equal(firstResponse.cancelled, true);
+        assert.equal(typeof firstResponse.searchId, 'number');
+        assert.equal(secondResponse.success, true);
+        assert.deepEqual(secondResponse.results, [{ units: ['B'] }]);
+    });
+
     it('cancels a search before the worker starts if cache lookup is still in flight', async () => {
         resetWorkers();
         const pendingCacheRead = createDeferred();

@@ -18,6 +18,7 @@ describe('search service state helpers', () => {
             cancelled: false,
             worker: null,
             settle: null,
+            terminate: null,
             completed: false,
             terminated: false,
             terminatePromise: null

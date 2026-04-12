@@ -61,6 +61,7 @@ function createSearchWorkerRunner({
             };
 
             searchContext.settle = safeResolve;
+            searchContext.terminate = terminateWorker;
             searchContext.worker = new Worker(workerPath, { workerData });
             if (searchContext.cancelled) {
                 void terminateWorker();
