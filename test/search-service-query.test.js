@@ -39,7 +39,7 @@ describe('search service query helpers', () => {
             normalizeForData: (params) => ({ ...params, canonical: true }),
             serializeForComparison: JSON.stringify,
             cacheService: {
-                getCacheKey(dataFingerprint, params) {
+                getPreparedSearchContextKey(dataFingerprint, params) {
                     cacheKeyCalls.push({ dataFingerprint, params });
                     return 'estimate-key';
                 },
@@ -84,5 +84,62 @@ describe('search service query helpers', () => {
             key: 'estimate-key',
             estimate: { count: 3, remainingSlots: 7 }
         }]);
+    });
+
+    it('reuses cached estimates when only result-limiting params change', async () => {
+        const cachedEstimates = new Map();
+        let combinationCountCalls = 0;
+        let preparedCalls = 0;
+        const query = createSearchServiceQuery({
+            normalizeSearchParams: (params) => params,
+            normalizeForData: (params) => ({ ...params, canonical: true }),
+            serializeForComparison: JSON.stringify,
+            cacheService: {
+                getPreparedSearchContextKey(_dataFingerprint, params) {
+                    return JSON.stringify({
+                        boardSize: params.boardSize,
+                        mustInclude: params.mustInclude || [],
+                        canonical: params.canonical
+                    });
+                },
+                getCachedEstimate(key) {
+                    return cachedEstimates.get(key) || null;
+                },
+                getPreparedSearchContext() {
+                    preparedCalls += 1;
+                    return { preparedContext: { prepared: true } };
+                },
+                setCachedEstimate(key, estimate) {
+                    cachedEstimates.set(key, estimate);
+                    return estimate;
+                }
+            },
+            engine: {
+                getCombinationCount() {
+                    combinationCountCalls += 1;
+                    return { count: 42, remainingSlots: 3 };
+                }
+            },
+            getDataCache: () => ({
+                dataFingerprint: 'fp-1',
+                units: ['A', 'B']
+            })
+        });
+
+        const firstEstimate = await query.getSearchEstimate({
+            boardSize: 7,
+            maxResults: 10,
+            mustInclude: ['A']
+        });
+        const secondEstimate = await query.getSearchEstimate({
+            boardSize: 7,
+            maxResults: 500,
+            mustInclude: ['A']
+        });
+
+        assert.deepEqual(firstEstimate, { count: 42, remainingSlots: 3 });
+        assert.deepEqual(secondEstimate, { count: 42, remainingSlots: 3 });
+        assert.equal(preparedCalls, 1);
+        assert.equal(combinationCountCalls, 1);
     });
 });

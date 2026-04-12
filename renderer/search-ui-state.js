@@ -60,7 +60,10 @@
             return 'Results pending...';
         }
 
-        function buildSearchButtonLabel(progress = null, { isSearching = false } = {}) {
+        function buildSearchButtonLabel(progress = null, {
+            isSearching = false,
+            hasEstimate = false
+        } = {}) {
             const normalizedProgress = normalizeSearchProgress(progress);
             if (Number.isFinite(normalizedProgress.pct)) {
                 return `Searching ${normalizedProgress.pct}%`;
@@ -72,7 +75,7 @@
             }
 
             if (isSearching) {
-                return 'Searching...';
+                return hasEstimate ? 'Searching...' : 'Estimating...';
             }
 
             return 'Estimating...';
@@ -116,12 +119,13 @@
             isSearching = false,
             progress = null,
             fallbackProgress = null,
+            hasEstimate = false,
             lastSearchParams = null,
             currentResults = []
         } = {}) {
             const activeProgress = progress ?? fallbackProgress ?? null;
             return {
-                searchLabel: isSearching ? buildSearchButtonLabel(activeProgress, { isSearching }) : null,
+                searchLabel: isSearching ? buildSearchButtonLabel(activeProgress, { isSearching, hasEstimate }) : null,
                 querySummaryParams: lastSearchParams || null,
                 querySummaryMeta: buildSearchMeta(),
                 shouldRenderPendingRow: !Array.isArray(currentResults) || currentResults.length === 0,
