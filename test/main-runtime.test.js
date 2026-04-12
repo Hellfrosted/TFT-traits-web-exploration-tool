@@ -79,6 +79,7 @@ function createRuntimeUnderTest(options = {}) {
     let ensureCacheDirCalls = 0;
     let createWindowCalls = 0;
     let scheduleSmokeTimeoutCalls = 0;
+    let windowServiceOptions = null;
     const serviceCalls = {
         fetchData: 0,
         getSearchEstimate: 0,
@@ -195,18 +196,21 @@ function createRuntimeUnderTest(options = {}) {
                 return { success: true };
             }
         }),
-        createWindowService: () => ({
-            createWindow: () => {
-                createWindowCalls += 1;
-            },
-            scheduleSmokeTimeout: () => {
-                scheduleSmokeTimeoutCalls += 1;
-            },
-            notifyRendererError: (message) => {
-                serviceCalls.rendererErrors.push(message);
-            },
-            getMainWindow: () => mainWindow
-        }),
+        createWindowService: (factoryOptions) => {
+            windowServiceOptions = factoryOptions;
+            return {
+                createWindow: () => {
+                    createWindowCalls += 1;
+                },
+                scheduleSmokeTimeout: () => {
+                    scheduleSmokeTimeoutCalls += 1;
+                },
+                notifyRendererError: (message) => {
+                    serviceCalls.rendererErrors.push(message);
+                },
+                getMainWindow: () => mainWindow
+            };
+        },
         appRoot: 'C:\\Users\\tester\\dev\\repo'
     });
 
@@ -240,7 +244,8 @@ function createRuntimeUnderTest(options = {}) {
             ensureCacheDirCalls,
             createWindowCalls,
             scheduleSmokeTimeoutCalls
-        })
+        }),
+        getWindowServiceOptions: () => windowServiceOptions
     };
 }
 
@@ -260,7 +265,8 @@ describe('main runtime', () => {
             fakeApp,
             fakeIpcMain,
             fakeProcess,
-            getCounts
+            getCounts,
+            getWindowServiceOptions
         } = createRuntimeUnderTest();
 
         const started = runtime.start();
@@ -276,6 +282,7 @@ describe('main runtime', () => {
             createWindowCalls: 1,
             scheduleSmokeTimeoutCalls: 1
         });
+        assert.equal(getWindowServiceOptions().iconPath, 'C:\\Users\\tester\\dev\\repo\\assets\\app-icon.ico');
 
         started.dispose();
 

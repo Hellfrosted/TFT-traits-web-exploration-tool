@@ -54,8 +54,10 @@ function createWindowServiceUnderTest({
         setMenuBarVisibility: () => {},
         loadFile: () => {}
     };
+    let browserWindowOptions = null;
 
-    function BrowserWindow() {
+    function BrowserWindow(options) {
+        browserWindowOptions = options;
         return window;
     }
 
@@ -63,6 +65,7 @@ function createWindowServiceUnderTest({
         app,
         BrowserWindow,
         preloadPath: 'preload.js',
+        iconPath: 'assets/app-icon.ico',
         ipcChannels: {
             MAIN_PROCESS_ERROR: 'main-process-error'
         },
@@ -75,7 +78,8 @@ function createWindowServiceUnderTest({
         service,
         app,
         listeners,
-        getWindowOpenHandler: () => windowOpenHandler
+        getWindowOpenHandler: () => windowOpenHandler,
+        getBrowserWindowOptions: () => browserWindowOptions
     };
 }
 
@@ -130,10 +134,11 @@ describe('window service smoke test', () => {
     });
 
     it('denies popup creation and blocks window navigation', () => {
-        const { service, listeners, getWindowOpenHandler } = createWindowServiceUnderTest();
+        const { service, listeners, getWindowOpenHandler, getBrowserWindowOptions } = createWindowServiceUnderTest();
 
         service.createWindow();
 
+        assert.equal(getBrowserWindowOptions().icon, 'assets/app-icon.ico');
         assert.equal(getWindowOpenHandler()().action, 'deny');
 
         let prevented = false;
