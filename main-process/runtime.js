@@ -26,6 +26,7 @@ function createMainRuntime(options = {}) {
     const processRef = options.processRef || process;
     const argv = options.argv || processRef.argv || [];
     const appRoot = options.appRoot || path.join(__dirname, '..');
+    const appIconPath = options.appIconPath || path.join(appRoot, 'assets', 'app-icon.ico');
     const setTimeoutFn = options.setTimeoutFn || setTimeout;
     const fatalExitDelayMs = Number.isFinite(options.fatalExitDelayMs) ? options.fatalExitDelayMs : 150;
     const {
@@ -69,6 +70,7 @@ function createMainRuntime(options = {}) {
         app,
         BrowserWindow,
         preloadPath: path.join(appRoot, 'preload.js'),
+        iconPath: appIconPath,
         ipcChannels: IPC_CHANNELS,
         rendererContract: RENDERER_CONTRACT,
         isSmokeTest

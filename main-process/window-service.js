@@ -2,6 +2,7 @@ function createWindowService({
     app,
     BrowserWindow,
     preloadPath,
+    iconPath,
     ipcChannels,
     rendererContract,
     isSmokeTest,
@@ -149,6 +150,7 @@ function createWindowService({
         mainWindow = new BrowserWindow({
             width: 1200,
             height: 800,
+            ...(iconPath ? { icon: iconPath } : {}),
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
