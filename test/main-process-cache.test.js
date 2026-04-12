@@ -59,6 +59,31 @@ describe('main-process cache service', () => {
         assert.equal(first, second);
     });
 
+    it('reuses prepared search contexts when only result-limiting params change', () => {
+        let prepareCalls = 0;
+        const service = createService('C:\\Users\\tester\\AppData\\Roaming\\TFT Tool', {
+            prepareSearchContext: () => {
+                prepareCalls += 1;
+                return { prepared: prepareCalls };
+            }
+        });
+        const dataCache = { dataFingerprint: 'fingerprint-1' };
+
+        const first = service.getPreparedSearchContext(dataCache, {
+            boardSize: 9,
+            maxResults: 10,
+            mustInclude: ['A']
+        }).preparedContext;
+        const second = service.getPreparedSearchContext(dataCache, {
+            boardSize: 9,
+            maxResults: 500,
+            mustInclude: ['A']
+        }).preparedContext;
+
+        assert.equal(prepareCalls, 1);
+        assert.equal(first, second);
+    });
+
     it('writes cache entries through a temp file before renaming into place', async () => {
         const operations = [];
         const storagePaths = {

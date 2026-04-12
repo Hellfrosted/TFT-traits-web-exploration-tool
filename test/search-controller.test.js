@@ -521,6 +521,23 @@ describe('renderer search controller', () => {
         );
         assert.deepEqual(
             JSON.parse(JSON.stringify(controller.__test.getActiveSearchUiState({
+                isSearching: true,
+                progress: null,
+                fallbackProgress: null,
+                lastSearchParams: { boardSize: 9, maxResults: 50 },
+                currentResults: [],
+                hasEstimate: false
+            }))),
+            {
+                searchLabel: 'Estimating...',
+                querySummaryParams: { boardSize: 9, maxResults: 50 },
+                querySummaryMeta: 'Active query',
+                shouldRenderPendingRow: true,
+                pendingRowMessage: 'Results pending...'
+            }
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(controller.__test.getActiveSearchUiState({
                 isSearching: false,
                 progress: null,
                 fallbackProgress: null,

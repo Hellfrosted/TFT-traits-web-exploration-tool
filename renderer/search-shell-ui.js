@@ -28,8 +28,10 @@
         }
 
         function buildSearchButtonLabel(progress = null) {
+            const hasEstimate = state.activeSearchEstimate !== null && state.activeSearchEstimate !== undefined;
             return searchUiState.buildSearchButtonLabel(progress, {
                 isSearching: state.isSearching,
+                hasEstimate,
                 formatBoardEstimate
             });
         }
@@ -104,10 +106,12 @@
             lastSearchParams = null,
             currentResults = []
         } = {}) {
+            const hasEstimate = state.activeSearchEstimate !== null && state.activeSearchEstimate !== undefined;
             return searchUiState.getActiveSearchUiState({
                 isSearching,
                 progress,
                 fallbackProgress,
+                hasEstimate,
                 lastSearchParams,
                 currentResults
             });

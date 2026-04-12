@@ -161,16 +161,37 @@ function createSearchCacheService({
         return await cacheIndexLoadPromise;
     }
 
-    function getCacheKey(dataFingerprint, params) {
+    function createHashedCacheKey(dataFingerprint, params) {
         const normalized = JSON.stringify({
             searchVersion: searchCacheVersion,
             dataFingerprint,
-            params: serializeSearchParams({
-                maxResults: limits.DEFAULT_MAX_RESULTS,
-                ...params
-            })
+            params: serializeSearchParams(params || {})
         });
         return crypto.createHash('md5').update(normalized).digest('hex');
+    }
+
+    function buildPreparedSearchContextCacheParams(params = {}) {
+        return {
+            boardSize: params.boardSize,
+            mustInclude: params.mustInclude,
+            mustExclude: params.mustExclude,
+            mustExcludeTraits: params.mustExcludeTraits,
+            variantLocks: params.variantLocks
+        };
+    }
+
+    function getCacheKey(dataFingerprint, params) {
+        return createHashedCacheKey(dataFingerprint, {
+            maxResults: limits.DEFAULT_MAX_RESULTS,
+            ...params
+        });
+    }
+
+    function getPreparedSearchContextKey(dataFingerprint, params) {
+        return createHashedCacheKey(
+            dataFingerprint,
+            buildPreparedSearchContextCacheParams(params)
+        );
     }
 
     function clearSearchMemoryCaches() {
@@ -180,7 +201,7 @@ function createSearchCacheService({
     }
 
     function getPreparedSearchContext(dataCacheSnapshot, normalizedParams) {
-        const contextKey = getCacheKey(dataCacheSnapshot.dataFingerprint, normalizedParams);
+        const contextKey = getPreparedSearchContextKey(dataCacheSnapshot.dataFingerprint, normalizedParams);
         let preparedContext = preparedSearchContextMemoryCache.get(contextKey);
         if (!preparedContext) {
             preparedContext = engine.prepareSearchContext(dataCacheSnapshot, normalizedParams);
@@ -475,6 +496,7 @@ function createSearchCacheService({
     return {
         ensureCacheDir,
         getCacheKey,
+        getPreparedSearchContextKey,
         clearSearchMemoryCaches,
         getPreparedSearchContext,
         getCachedEstimate,

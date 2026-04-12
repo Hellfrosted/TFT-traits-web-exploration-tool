@@ -33,7 +33,9 @@ function createSearchServiceQuery({
         }
 
         const normalizedParams = normalizeForActiveData(params);
-        const estimateKey = cacheService.getCacheKey(dataCache.dataFingerprint, normalizedParams);
+        const estimateKey = typeof cacheService.getPreparedSearchContextKey === 'function'
+            ? cacheService.getPreparedSearchContextKey(dataCache.dataFingerprint, normalizedParams)
+            : cacheService.getCacheKey(dataCache.dataFingerprint, normalizedParams);
         const cachedEstimate = cacheService.getCachedEstimate(estimateKey);
         if (cachedEstimate) {
             return cachedEstimate;
