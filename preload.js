@@ -1,11 +1,20 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Keep preload self-contained so a secondary module load cannot break the renderer bridge.
-const IPC_CHANNELS = {
+// Keep preload self-contained so a local module load cannot break the renderer bridge.
+// The bridge contract is loaded when available and falls back to local mirrors if not.
+let bridgeContract;
+try {
+    bridgeContract = require('./bridge-contract.js');
+} catch {
+    bridgeContract = undefined;
+}
+
+const IPC_CHANNELS = bridgeContract?.IPC_CHANNELS || {
     FETCH_DATA: 'fetch-data',
     SEARCH_BOARDS: 'search-boards',
     CANCEL_SEARCH: 'cancel-search',
     GET_SEARCH_ESTIMATE: 'get-search-estimate',
+    NORMALIZE_SEARCH_PARAMS: 'normalize-search-params',
     LIST_CACHE: 'list-cache',
     DELETE_CACHE_ENTRY: 'delete-cache-entry',
     CLEAR_ALL_CACHE: 'clear-all-cache',
@@ -13,55 +22,67 @@ const IPC_CHANNELS = {
     MAIN_PROCESS_ERROR: 'main-process-error'
 };
 
-const DATA_SOURCES = {
+const DATA_SOURCES = bridgeContract?.DATA_SOURCES || {
     PBE: 'pbe',
     LIVE: 'latest'
 };
 
-const DEFAULT_DATA_SOURCE = DATA_SOURCES.PBE;
+const DEFAULT_DATA_SOURCE = bridgeContract?.DEFAULT_DATA_SOURCE || DATA_SOURCES.PBE;
+const SMOKE_TEST_FLAG = bridgeContract?.SMOKE_TEST_FLAG || '--smoke-test';
 
-const LIMITS = {
+const LIMITS = bridgeContract?.LIMITS || {
     MAX_REMAINING_SLOTS: 7,
     COMBINATION_LIMIT: 50_000_000_000,
     PROGRESS_INTERVAL: 500_000,
-    DEFAULT_MAX_RESULTS: 200,
+    DEFAULT_MAX_RESULTS: 500,
+    MAX_RESULTS: 1000,
+    RESULTS_PAGE_SIZE: 100,
     LARGE_SEARCH_THRESHOLD: 6_000_000_000
 };
+const RENDERER_CONTRACT = bridgeContract?.RENDERER_CONTRACT || {
+    requiredBridgeMethods: [
+        'fetchData',
+        'searchBoards',
+        'cancelSearch',
+        'listCache',
+        'deleteCacheEntry',
+        'clearAllCache',
+        'getSearchEstimate',
+        'normalizeSearchParams'
+    ],
+    requiredShellIds: [
+        'dataSourceSelect',
+        'fetchBtn',
+        'status',
+        'dataStats',
+        'resultsQuerySummary',
+        'boardSpotlight',
+        'sortMode',
+        'searchBtn',
+        'cancelBtn',
+        'resetFiltersBtn',
+        'resBody'
+    ]
+};
 
-/**
- * Bridge between Electron main and renderer processes.
- * Exposes a limited, secure set of APIs to the window context.
- */
 contextBridge.exposeInMainWorld('electronAPI', {
     limits: LIMITS,
     dataSources: DATA_SOURCES,
     defaultDataSource: DEFAULT_DATA_SOURCE,
+    rendererContract: RENDERER_CONTRACT,
     flags: {
-        smokeTest: process.argv.includes('--smoke-test')
+        smokeTest: process.argv.includes(SMOKE_TEST_FLAG)
     },
 
-    /** Fetch latest champion and trait data from CommunityDragon/Cache */
     fetchData: (source) => ipcRenderer.invoke(IPC_CHANNELS.FETCH_DATA, source),
-
-    /** Execute a recursive DFS search for optimal boards */
     searchBoards: (params) => ipcRenderer.invoke(IPC_CHANNELS.SEARCH_BOARDS, params),
-
-    /** Cancel any currently running search worker */
     cancelSearch: () => ipcRenderer.invoke(IPC_CHANNELS.CANCEL_SEARCH),
-
-    /** List all cached search results from local storage */
-    listCache: () => ipcRenderer.invoke(IPC_CHANNELS.LIST_CACHE),
-
-    /** Delete a specific cache entry by its MD5 key */
+    listCache: (options) => ipcRenderer.invoke(IPC_CHANNELS.LIST_CACHE, options),
     deleteCacheEntry: (key) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_CACHE_ENTRY, key),
-
-    /** Clear all cached search results */
     clearAllCache: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_ALL_CACHE),
-
-    /** Get an algorithmic estimate of search combinations */
     getSearchEstimate: (params) => ipcRenderer.invoke(IPC_CHANNELS.GET_SEARCH_ESTIMATE, params),
+    normalizeSearchParams: (params) => ipcRenderer.invoke(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, params),
 
-    /** Listen for search progress updates (percentage and count) */
     onSearchProgress: (callback) => {
         const listener = (_event, data) => callback(data);
         ipcRenderer.on(IPC_CHANNELS.SEARCH_PROGRESS, listener);
@@ -70,7 +91,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         };
     },
 
-    /** Listen for uncaught errors in the main process thread */
     onMainProcessError: (callback) => {
         const listener = (_event, data) => callback(data);
         ipcRenderer.on(IPC_CHANNELS.MAIN_PROCESS_ERROR, listener);
