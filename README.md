@@ -47,7 +47,6 @@ npm run lint
 npm run validate:data
 ```
 
-For maintainer workflow and smoke-test notes, see [DEVELOPING.md](DEVELOPING.md).
 
 ## License
 
