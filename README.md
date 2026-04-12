@@ -1,65 +1,61 @@
 # TFT Board Exploration Tool
 
-Desktop app for exploring Teamfight Tactics late-game boards from raw game data.
+Desktop app for exploring high-cap Teamfight Tactics boards from raw game data.
 
-This project exists because I was using `tactics.tools` Perfect Synergy during games and it lag my PC for long enough it cost a whole round. I wanted a local tool that stays focused on one job: exploring expensive, strong endgame boards built around go wide augment given X board constraints.
+This project exists because `tactics.tools` Perfect Synergy was lagging my PC badly enough to cost me time during live games. The goal here is narrower: fast local board exploration for expensive late-game boards built around augments, units, traits, roles, and emblems.
 
-This tool is built around questions like:
+Use it for questions like:
 
-- what can I build around Stand United, Bronze For Life, or similar effects?
-- what expensive boards fit these units, traits, roles, or emblems?
+- What can I build around Stand United, Bronze For Life, or similar effects?
+- What expensive boards fit these units, traits, roles, or emblems?
 
-It is a board search tool, not a comp list or trait tracker solver.
+This is a board search tool, not a comp list or trait tracker.
 
-## Why This Over `tactics.tools`?
+## Why Use This?
 
-- This tool is focused on board exploration, especially high-cap late-game boards, instead of a broader collection of TFT utilities.
-- It runs as a local desktop app, so it does not clog up your browser session where you are also watching streams, videos, or guides.
+- Local desktop app instead of another heavy browser tab during games.
+- Focused on expensive late-game board search instead of a broader TFT toolbox.
+- Supports both `latest` and `pbe` Community Dragon data.
 
 ## Q&A
 
 ### Why not just use `tactics.tools`?
 
-`tactics.tools` is useful, but it solves a broader set of problems than I want here. This project is narrower on purpose: fast local search for expensive late-game boards built around augment conditions.
+`tactics.tools` is useful, but it solves a broader set of problems. This project is narrower on purpose: fast local search for expensive late-game boards built around specific conditions.
 
 ### Why Electron?
 
-Because I do not want another heavy browser tab competing with videos, stream while I am in game. A desktop app keeps this tool separate from the browser workload and I just want to learn how to use electron :)
+To keep the workload out of the browser while playing.
 
-### Is this trying to replace comp tier lists?
+### Does this replace comp tier lists?
 
-No. The point is exploration for day 1 of new set, not replacing TFTacademy. If the meta is already exist, a tier list is faster. This tool is more for when you want to search for strong endgame boards that fit a condition on day 0.
-### Where do you got the game data?
+No. It is more useful for early-set exploration and unusual constraint searches than for looking up an established meta board.
 
-TFT data from [Community Dragon](https://communitydragon.org/), supports both `latest` and `pbe`.
+### Where does the data come from?
+
+TFT data comes from [Community Dragon](https://communitydragon.org/) and supports both `latest` and `pbe`.
 
 ## Setup
 
-```powershell
+```sh
 npm install
 ```
 
 ## Run
 
-```powershell
+```sh
 npm start
 ```
 
 ## Development
 
-```powershell
+```sh
 npm test
-npm run test:smoke
-npm run test:all
 npm run lint
 npm run validate:data
 ```
 
-`npm run test:smoke` boots the actual Electron app once and exits through the built-in smoke mode.
-
-`npm run validate:data` hits live Community Dragon endpoints for both `pbe` and `latest`, so treat it as a live parser smoke test rather than an offline unit test.
-
-For maintainer-oriented notes about architecture, cache behavior, and local workflow, see [DEVELOPING.md](DEVELOPING.md).
+For maintainer workflow and smoke-test notes, see [DEVELOPING.md](DEVELOPING.md).
 
 ## License
 
