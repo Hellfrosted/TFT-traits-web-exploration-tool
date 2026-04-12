@@ -78,9 +78,7 @@ Fallback to plain `npm` if the local wrapper runtime is missing.
 
 `npm run test:smoke:unit` keeps the window-service contract test available when you only want the stubbed unit-level smoke assertions.
 
-`npm run validate:data` is intentionally live and network-dependent. Use it as a manual or scheduled parser health check, not as a local offline gate.
-
-The committed PR CI workflow in `.github/workflows/ci.yml` runs `npm test`, `npm run test:smoke`, `npm run lint`, `npm run pack:win`, and `npm run pack:smoke` on Windows. Live Community Dragon validation now lives in `.github/workflows/live-data-validation.yml`.
+`npm run validate:data` is intentionally live and network-dependent. Use it as a manual parser health check, not as a local offline gate.
 
 ## Testing Notes
 
