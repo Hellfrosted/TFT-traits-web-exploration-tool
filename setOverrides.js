@@ -1,26 +1,8 @@
-const GLOBAL_OVERRIDES = Object.freeze({
-    excludedUnitPatterns: ['PVE_', '_FakeUnit', 'Dummy', 'Tracker', 'Golem', 'TFT_Item_', 'God_', 'Enemy_', '_TraitClone'],
-    excludedUnitSuffixes: ['Wolf', 'Lantern', 'Follower', 'Minion', 'Shrine', 'Prop', 'Core'],
-    excludedUnitExact: ['Summon'],
-    excludedTraitNames: [],
-    roleOverrides: {},
-    allowedUnknownRoleUnits: [],
-    specialCaseNotes: {},
-    unitOverrides: {}
-});
+const { GLOBAL_OVERRIDES } = require('./set-overrides/global.js');
+const { SET_17_OVERRIDES } = require('./set-overrides/set17.js');
 
 const SET_OVERRIDES = Object.freeze({
-    '17': {
-        excludedTraitNames: ['Choose Trait'],
-        roleOverrides: {},
-        unitOverrides: {
-            MissFortune: {
-                allowUnknownRole: true,
-                removeTraits: ['Choose Trait'],
-                note: 'Mode choice is auto-detected from trait-clone data, and the upstream payload currently omits a stable role.'
-            }
-        }
-    }
+    '17': SET_17_OVERRIDES
 });
 
 function mergeUnique(...lists) {

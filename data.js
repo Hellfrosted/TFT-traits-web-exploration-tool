@@ -9,6 +9,7 @@ const parseMethods = require('./data-engine/parse.js');
  * @property {string} id
  * @property {string} label
  * @property {string} role
+ * @property {number} [slotCost]
  * @property {string[]} traits
  * @property {Object<string, number>} [traitContributions]
  * @property {Object<string, any>} [conditions]
@@ -21,6 +22,7 @@ const parseMethods = require('./data-engine/parse.js');
  * @property {string} id
  * @property {number} cost
  * @property {string} role
+ * @property {number} [slotCost]
  * @property {string[]} traits
  * @property {Object<string, number>} [traitContributions]
  * @property {{conditions?: Object<string, any>, traitContributions: Object<string, number>}[]} [conditionalEffects]

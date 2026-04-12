@@ -1,10 +1,11 @@
 const { LIMITS } = require('./constants.js');
+const normalizationMetadataCache = new WeakMap();
 
 const UI_LIMITS = {
     MIN_BOARD_SIZE: 1,
     MAX_BOARD_SIZE: 20,
     MIN_RESULTS: 1,
-    MAX_RESULTS: 10000
+    MAX_RESULTS: LIMITS.MAX_RESULTS || 1000
 };
 
 function normalizeStringList(values) {
@@ -107,9 +108,134 @@ function normalizeSearchParams(params = {}) {
     };
 }
 
+function filterAllowedValues(values, allowedValues) {
+    if (!allowedValues) {
+        return values;
+    }
+
+    return values.filter((value) => allowedValues.has(value));
+}
+
+function getUnitsFromDataCache(dataCache) {
+    if (Array.isArray(dataCache?.units)) {
+        return dataCache.units;
+    }
+
+    if (dataCache?.unitMap instanceof Map) {
+        return [...dataCache.unitMap.values()];
+    }
+
+    return [];
+}
+
+function getNormalizationMetadata(dataCache) {
+    if (!dataCache || typeof dataCache !== 'object') {
+        return null;
+    }
+
+    const cachedMetadata = normalizationMetadataCache.get(dataCache);
+    if (cachedMetadata) {
+        return cachedMetadata;
+    }
+
+    const units = getUnitsFromDataCache(dataCache);
+    const allowedUnitIds = new Set(units.map((unit) => String(unit?.id ?? '').trim()).filter(Boolean));
+    const allowedTraits = new Set(
+        Array.isArray(dataCache.traits) ? dataCache.traits.map((value) => String(value ?? '').trim()).filter(Boolean) : []
+    );
+    const allowedRoles = new Set(
+        Array.isArray(dataCache.roles) ? dataCache.roles.map((value) => String(value ?? '').trim()).filter(Boolean) : []
+    );
+    const allowedVariantsByUnit = new Map();
+    units.forEach((unit) => {
+        const unitId = String(unit?.id ?? '').trim();
+        if (!unitId || !Array.isArray(unit?.variants)) {
+            return;
+        }
+        const allowedVariants = new Set(
+            unit.variants.map((variant) => String(variant?.id ?? '').trim()).filter(Boolean)
+        );
+        if (allowedVariants.size > 0) {
+            allowedVariantsByUnit.set(unitId, allowedVariants);
+        }
+    });
+
+    const metadata = {
+        allowedUnitIds,
+        allowedTraits,
+        allowedRoles,
+        allowedVariantsByUnit
+    };
+    normalizationMetadataCache.set(dataCache, metadata);
+    return metadata;
+}
+
+function normalizeSearchParamsForData(params = {}, dataCache = null) {
+    const normalized = normalizeSearchParams(params);
+    if (!dataCache || typeof dataCache !== 'object') {
+        return normalized;
+    }
+
+    const metadata = getNormalizationMetadata(dataCache);
+    const allowedUnitIds = metadata?.allowedUnitIds || new Set();
+    const allowedTraits = metadata?.allowedTraits || new Set();
+    const allowedRoles = metadata?.allowedRoles || new Set();
+    const allowedVariantsByUnit = metadata?.allowedVariantsByUnit || new Map();
+
+    const filteredVariantLocks = {};
+    Object.keys(normalized.variantLocks || {}).forEach((unitId) => {
+        const variantId = normalized.variantLocks[unitId];
+        const allowedVariants = allowedVariantsByUnit.get(unitId);
+        if (!allowedVariants || !allowedVariants.has(variantId)) {
+            return;
+        }
+        filteredVariantLocks[unitId] = variantId;
+    });
+
+    return {
+        ...normalized,
+        mustInclude: filterAllowedValues(normalized.mustInclude, allowedUnitIds),
+        mustExclude: filterAllowedValues(normalized.mustExclude, allowedUnitIds),
+        mustIncludeTraits: filterAllowedValues(normalized.mustIncludeTraits, allowedTraits),
+        mustExcludeTraits: filterAllowedValues(normalized.mustExcludeTraits, allowedTraits),
+        tankRoles: filterAllowedValues(normalized.tankRoles, allowedRoles),
+        carryRoles: filterAllowedValues(normalized.carryRoles, allowedRoles),
+        extraEmblems: filterAllowedValues(normalized.extraEmblems, allowedTraits),
+        variantLocks: filteredVariantLocks
+    };
+}
+
+function buildSerializableSearchParams(params = {}) {
+    const normalized = normalizeSearchParams(params);
+    return {
+        boardSize: normalized.boardSize,
+        maxResults: normalized.maxResults ?? LIMITS.DEFAULT_MAX_RESULTS,
+        mustInclude: [...(normalized.mustInclude || [])].sort(),
+        mustExclude: [...(normalized.mustExclude || [])].sort(),
+        mustIncludeTraits: [...(normalized.mustIncludeTraits || [])].sort(),
+        mustExcludeTraits: [...(normalized.mustExcludeTraits || [])].sort(),
+        tankRoles: [...(normalized.tankRoles || [])].sort(),
+        carryRoles: [...(normalized.carryRoles || [])].sort(),
+        extraEmblems: [...(normalized.extraEmblems || [])].sort(),
+        variantLocks: Object.keys(normalized.variantLocks || {}).sort().map((unitId) => [
+            unitId,
+            normalized.variantLocks[unitId]
+        ]),
+        onlyActive: !!normalized.onlyActive,
+        tierRank: !!normalized.tierRank,
+        includeUnique: !!normalized.includeUnique
+    };
+}
+
+function serializeSearchParams(params = {}) {
+    return JSON.stringify(buildSerializableSearchParams(params));
+}
+
 module.exports = {
     normalizeBoolean,
+    normalizeSearchParamsForData,
     normalizeSearchParams,
+    serializeSearchParams,
     normalizeStringList,
     normalizeStringMap
 };
