@@ -61,6 +61,105 @@ function createSearchCacheService({
             ? limits.PREPARED_CONTEXT_MEMORY_CACHE_MAX_ENTRIES
             : 100
     };
+    let cacheIndexEntries = null;
+    let cacheIndexLoadPromise = null;
+
+    function createCacheIndexEntry(key, payload = {}) {
+        if (typeof key !== 'string' || !key) {
+            return null;
+        }
+
+        if (!payload?.params || typeof payload.params !== 'object') {
+            return null;
+        }
+
+        return {
+            key,
+            params: payload.params,
+            resultCount: Array.isArray(payload.results) ? payload.results.length : (Number.isFinite(payload.resultCount) ? payload.resultCount : 0),
+            timestamp: Number.isFinite(payload.timestamp) ? payload.timestamp : null,
+            dataFingerprint: typeof payload.dataFingerprint === 'string' ? payload.dataFingerprint : null,
+            searchVersion: Number.isFinite(payload.searchVersion) ? payload.searchVersion : searchCacheVersion
+        };
+    }
+
+    function normalizeCacheIndexEntries(rawEntries) {
+        const entries = Array.isArray(rawEntries) ? rawEntries : [];
+        const normalizedEntries = new Map();
+
+        entries.forEach((entry) => {
+            const normalizedEntry = createCacheIndexEntry(entry?.key, entry);
+            if (!normalizedEntry) {
+                return;
+            }
+
+            normalizedEntries.set(normalizedEntry.key, normalizedEntry);
+        });
+
+        return normalizedEntries;
+    }
+
+    async function persistCacheIndexEntries() {
+        if (!cacheIndexEntries) {
+            return;
+        }
+
+        try {
+            await cacheStore.writeCacheIndex([...cacheIndexEntries.values()]);
+        } catch (error) {
+            console.warn('Failed to write cache index:', error.message || String(error));
+        }
+    }
+
+    async function rebuildCacheIndex() {
+        const nextCacheIndexEntries = new Map();
+        const files = await cacheStore.listCacheFiles();
+
+        for (const file of files) {
+            try {
+                const parsed = await cacheStore.readJsonFile(file.filePath);
+                const indexEntry = createCacheIndexEntry(file.key, parsed);
+                if (!indexEntry || indexEntry.searchVersion !== searchCacheVersion) {
+                    continue;
+                }
+
+                nextCacheIndexEntries.set(file.key, indexEntry);
+            } catch (error) {
+                console.warn(`Skipping cache index rebuild entry ${file.file}:`, error.message || String(error));
+            }
+        }
+
+        cacheIndexEntries = nextCacheIndexEntries;
+        await persistCacheIndexEntries();
+        return cacheIndexEntries;
+    }
+
+    async function ensureCacheIndexEntries() {
+        if (cacheIndexEntries) {
+            return cacheIndexEntries;
+        }
+
+        if (cacheIndexLoadPromise) {
+            return await cacheIndexLoadPromise;
+        }
+
+        cacheIndexLoadPromise = (async () => {
+            try {
+                cacheIndexEntries = normalizeCacheIndexEntries(await cacheStore.readCacheIndex());
+            } catch (error) {
+                if (error?.code !== 'ENOENT') {
+                    console.warn('Failed to read cache index:', error.message || String(error));
+                }
+                await rebuildCacheIndex();
+            } finally {
+                cacheIndexLoadPromise = null;
+            }
+
+            return cacheIndexEntries;
+        })();
+
+        return await cacheIndexLoadPromise;
+    }
 
     function getCacheKey(dataFingerprint, params) {
         const normalized = JSON.stringify({
@@ -148,6 +247,7 @@ function createSearchCacheService({
 
     async function writeCache(key, dataFingerprint, params, results) {
         ensureCacheDir();
+        const timestamp = Date.now();
         touchMemoryCacheEntry(searchResultMemoryCache, key, {
             dataFingerprint,
             searchVersion: searchCacheVersion,
@@ -160,8 +260,17 @@ function createSearchCacheService({
                 dataFingerprint,
                 params,
                 results,
-                timestamp: Date.now()
+                timestamp
             });
+            const cacheIndex = await ensureCacheIndexEntries();
+            cacheIndex.set(key, createCacheIndexEntry(key, {
+                searchVersion: searchCacheVersion,
+                dataFingerprint,
+                params,
+                results,
+                timestamp
+            }));
+            await persistCacheIndexEntries();
         } catch (error) {
             console.error('Failed to write cache:', error.message);
         }
@@ -170,6 +279,8 @@ function createSearchCacheService({
     async function migrateCanonicalParams({ canonicalizeByFingerprint } = {}) {
         const files = await cacheStore.listCacheFiles();
         if (files.length === 0) {
+            cacheIndexEntries = new Map();
+            await persistCacheIndexEntries();
             return {
                 rewritten: 0,
                 removed: 0
@@ -251,6 +362,7 @@ function createSearchCacheService({
         }
 
         clearSearchMemoryCaches();
+        await rebuildCacheIndex();
         return {
             rewritten: stagedByKey.size,
             removed
@@ -307,6 +419,7 @@ function createSearchCacheService({
                     await fsp.unlink(file.filePath).catch(() => {});
                 }
             }));
+            await rebuildCacheIndex();
         } catch (error) {
             console.warn('Failed to prune cache:', error.message);
         }
@@ -316,29 +429,16 @@ function createSearchCacheService({
         const limit = Number.isFinite(options?.limit) && options.limit > 0
             ? Math.trunc(options.limit)
             : null;
-        const files = await cacheStore.listCacheFiles();
-        const entries = [];
-        for (const file of files) {
-            try {
-                const parsed = await cacheStore.readJsonFile(file.filePath);
-                if ((parsed?.searchVersion ?? 1) !== searchCacheVersion) {
-                    continue;
-                }
-                if (activeDataFingerprint && parsed?.dataFingerprint !== activeDataFingerprint) {
-                    continue;
-                }
-                if (parsed && parsed.params) {
-                    entries.push({
-                        key: file.key,
-                        params: parsed.params,
-                        resultCount: parsed.results ? parsed.results.length : 0,
-                        timestamp: parsed.timestamp || null
-                    });
-                }
-            } catch (error) {
-                console.warn(`Skipping corrupt cache file ${file.file}:`, error.message);
-            }
-        }
+        const cacheIndex = await ensureCacheIndexEntries();
+        const entries = [...cacheIndex.values()]
+            .filter((entry) => entry.searchVersion === searchCacheVersion)
+            .filter((entry) => !activeDataFingerprint || entry.dataFingerprint === activeDataFingerprint)
+            .map((entry) => ({
+                key: entry.key,
+                params: entry.params,
+                resultCount: entry.resultCount,
+                timestamp: entry.timestamp
+            }));
         entries.sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
         return limit ? entries.slice(0, limit) : entries;
     }
@@ -348,12 +448,21 @@ function createSearchCacheService({
         searchEstimateMemoryCache.delete(key);
         preparedSearchContextMemoryCache.delete(key);
         await cacheStore.deleteCacheEntryFile(key);
+        const cacheIndex = await ensureCacheIndexEntries();
+        cacheIndex.delete(key);
+        await persistCacheIndexEntries();
     }
 
     async function clearAllCache() {
         clearSearchMemoryCaches();
         const deletedCacheEntries = await cacheStore.clearCacheFiles();
         const deletedFallbackSnapshots = await cacheStore.clearDataFallbackFiles();
+        if (deletedCacheEntries.failures.length === 0) {
+            cacheIndexEntries = new Map();
+            await persistCacheIndexEntries();
+        } else {
+            await rebuildCacheIndex();
+        }
         return {
             deleted: deletedCacheEntries.deleted + deletedFallbackSnapshots.deleted,
             failures: [

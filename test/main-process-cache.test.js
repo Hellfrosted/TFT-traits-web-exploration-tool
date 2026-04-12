@@ -62,23 +62,32 @@ describe('main-process cache service', () => {
     it('writes cache entries through a temp file before renaming into place', async () => {
         const operations = [];
         const storagePaths = {
-            cacheDir: 'C:\\cache'
+            cacheDir: 'C:\\cache',
+            storageRoot: 'C:\\cache-root'
         };
         const service = createSearchCacheService({
             storagePaths,
             ensureStorageDirs: () => {},
             resolveCacheEntryPath: () => 'C:\\cache\\entry.json',
-            resolveDataFallbackPath: () => 'C:\\cache\\data.json',
+            resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
             engine: {
                 prepareSearchContext: () => ({ prepared: true })
             },
             fsp: {
+                readFile: async (filePath) => {
+                    if (filePath === 'C:\\cache-root\\search_cache_index.json') {
+                        return '[]';
+                    }
+
+                    throw new Error(`Unexpected read: ${filePath}`);
+                },
                 writeFile: async (filePath, payload) => {
                     operations.push(['writeFile', filePath, payload]);
                 },
                 rename: async (fromPath, toPath) => {
                     operations.push(['rename', fromPath, toPath]);
-                }
+                },
+                readdir: async () => []
             },
             crypto,
             limits: LIMITS,
@@ -87,12 +96,17 @@ describe('main-process cache service', () => {
 
         await service.writeCache('entry', 'fingerprint-1', { boardSize: 9 }, [{ units: ['A'] }]);
 
-        assert.equal(operations.length, 2);
+        assert.equal(operations.length, 4);
         assert.equal(operations[0][0], 'writeFile');
         assert.match(operations[0][1], /entry\.json\..+\.tmp$/);
         assert.equal(operations[1][0], 'rename');
         assert.equal(operations[1][1], operations[0][1]);
         assert.equal(operations[1][2], 'C:\\cache\\entry.json');
+        assert.equal(operations[2][0], 'writeFile');
+        assert.match(operations[2][1], /search_cache_index\.json\..+\.tmp$/);
+        assert.equal(operations[3][0], 'rename');
+        assert.equal(operations[3][1], operations[2][1]);
+        assert.equal(operations[3][2], 'C:\\cache-root\\search_cache_index.json');
     });
 
     it('writes fallback snapshots through a temp file before renaming into place', async () => {
@@ -132,6 +146,76 @@ describe('main-process cache service', () => {
         assert.equal(operations[1][0], 'rename');
         assert.equal(operations[1][1], operations[0][1]);
         assert.equal(operations[1][2], 'C:\\cache-root\\data_fallback_pbe.json');
+    });
+
+    it('lists cache entries from the persisted cache index without reading every cache file', async () => {
+        const readFileCalls = [];
+        const service = createSearchCacheService({
+            storagePaths: {
+                cacheDir: 'C:\\cache',
+                storageRoot: 'C:\\cache-root'
+            },
+            ensureStorageDirs: () => {},
+            resolveCacheEntryPath: (_storagePaths, key) => `C:\\cache\\${key}.json`,
+            resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
+            engine: {
+                prepareSearchContext: () => ({ prepared: true })
+            },
+            fsp: {
+                readFile: async (filePath) => {
+                    readFileCalls.push(filePath);
+                    if (filePath === 'C:\\cache-root\\search_cache_index.json') {
+                        return JSON.stringify([
+                            {
+                                key: 'first',
+                                searchVersion: 4,
+                                dataFingerprint: 'keep-fingerprint',
+                                params: { boardSize: 9, maxResults: 10 },
+                                resultCount: 1,
+                                timestamp: 100
+                            },
+                            {
+                                key: 'second',
+                                searchVersion: 4,
+                                dataFingerprint: 'keep-fingerprint',
+                                params: { boardSize: 8, maxResults: 10 },
+                                resultCount: 2,
+                                timestamp: 200
+                            },
+                            {
+                                key: 'ignored',
+                                searchVersion: 3,
+                                dataFingerprint: 'keep-fingerprint',
+                                params: { boardSize: 7, maxResults: 10 },
+                                resultCount: 3,
+                                timestamp: 300
+                            }
+                        ]);
+                    }
+
+                    throw new Error(`Unexpected read: ${filePath}`);
+                },
+                readdir: async () => {
+                    throw new Error('listCacheEntries should not rebuild the cache index when a persisted index is available.');
+                },
+                writeFile: async () => {},
+                rename: async () => {},
+                unlink: async () => {}
+            },
+            crypto,
+            limits: LIMITS,
+            searchCacheVersion: 4
+        });
+
+        const listedEntries = await service.listCacheEntries('keep-fingerprint', { limit: 1 });
+
+        assert.deepEqual(listedEntries, [{
+            key: 'second',
+            params: { boardSize: 8, maxResults: 10 },
+            resultCount: 2,
+            timestamp: 200
+        }]);
+        assert.deepEqual(readFileCalls, ['C:\\cache-root\\search_cache_index.json']);
     });
 
     it('quarantines malformed fallback snapshots after a JSON parse failure', async () => {

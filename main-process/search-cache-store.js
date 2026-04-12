@@ -8,6 +8,7 @@ function createSearchCacheStore({
     fsp
 }) {
     const cacheDir = storagePaths.cacheDir;
+    const cacheIndexPath = path.join(storagePaths.storageRoot, 'search_cache_index.json');
 
     function ensureCacheDir() {
         ensureStorageDirs(storagePaths);
@@ -68,6 +69,15 @@ function createSearchCacheStore({
     async function readJsonFile(filePath) {
         const data = await fsp.readFile(filePath, 'utf-8');
         return JSON.parse(data);
+    }
+
+    async function writeCacheIndex(entries = []) {
+        ensureCacheDir();
+        await writeCachePayload(cacheIndexPath, JSON.stringify(entries));
+    }
+
+    async function readCacheIndex() {
+        return await readJsonFile(cacheIndexPath);
     }
 
     async function writeCacheEntry(key, payload) {
@@ -141,9 +151,12 @@ function createSearchCacheStore({
 
     return {
         cacheDir,
+        cacheIndexPath,
         ensureCacheDir,
         writeCacheEntry,
         readCacheEntry,
+        writeCacheIndex,
+        readCacheIndex,
         listCacheFiles,
         deleteCacheEntryFile,
         clearCacheFiles,
