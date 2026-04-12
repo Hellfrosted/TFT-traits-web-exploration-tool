@@ -11,13 +11,21 @@
         } = ns.shared || {};
         const { state } = app;
         const reporterState = {
-            missingSetupDependency: false
+            missingSetupDependency: false,
+            selectorShellMismatch: false
         };
 
         function reportMissingSetupDependency() {
             reportRendererIssue(app, reporterState, 'missingSetupDependency', {
                 consoleMessage: '[Renderer Dependency Missing] setupMultiSelect is unavailable.',
                 statusMessage: 'Renderer dependency mismatch: selector controls unavailable.'
+            });
+        }
+
+        function reportSelectorShellMismatch() {
+            reportRendererIssue(app, reporterState, 'selectorShellMismatch', {
+                consoleMessage: '[Renderer Shell Mismatch] Selector shell is incomplete.',
+                statusMessage: 'Renderer shell mismatch: selector controls unavailable.'
             });
         }
 
@@ -173,28 +181,67 @@
             ];
         }
 
+        function hasValidSelectorShell(containerId) {
+            if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+                return true;
+            }
+
+            const container = document.getElementById(containerId);
+            if (!container || typeof container.querySelector !== 'function') {
+                return false;
+            }
+
+            return !!container.querySelector('.pills')
+                && !!container.querySelector('input')
+                && !!container.querySelector('.dropdown');
+        }
+
         function initializeSelectors(res, preservedVariantLocks) {
             const setupMultiSelect = getSetupMultiSelect();
             if (!setupMultiSelect) {
-                return false;
+                return {
+                    success: false,
+                    shouldRevertActiveData: false
+                };
             }
 
             const unitOptions = createUnitOptions(res.units);
             const traitOptions = createTraitOptions(res);
             const selectorSetupConfigs = getSelectorSetupConfigs(unitOptions, traitOptions, res.roles);
+            const shouldValidateSelectorShell = typeof document !== 'undefined'
+                && typeof document.getElementById === 'function'
+                && selectorSetupConfigs.some((config) => {
+                    const container = document.getElementById(config.containerId);
+                    return !!container && typeof container.querySelector === 'function';
+                });
+            if (shouldValidateSelectorShell) {
+                const malformedConfig = selectorSetupConfigs.find((config) => !hasValidSelectorShell(config.containerId));
+                if (malformedConfig) {
+                    reportSelectorShellMismatch();
+                    return {
+                        success: false,
+                        shouldRevertActiveData: true
+                    };
+                }
+            }
+            const nextSelectors = {};
 
             selectorSetupConfigs.forEach((config) => {
-                state.selectors[config.key] = setupMultiSelect(
+                nextSelectors[config.key] = setupMultiSelect(
                     config.containerId,
                     config.options,
                     config.isUnit
                 );
             });
 
+            state.selectors = nextSelectors;
             app.queryUi.renderVariantLockControls(state.lastSearchParams?.variantLocks || preservedVariantLocks);
             Object.values(state.selectors).forEach((selector) => selector.resolvePills(res.hashMap));
             app.queryUi.applyDefaultRoleFilters();
-            return true;
+            return {
+                success: true,
+                shouldRevertActiveData: false
+            };
         }
 
         async function normalizeQuery(params) {
@@ -389,10 +436,15 @@
                 }
                 if (res.success) {
                     const successState = getSuccessfulFetchState(res, source, previousFingerprint);
+                    const previousActiveData = state.activeData;
                     state.activeData = successState.activeData;
 
                     renderLoadedDataStatus(res, successState.setLabel, successState.cacheSummary);
-                    if (!initializeSelectors(res, preservedVariantLocks)) {
+                    const selectorInitialization = initializeSelectors(res, preservedVariantLocks);
+                    if (!selectorInitialization.success) {
+                        if (selectorInitialization.shouldRevertActiveData) {
+                            state.activeData = previousActiveData;
+                        }
                         return;
                     }
                     await restoreQueryState(previousEffectiveQuery, {

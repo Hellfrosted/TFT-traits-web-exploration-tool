@@ -339,7 +339,7 @@ describe('main-process search service', () => {
         assert.equal(typeof searchResponse.searchId, 'number');
     });
 
-    it('returns successful worker results even if cancellation happens during cache persistence', async () => {
+    it('allows a new search immediately after a successful result while cache persistence is still running', async () => {
         resetWorkers();
         const cacheWrite = createDeferred();
         const { searchService, cacheService } = createSearchServiceUnderTest();
@@ -356,18 +356,27 @@ describe('main-process search service', () => {
             results: [{ units: ['A'] }]
         });
 
-        const searchResponse = await pendingSearch;
-        const cancelResponse = await searchService.cancelSearch();
+        const firstResponse = await pendingSearch;
+        const secondSearch = searchService.searchBoards({ boardSize: 9 });
+        const secondWorker = await waitForWorker(2);
+        secondWorker.emit('message', {
+            type: 'done',
+            success: true,
+            results: [{ units: ['B'] }]
+        });
+        const secondResponse = await secondSearch;
+
         cacheWrite.resolve();
 
-        assert.equal(searchResponse.success, true);
-        assert.equal(searchResponse.cancelled, false);
-        assert.deepEqual(searchResponse.results, [{ units: ['A'] }]);
-        assert.equal(typeof searchResponse.searchId, 'number');
-        assert.equal(cancelResponse.success, true);
+        assert.equal(firstResponse.success, true);
+        assert.equal(firstResponse.cancelled, false);
+        assert.deepEqual(firstResponse.results, [{ units: ['A'] }]);
+        assert.equal(typeof firstResponse.searchId, 'number');
+        assert.equal(secondResponse.success, true);
+        assert.deepEqual(secondResponse.results, [{ units: ['B'] }]);
     });
 
-    it('keeps active search state until worker termination resolves', async () => {
+    it('releases active search state before worker termination finishes after a completed result', async () => {
         resetWorkers();
         const { searchService } = createSearchServiceUnderTest();
         const termination = createDeferred();
@@ -388,22 +397,19 @@ describe('main-process search service', () => {
         const firstResponse = await firstSearchPromise;
         assert.equal(firstResponse.success, true);
 
-        const blockedSecondResponse = await searchService.searchBoards({ boardSize: 9 });
-        assert.equal(blockedSecondResponse.success, false);
-        assert.match(blockedSecondResponse.error, /already in progress/i);
-
-        termination.resolve();
-        await Promise.resolve();
-
-        const thirdSearchPromise = searchService.searchBoards({ boardSize: 9 });
+        const secondSearchPromise = searchService.searchBoards({ boardSize: 9 });
         const secondWorker = await waitForWorker(2);
         secondWorker.emit('message', {
             type: 'done',
             success: true,
             results: [{ units: ['B'] }]
         });
-        const thirdResponse = await thirdSearchPromise;
-        assert.equal(thirdResponse.success, true);
-        assert.deepEqual(thirdResponse.results, [{ units: ['B'] }]);
+        const secondResponse = await secondSearchPromise;
+
+        assert.equal(secondResponse.success, true);
+        assert.deepEqual(secondResponse.results, [{ units: ['B'] }]);
+
+        termination.resolve();
+        await Promise.resolve();
     });
 });

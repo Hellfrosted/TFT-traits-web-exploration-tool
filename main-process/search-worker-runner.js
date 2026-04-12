@@ -86,11 +86,13 @@ function createSearchWorkerRunner({
 
                 searchContext.completed = true;
                 if (searchContext.cancelled) {
+                    cleanup();
                     void terminateWorker();
                     safeResolve(createCancelledSearchResponse(searchContext.searchId));
                     return;
                 }
 
+                cleanup();
                 safeResolve(createWorkerDoneResponse(msg, searchContext.searchId));
                 if (shouldPersistSearchResults(msg.results)) {
                     void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
@@ -105,6 +107,7 @@ function createSearchWorkerRunner({
             });
 
             searchContext.worker.on('error', (error) => {
+                cleanup();
                 safeResolve(
                     createWorkerErrorResponse(error, searchContext.searchId, searchContext.cancelled)
                 );

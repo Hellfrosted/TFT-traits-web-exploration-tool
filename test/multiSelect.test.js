@@ -181,4 +181,47 @@ describe('multiSelect component', () => {
 
         assert.equal(changeEvents, 0);
     });
+
+    it('returns a non-ready controller when the selector shell is incomplete', () => {
+        const pills = createElement('div');
+        const container = createElement('div');
+        container.querySelector = (selector) => ({
+            '.pills': pills,
+            'input': null,
+            '.dropdown': null
+        }[selector] || null);
+
+        const sandbox = {
+            console,
+            AbortController: class AbortController {
+                constructor() {
+                    this.signal = {};
+                }
+
+                abort() {}
+            },
+            CustomEvent: function CustomEvent(type, init) {
+                this.type = type;
+                this.detail = init?.detail;
+                this.bubbles = init?.bubbles;
+            },
+            document: {
+                activeElement: null,
+                getElementById: (id) => id === 'mustIncludeContainer' ? container : null,
+                createElement: (tagName) => createElement(tagName),
+                createTextNode: (text) => ({ textContent: text }),
+                addEventListener: () => {}
+            },
+            window: {}
+        };
+
+        const setupMultiSelect = loadMultiSelect(sandbox);
+        const controller = setupMultiSelect('mustIncludeContainer', [
+            { id: 'Galio', displayName: 'Galio' }
+        ], true);
+
+        assert.equal(controller.ready, false);
+        assert.equal(controller.getValues().length, 0);
+        assert.doesNotThrow(() => controller.setValues(['Galio']));
+    });
 });

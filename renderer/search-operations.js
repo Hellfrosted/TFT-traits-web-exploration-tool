@@ -74,6 +74,14 @@
             }
         }
 
+        async function submitSearch(params = null) {
+            if (params) {
+                app.queryUi.applySearchParams(params);
+            }
+
+            return await handleSearchClick();
+        }
+
         async function handleSearchClick() {
             if (state.isSearching) {
                 return;
@@ -182,6 +190,7 @@
             normalizeCurrentSearchParams,
             confirmLargeSearchVolume,
             requestCancelSearch,
+            submitSearch,
             handleSearchClick,
             subscribeProgressUpdates,
             __test: {

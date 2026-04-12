@@ -135,6 +135,7 @@
             setCancellingSearch: shellUi.setCancellingSearch,
             setSearchState: shellUi.setSearchState,
             requestCancelSearch: searchOperations.requestCancelSearch,
+            submitSearch: searchOperations.submitSearch,
             handleSearchClick: searchOperations.handleSearchClick,
             subscribeProgressUpdates: searchOperations.subscribeProgressUpdates,
             __test: {

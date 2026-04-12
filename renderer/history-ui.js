@@ -13,6 +13,8 @@
         const reporterState = {
             missingDialogDependency: false
         };
+        let nextHistoryRefreshRequestId = 0;
+        let activeHistoryRefreshRequestId = 0;
         const showAlert = typeof createDialogInvoker === 'function'
             ? createDialogInvoker(app, reporterState, {
                 methodName: 'showAlert'
@@ -113,6 +115,17 @@
             });
         }
 
+        function beginHistoryRefresh() {
+            const requestId = nextHistoryRefreshRequestId + 1;
+            nextHistoryRefreshRequestId = requestId;
+            activeHistoryRefreshRequestId = requestId;
+            return requestId;
+        }
+
+        function isActiveHistoryRefresh(requestId) {
+            return requestId === activeHistoryRefreshRequestId;
+        }
+
         async function updateHistoryList() {
             const { historyList: listEl } = resolveHistoryShell();
             if (!listEl) return;
@@ -121,14 +134,21 @@
                 return;
             }
 
+            const requestId = beginHistoryRefresh();
             let res;
             try {
                 res = await state.electronBridge.listCache({ limit: 5 });
             } catch (error) {
+                if (!isActiveHistoryRefresh(requestId)) {
+                    return;
+                }
                 renderHistoryEmptyState(listEl, getHistoryListStateMessage(null, error));
                 return;
             }
 
+            if (!isActiveHistoryRefresh(requestId)) {
+                return;
+            }
             const stateMessage = getHistoryListStateMessage(res);
             if (stateMessage) {
                 renderHistoryEmptyState(listEl, stateMessage);
@@ -156,10 +176,15 @@
             state.selectors.carryRoles?.resolvePills(state.activeData.hashMap);
         }
 
-        function replayHistorySearch(canonicalParams) {
+        async function replayHistorySearch(canonicalParams) {
             app.queryUi.applySearchParams(canonicalParams);
             resolveReplayRolePills();
             app.queryUi.renderQuerySummary(canonicalParams, 'Loaded a recent search. Replaying canonical query now.');
+            if (typeof app.search?.submitSearch === 'function') {
+                await app.search.submitSearch();
+                return;
+            }
+
             const { searchBtn } = resolveHistoryShell();
             searchBtn?.click();
         }
@@ -188,7 +213,7 @@
 
             try {
                 const canonicalParams = await resolveReplayParams(params);
-                replayHistorySearch(canonicalParams);
+                await replayHistorySearch(canonicalParams);
             } catch (error) {
                 console.error('[History Replay Failed]', error);
                 if (typeof app.queryUi.setStatusMessage === 'function') {

@@ -9,25 +9,48 @@
      * @param {string} containerId - DOM ID of the `.multi-select-container` wrapper
      * @param {Array} options - Available options (unit objects or trait name strings)
      * @param {boolean} [isUnit=true] - Whether options are unit objects (true) or plain strings (false)
-     * @returns {{getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
+     * @returns {{ready: boolean, getValues: Function, setValues: Function, resolvePills: Function, destroy: Function}}
      */
     function setupMultiSelect(containerId, options, isUnit = true) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.warn(`MultiSelect container not found: ${containerId}`);
-        return { getValues: () => [], setValues: () => {}, resolvePills: () => {}, destroy: () => {} };
-    }
+        function createNoopController(containerRef = null) {
+            const api = {
+                ready: false,
+                getValues: () => [],
+                setValues: () => {},
+                resolvePills: () => {},
+                destroy: () => {
+                    if (containerRef?._multiSelectController === api) {
+                        delete containerRef._multiSelectController;
+                    }
+                }
+            };
+            if (containerRef) {
+                containerRef._multiSelectController = api;
+            }
+            return api;
+        }
 
-    const previousController = container._multiSelectController;
-    const preservedValues = previousController?.getValues ? previousController.getValues() : [];
-    previousController?.destroy?.();
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`MultiSelect container not found: ${containerId}`);
+            return createNoopController();
+        }
 
-    const pillsContainer = container.querySelector('.pills');
-    const input = container.querySelector('input');
-    const dropdown = container.querySelector('.dropdown');
-    pillsContainer.innerHTML = '';
-    dropdown.innerHTML = '';
-    dropdown.classList.add('hidden');
+        const previousController = container._multiSelectController;
+        const preservedValues = previousController?.getValues ? previousController.getValues() : [];
+        previousController?.destroy?.();
+
+        const pillsContainer = container.querySelector('.pills');
+        const input = container.querySelector('input');
+        const dropdown = container.querySelector('.dropdown');
+        if (!pillsContainer || !input || !dropdown) {
+            console.warn(`MultiSelect shell incomplete: ${containerId}`);
+            return createNoopController(container);
+        }
+
+        pillsContainer.innerHTML = '';
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
     
     let selectedValues = [];
     let filteredOptions = [];
@@ -293,40 +316,41 @@
         setValues(initialValues);
     }
 
-    const api = {
-        getValues: () => [...selectedValues],
-        setValues,
-        resolvePills: (hashMap) => {
-            const pills = pillsContainer.querySelectorAll('.pill');
-            pills.forEach((pill) => {
-                let currentValue = pill.dataset.value || '';
-                if (currentValue.startsWith('{') && currentValue.endsWith('}')) {
-                    const resolved = hashMap[currentValue];
-                    if (resolved) {
-                        const index = selectedValues.indexOf(currentValue);
-                        if (index !== -1) selectedValues[index] = resolved;
-                        pill.dataset.value = resolved;
-                        currentValue = resolved;
-                        const resolvedMeta = optionsByValue.get(resolved);
-                        const labelText = pill.querySelector('.pill-label-text');
-                        if (labelText) {
-                            labelText.textContent = resolvedMeta?.pillLabel || resolvedMeta?.label || resolved;
+        const api = {
+            ready: true,
+            getValues: () => [...selectedValues],
+            setValues,
+            resolvePills: (hashMap) => {
+                const pills = pillsContainer.querySelectorAll('.pill');
+                pills.forEach((pill) => {
+                    let currentValue = pill.dataset.value || '';
+                    if (currentValue.startsWith('{') && currentValue.endsWith('}')) {
+                        const resolved = hashMap[currentValue];
+                        if (resolved) {
+                            const index = selectedValues.indexOf(currentValue);
+                            if (index !== -1) selectedValues[index] = resolved;
+                            pill.dataset.value = resolved;
+                            currentValue = resolved;
+                            const resolvedMeta = optionsByValue.get(resolved);
+                            const labelText = pill.querySelector('.pill-label-text');
+                            if (labelText) {
+                                labelText.textContent = resolvedMeta?.pillLabel || resolvedMeta?.label || resolved;
+                            }
                         }
                     }
-                }
 
-                if (!optionsByValue.has(currentValue)) {
-                    selectedValues = selectedValues.filter((value) => value !== currentValue);
-                    pill.remove();
-                }
-            });
-            emitChange();
-        },
-        destroy: () => {
-            controller.abort();
-            delete container._multiSelectController;
-        }
-    };
+                    if (!optionsByValue.has(currentValue)) {
+                        selectedValues = selectedValues.filter((value) => value !== currentValue);
+                        pill.remove();
+                    }
+                });
+                emitChange();
+            },
+            destroy: () => {
+                controller.abort();
+                delete container._multiSelectController;
+            }
+        };
 
         container._multiSelectController = api;
         return api;
