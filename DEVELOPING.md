@@ -8,7 +8,9 @@ Electron responsibilities are split across three areas:
 
 - Main process: window bootstrap, data fetch/fallback orchestration, worker-backed search execution, cache management, and IPC registration.
 - Preload: the narrow renderer bridge only. Keep it self-contained; its mirrored IPC/data-source/limit contract is checked against `bridge-contract.js` by `test/bridge-contract.test.js`.
-- Renderer: query controls, results rendering, history UI, and degraded-mode handling when the bridge is unavailable.
+- Renderer: Vite/React UI under `src/renderer/`.
+
+The Electron app loads `renderer-dist/index.html` in normal mode. Use `npm run build:renderer` before launching Electron directly. For hot reload, run `npm run dev:renderer` in one terminal and `npm run dev:electron` in another.
 
 ## Search Pipeline
 
@@ -54,7 +56,7 @@ When adding new TFT mechanics, prefer extending existing variant/conditional abs
 Put set-specific behavior in data-driven files first:
 
 - `setOverrides.js`: excluded traits/units, role overrides, unit overrides, conditional profiles/effects, selection groups
-- `roleDefaults.js`: default tank/carry role derivation from fetched roles
+- `src/renderer/helpers.js`: default tank/carry role derivation from fetched roles
 
 Do not hardcode stale role names or set-specific mechanics directly into HTML or renderer glue.
 
@@ -63,6 +65,7 @@ Do not hardcode stale role names or set-specific mechanics directly into HTML or
 Use the local Windows wrapper when `tools/node/` exists:
 
 ```powershell
+npm run build:renderer
 .\npmw.cmd run test
 .\npmw.cmd run lint
 .\npmw.cmd run test:smoke
@@ -74,7 +77,7 @@ Use the local Windows wrapper when `tools/node/` exists:
 
 Fallback to plain `npm` if the local wrapper runtime is missing.
 
-`npm run test:smoke` now boots the actual Electron app through `--smoke-test`.
+`npm run test:smoke` builds the Vite renderer, then boots the actual Electron app through `--smoke-test`.
 
 `npm run test:smoke:unit` keeps the window-service contract test available when you only want the stubbed unit-level smoke assertions.
 
@@ -88,7 +91,7 @@ Current test layers cover:
 - parser behavior and source freshness
 - storage helpers
 - main-process cache/search services
-- renderer controller/results sorting behavior
+- renderer boot behavior through the Electron smoke test
 - Electron smoke boot verification
 
 For new work, add tests at the narrowest extracted seam first instead of expanding the legacy monolith tests.

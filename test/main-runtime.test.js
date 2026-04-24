@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const path = require('node:path');
 
 const { createMainRuntime } = require('../main-process/runtime.js');
 const { createMainRuntime: createMainRuntimeFromEntry } = require('../main.js');
@@ -282,7 +283,10 @@ describe('main runtime', () => {
             createWindowCalls: 1,
             scheduleSmokeTimeoutCalls: 1
         });
-        assert.equal(getWindowServiceOptions().iconPath, 'C:\\Users\\tester\\dev\\repo\\assets\\app-icon.ico');
+        assert.equal(
+            getWindowServiceOptions().iconPath,
+            path.join('C:\\Users\\tester\\dev\\repo', 'assets', 'app-icon.ico')
+        );
 
         started.dispose();
 

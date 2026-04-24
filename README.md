@@ -39,13 +39,19 @@ npm install
 npm start
 ```
 
+`npm start` builds the Vite/React renderer and opens the Electron app.
+
 ## Development
 
 ```sh
+npm run dev:renderer
+npm run dev:electron
 npm test
 npm run lint
 npm run validate:data
 ```
+
+Run the two dev commands in separate terminals when you want Vite hot reload inside Electron.
 
 
 ## License

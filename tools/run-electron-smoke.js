@@ -5,9 +5,18 @@ async function main() {
     const electronBinary = require('electron');
     const repoRoot = path.resolve(__dirname, '..');
     const timeoutMs = 30_000;
+    const electronArgs = [repoRoot, '--smoke-test'];
+
+    if (process.env.CI) {
+        if (process.platform === 'linux') {
+            electronArgs.push('--no-sandbox');
+        }
+
+        electronArgs.push('--disable-gpu', '--disable-dev-shm-usage');
+    }
 
     await new Promise((resolve, reject) => {
-        const child = spawn(electronBinary, [repoRoot, '--smoke-test'], {
+        const child = spawn(electronBinary, electronArgs, {
             cwd: repoRoot,
             stdio: 'inherit',
             env: {

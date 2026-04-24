@@ -90,6 +90,7 @@ describe('main-process cache service', () => {
             cacheDir: 'C:\\cache',
             storageRoot: 'C:\\cache-root'
         };
+        const cacheIndexPath = path.join(storagePaths.storageRoot, 'search_cache_index.json');
         const service = createSearchCacheService({
             storagePaths,
             ensureStorageDirs: () => {},
@@ -100,7 +101,7 @@ describe('main-process cache service', () => {
             },
             fsp: {
                 readFile: async (filePath) => {
-                    if (filePath === 'C:\\cache-root\\search_cache_index.json') {
+                    if (filePath === cacheIndexPath) {
                         return '[]';
                     }
 
@@ -131,7 +132,7 @@ describe('main-process cache service', () => {
         assert.match(operations[2][1], /search_cache_index\.json\..+\.tmp$/);
         assert.equal(operations[3][0], 'rename');
         assert.equal(operations[3][1], operations[2][1]);
-        assert.equal(operations[3][2], 'C:\\cache-root\\search_cache_index.json');
+        assert.equal(operations[3][2], cacheIndexPath);
     });
 
     it('writes fallback snapshots through a temp file before renaming into place', async () => {
@@ -175,11 +176,13 @@ describe('main-process cache service', () => {
 
     it('lists cache entries from the persisted cache index without reading every cache file', async () => {
         const readFileCalls = [];
+        const storagePaths = {
+            cacheDir: 'C:\\cache',
+            storageRoot: 'C:\\cache-root'
+        };
+        const cacheIndexPath = path.join(storagePaths.storageRoot, 'search_cache_index.json');
         const service = createSearchCacheService({
-            storagePaths: {
-                cacheDir: 'C:\\cache',
-                storageRoot: 'C:\\cache-root'
-            },
+            storagePaths,
             ensureStorageDirs: () => {},
             resolveCacheEntryPath: (_storagePaths, key) => `C:\\cache\\${key}.json`,
             resolveDataFallbackPath: () => 'C:\\cache-root\\data_fallback_pbe.json',
@@ -189,7 +192,7 @@ describe('main-process cache service', () => {
             fsp: {
                 readFile: async (filePath) => {
                     readFileCalls.push(filePath);
-                    if (filePath === 'C:\\cache-root\\search_cache_index.json') {
+                    if (filePath === cacheIndexPath) {
                         return JSON.stringify([
                             {
                                 key: 'first',
@@ -240,7 +243,7 @@ describe('main-process cache service', () => {
             resultCount: 2,
             timestamp: 200
         }]);
-        assert.deepEqual(readFileCalls, ['C:\\cache-root\\search_cache_index.json']);
+        assert.deepEqual(readFileCalls, [cacheIndexPath]);
     });
 
     it('quarantines malformed fallback snapshots after a JSON parse failure', async () => {

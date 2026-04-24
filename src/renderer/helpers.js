@@ -1,0 +1,241 @@
+export const DEFAULT_QUERY = {
+    boardSize: 9,
+    maxResults: 500,
+    mustInclude: [],
+    mustExclude: [],
+    mustIncludeTraits: [],
+    mustExcludeTraits: [],
+    tankRoles: [],
+    carryRoles: [],
+    extraEmblems: [],
+    variantLocks: {},
+    onlyActive: true,
+    tierRank: true,
+    includeUnique: false
+};
+
+export function formatNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '-';
+    return new Intl.NumberFormat('en-US').format(numeric);
+}
+
+export function formatBoardEstimate(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 'variable';
+    if (numeric >= 1_000_000_000) return `${(numeric / 1_000_000_000).toFixed(1)}B`;
+    if (numeric >= 1_000_000) return `${(numeric / 1_000_000).toFixed(1)}M`;
+    if (numeric >= 1_000) return `${(numeric / 1_000).toFixed(1)}K`;
+    return formatNumber(numeric);
+}
+
+export function formatTimestamp(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString();
+}
+
+export function formatSnapshotAge(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const elapsedMs = Date.now() - date.getTime();
+    if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '';
+    const minutes = Math.floor(elapsedMs / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m old`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 48) return `${hours}h old`;
+    return `${Math.floor(hours / 24)}d old`;
+}
+
+export function getDataSourceLabel(source) {
+    return source === 'latest' ? 'Live' : 'PBE';
+}
+
+export function clampInteger(value, fallback, min, max) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(parsed, min), max);
+}
+
+export function normalizeStringList(values) {
+    if (!Array.isArray(values)) return [];
+    const seen = new Set();
+    const normalized = [];
+    values.forEach((value) => {
+        const candidate = typeof value === 'object' && value
+            ? value.value ?? value.id ?? value.name ?? value.label
+            : value;
+        const stringValue = String(candidate ?? '').trim();
+        if (!stringValue || seen.has(stringValue)) return;
+        seen.add(stringValue);
+        normalized.push(stringValue);
+    });
+    return normalized;
+}
+
+export function normalizeSearchParams(params = {}, limits = {}) {
+    const maxResultsLimit = limits.MAX_RESULTS || 1000;
+    const defaultMaxResults = limits.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults;
+    const variantLocks = {};
+    if (params.variantLocks && typeof params.variantLocks === 'object' && !Array.isArray(params.variantLocks)) {
+        Object.keys(params.variantLocks).sort().forEach((unitId) => {
+            const key = String(unitId ?? '').trim();
+            const value = String(params.variantLocks[unitId] ?? '').trim();
+            if (key && value && value !== 'auto') {
+                variantLocks[key] = value;
+            }
+        });
+    }
+
+    return {
+        boardSize: clampInteger(params.boardSize, DEFAULT_QUERY.boardSize, 1, 20),
+        maxResults: clampInteger(params.maxResults, defaultMaxResults, 1, maxResultsLimit),
+        mustInclude: normalizeStringList(params.mustInclude),
+        mustExclude: normalizeStringList(params.mustExclude),
+        mustIncludeTraits: normalizeStringList(params.mustIncludeTraits),
+        mustExcludeTraits: normalizeStringList(params.mustExcludeTraits),
+        tankRoles: normalizeStringList(params.tankRoles),
+        carryRoles: normalizeStringList(params.carryRoles),
+        extraEmblems: normalizeStringList(params.extraEmblems),
+        variantLocks,
+        onlyActive: !!params.onlyActive,
+        tierRank: !!params.tierRank,
+        includeUnique: !!params.includeUnique
+    };
+}
+
+export function deriveDefaultTankRoles(roles) {
+    return normalizeStringList(roles).filter((role) => /tank/i.test(role));
+}
+
+export function deriveDefaultCarryRoles(roles) {
+    const normalizedRoles = normalizeStringList(roles);
+    const tankRoles = new Set(deriveDefaultTankRoles(normalizedRoles).map((role) => role.toLowerCase()));
+    return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
+}
+
+export function summarizeParams(params = {}) {
+    const parts = [];
+    if (params.boardSize) parts.push(`Level ${params.boardSize}`);
+    if (params.mustInclude?.length) parts.push(`include ${params.mustInclude.length} units`);
+    if (params.mustExclude?.length) parts.push(`ban ${params.mustExclude.length} units`);
+    if (params.mustIncludeTraits?.length) parts.push(`force ${params.mustIncludeTraits.length} traits`);
+    if (params.mustExcludeTraits?.length) parts.push(`exclude ${params.mustExcludeTraits.length} traits`);
+    if (params.extraEmblems?.length) parts.push(`${params.extraEmblems.length} emblems`);
+    const lockCount = Object.keys(params.variantLocks || {}).length;
+    if (lockCount) parts.push(`${lockCount} locked modes`);
+    if (params.includeUnique) parts.push('unique traits on');
+    if (params.onlyActive === false) parts.push('inactive counted');
+    if (params.tierRank === false) parts.push('flat ranking');
+    return parts.length ? parts.join(' • ') : 'Default query';
+}
+
+export function getBoardMetric(board) {
+    return Number(board?.synergyScore ?? board?.traitsCount ?? 0);
+}
+
+export function sortBoards(results, sortMode) {
+    const sorters = {
+        mostTraits: (left, right) => getBoardMetric(right) - getBoardMetric(left) || Number(right.totalCost || 0) - Number(left.totalCost || 0),
+        lowestCost: (left, right) => Number(left.totalCost || 0) - Number(right.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
+        highestCost: (left, right) => Number(right.totalCost || 0) - Number(left.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
+        bestValue: (left, right) => (getBoardMetric(right) / Math.max(Number(right.totalCost || 0), 1)) - (getBoardMetric(left) / Math.max(Number(left.totalCost || 0), 1))
+    };
+    return [...(Array.isArray(results) ? results : [])].sort(sorters[sortMode] || sorters.mostTraits);
+}
+
+export function createActiveData(response, fallbackSource) {
+    return {
+        units: response.units || [],
+        unitMap: new Map((response.units || []).map((unit) => [unit.id, unit])),
+        traits: response.traits || [],
+        roles: response.roles || [],
+        traitBreakpoints: response.traitBreakpoints || {},
+        traitIcons: response.traitIcons || {},
+        assetValidation: response.assetValidation || null,
+        setNumber: response.setNumber,
+        dataSource: response.dataSource || fallbackSource,
+        dataFingerprint: response.dataFingerprint || null,
+        hashMap: response.hashMap || {},
+        snapshotFetchedAt: response.snapshotFetchedAt || null,
+        usedCachedSnapshot: !!response.usedCachedSnapshot
+    };
+}
+
+export function getAssetCoverageLabel(assetValidation) {
+    if (!assetValidation) return 'N/A';
+    const valid = Number(assetValidation.valid ?? assetValidation.validCount);
+    const total = Number(assetValidation.total ?? assetValidation.totalCount);
+    if (Number.isFinite(valid) && Number.isFinite(total) && total > 0) {
+        return `${valid}/${total}`;
+    }
+    if (typeof assetValidation.coverage === 'string') return assetValidation.coverage;
+    return 'N/A';
+}
+
+export function getVariantAssignment(board, unitId) {
+    const assignment = board?.variantAssignments?.[unitId];
+    if (!assignment) return null;
+    if (typeof assignment === 'string') return { id: assignment, label: assignment };
+    return assignment;
+}
+
+export function buildTraitSummary(board, activeData, query) {
+    if (!board || !activeData) return [];
+    const counts = new Map();
+    Object.entries(board.traitCounts || {}).forEach(([trait, count]) => {
+        const numeric = Number(count);
+        if (trait && Number.isFinite(numeric) && numeric > 0) {
+            counts.set(trait, numeric);
+        }
+    });
+    (query.extraEmblems || []).forEach((trait) => {
+        counts.set(trait, (counts.get(trait) || 0) + 1);
+    });
+
+    return [...counts.entries()]
+        .map(([trait, count]) => {
+            const breakpoints = activeData.traitBreakpoints?.[trait] || [1];
+            let levelReached = 0;
+            for (const breakpoint of breakpoints) {
+                if (count >= breakpoint) levelReached = breakpoint;
+                else break;
+            }
+            const isUnique = breakpoints.length === 1 && breakpoints[0] === 1;
+            if (!query.includeUnique && isUnique) return null;
+            const nextBreakpoint = breakpoints.find((breakpoint) => breakpoint > count) || breakpoints.at(-1) || 1;
+            return {
+                trait,
+                count,
+                levelReached,
+                isActive: levelReached > 0,
+                iconUrl: activeData.traitIcons?.[trait] || null,
+                label: levelReached > 0 ? `${trait} ${count}/${levelReached}` : `${trait} ${count}/${nextBreakpoint}`
+            };
+        })
+        .filter(Boolean)
+        .sort((left, right) =>
+            Number(right.isActive) - Number(left.isActive)
+            || right.levelReached - left.levelReached
+            || right.count - left.count
+            || left.trait.localeCompare(right.trait)
+        );
+}
+
+export function collectUnitTraitLabels(unit) {
+    const traitNames = new Set();
+    const addTraitNames = (entity) => {
+        if (!entity || typeof entity !== 'object') return;
+        if (entity.traitContributions && typeof entity.traitContributions === 'object') {
+            Object.keys(entity.traitContributions).forEach((traitName) => traitName && traitNames.add(traitName));
+            return;
+        }
+        (entity.traits || []).forEach((traitName) => traitName && traitNames.add(traitName));
+    };
+    addTraitNames(unit);
+    (unit?.variants || []).forEach(addTraitNames);
+    return [...traitNames].sort((left, right) => left.localeCompare(right));
+}
