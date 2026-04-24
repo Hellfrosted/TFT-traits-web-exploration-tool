@@ -12,9 +12,9 @@ const parseMethods = require('./data-engine/parse.js');
  * @property {number} [slotCost]
  * @property {string[]} traits
  * @property {Object<string, number>} [traitContributions]
- * @property {Object<string, any>} [conditions]
- * @property {{conditions?: Object<string, any>, traitContributions: Object<string, number>}[]} [conditionalEffects]
- * @property {{conditions?: Object<string, any>, traits: string[], traitContributions: Object<string, number>}[]} [conditionalProfiles]
+ * @property {Object<string, unknown>} [conditions]
+ * @property {{conditions?: Object<string, unknown>, traitContributions: Object<string, number>}[]} [conditionalEffects]
+ * @property {{conditions?: Object<string, unknown>, traits: string[], traitContributions: Object<string, number>}[]} [conditionalProfiles]
  */
 
 /**
@@ -25,8 +25,8 @@ const parseMethods = require('./data-engine/parse.js');
  * @property {number} [slotCost]
  * @property {string[]} traits
  * @property {Object<string, number>} [traitContributions]
- * @property {{conditions?: Object<string, any>, traitContributions: Object<string, number>}[]} [conditionalEffects]
- * @property {{conditions?: Object<string, any>, traits: string[], traitContributions: Object<string, number>}[]} [conditionalProfiles]
+ * @property {{conditions?: Object<string, unknown>, traitContributions: Object<string, number>}[]} [conditionalEffects]
+ * @property {{conditions?: Object<string, unknown>, traits: string[], traitContributions: Object<string, number>}[]} [conditionalProfiles]
  * @property {string[]} traitIds
  * @property {string} displayName
  * @property {string|null} [iconUrl]

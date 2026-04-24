@@ -1,5 +1,5 @@
 declare module '*.css';
 
 interface Window {
-    electronAPI?: any;
+    electronAPI?: LooseRecord;
 }

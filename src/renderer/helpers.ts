@@ -35,13 +35,42 @@ type RendererLimits = {
     MAX_RESULTS?: number;
 };
 
-export function formatNumber(value) {
+type VariantAssignment = {
+    id?: string;
+    label?: string;
+};
+
+type UnitLike = LooseRecord & {
+    id?: string;
+    traits?: string[];
+    variants?: UnitLike[];
+    traitContributions?: Record<string, number>;
+};
+
+type BoardLike = LooseRecord & {
+    synergyScore?: number;
+    traitsCount?: number;
+    totalCost?: number;
+    traitCounts?: Record<string, number>;
+    variantAssignments?: Record<string, string | VariantAssignment>;
+};
+
+type ActiveData = LooseRecord & {
+    units: UnitLike[];
+    unitMap: Map<string, UnitLike>;
+    traits: string[];
+    roles: string[];
+    traitBreakpoints: Record<string, number[]>;
+    traitIcons: Record<string, string>;
+};
+
+export function formatNumber(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return '-';
     return new Intl.NumberFormat('en-US').format(numeric);
 }
 
-export function formatBoardEstimate(value) {
+export function formatBoardEstimate(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 'variable';
     if (numeric >= 1_000_000_000) return `${(numeric / 1_000_000_000).toFixed(1)}B`;
@@ -50,16 +79,16 @@ export function formatBoardEstimate(value) {
     return formatNumber(numeric);
 }
 
-export function formatTimestamp(value) {
+export function formatTimestamp(value: unknown) {
     if (!value) return '-';
-    const date = new Date(value);
+    const date = new Date(value as string | number | Date);
     if (Number.isNaN(date.getTime())) return '-';
     return date.toLocaleString();
 }
 
-export function formatSnapshotAge(value) {
+export function formatSnapshotAge(value: unknown) {
     if (!value) return '';
-    const date = new Date(value);
+    const date = new Date(value as string | number | Date);
     if (Number.isNaN(date.getTime())) return '';
     const elapsedMs = Date.now() - date.getTime();
     if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '';
@@ -71,20 +100,20 @@ export function formatSnapshotAge(value) {
     return `${Math.floor(hours / 24)}d old`;
 }
 
-export function getDataSourceLabel(source) {
+export function getDataSourceLabel(source: unknown) {
     return source === 'latest' ? 'Live' : 'PBE';
 }
 
-export function clampInteger(value, fallback, min, max) {
-    const parsed = Number.parseInt(value, 10);
+export function clampInteger(value: unknown, fallback: number, min: number, max: number) {
+    const parsed = Number.parseInt(String(value), 10);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(Math.max(parsed, min), max);
 }
 
-export function normalizeStringList(values) {
+export function normalizeStringList(values: unknown) {
     if (!Array.isArray(values)) return [];
     const seen = new Set();
-    const normalized = [];
+    const normalized: string[] = [];
     values.forEach((value) => {
         const candidate = typeof value === 'object' && value
             ? value.value ?? value.id ?? value.name ?? value.label
@@ -128,18 +157,18 @@ export function normalizeSearchParams(params: SearchParams = {}, limits: Rendere
     };
 }
 
-export function deriveDefaultTankRoles(roles) {
+export function deriveDefaultTankRoles(roles: unknown) {
     return normalizeStringList(roles).filter((role) => /tank/i.test(role));
 }
 
-export function deriveDefaultCarryRoles(roles) {
+export function deriveDefaultCarryRoles(roles: unknown) {
     const normalizedRoles = normalizeStringList(roles);
     const tankRoles = new Set(deriveDefaultTankRoles(normalizedRoles).map((role) => role.toLowerCase()));
     return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
 }
 
 export function summarizeParams(params: SearchParams = {}) {
-    const parts = [];
+    const parts: string[] = [];
     if (params.boardSize) parts.push(`Level ${params.boardSize}`);
     if (params.mustInclude?.length) parts.push(`include ${params.mustInclude.length} units`);
     if (params.mustExclude?.length) parts.push(`ban ${params.mustExclude.length} units`);
@@ -154,11 +183,11 @@ export function summarizeParams(params: SearchParams = {}) {
     return parts.length ? parts.join(' • ') : 'Default query';
 }
 
-export function getBoardMetric(board: any) {
+export function getBoardMetric(board: BoardLike) {
     return Number(board?.synergyScore ?? board?.traitsCount ?? 0);
 }
 
-export function sortBoards(results: any[], sortMode: string) {
+export function sortBoards(results: BoardLike[], sortMode: string) {
     const sorters = {
         mostTraits: (left, right) => getBoardMetric(right) - getBoardMetric(left) || Number(right.totalCost || 0) - Number(left.totalCost || 0),
         lowestCost: (left, right) => Number(left.totalCost || 0) - Number(right.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
@@ -168,7 +197,7 @@ export function sortBoards(results: any[], sortMode: string) {
     return [...(Array.isArray(results) ? results : [])].sort(sorters[sortMode] || sorters.mostTraits);
 }
 
-export function createActiveData(response: any, fallbackSource: string) {
+export function createActiveData(response: LooseRecord, fallbackSource: string): ActiveData {
     return {
         units: response.units || [],
         unitMap: new Map((response.units || []).map((unit) => [unit.id, unit])),
@@ -186,7 +215,7 @@ export function createActiveData(response: any, fallbackSource: string) {
     };
 }
 
-export function getAssetCoverageLabel(assetValidation: any) {
+export function getAssetCoverageLabel(assetValidation: LooseRecord) {
     if (!assetValidation) return 'N/A';
     const valid = Number(assetValidation.valid ?? assetValidation.validCount);
     const total = Number(assetValidation.total ?? assetValidation.totalCount);
@@ -197,16 +226,16 @@ export function getAssetCoverageLabel(assetValidation: any) {
     return 'N/A';
 }
 
-export function getVariantAssignment(board: any, unitId: string) {
+export function getVariantAssignment(board: BoardLike, unitId: string) {
     const assignment = board?.variantAssignments?.[unitId];
     if (!assignment) return null;
     if (typeof assignment === 'string') return { id: assignment, label: assignment };
     return assignment;
 }
 
-export function buildTraitSummary(board: any, activeData: any, query: SearchParams) {
+export function buildTraitSummary(board: BoardLike, activeData: ActiveData, query: SearchParams) {
     if (!board || !activeData) return [];
-    const counts = new Map();
+    const counts = new Map<string, number>();
     Object.entries(board.traitCounts || {}).forEach(([trait, count]) => {
         const numeric = Number(count);
         if (trait && Number.isFinite(numeric) && numeric > 0) {
@@ -214,7 +243,10 @@ export function buildTraitSummary(board: any, activeData: any, query: SearchPara
         }
     });
     (query.extraEmblems || []).forEach((trait) => {
-        counts.set(trait, (counts.get(trait) || 0) + 1);
+        const traitName = String(trait ?? '').trim();
+        if (traitName) {
+            counts.set(traitName, (counts.get(traitName) || 0) + 1);
+        }
     });
 
     return [...counts.entries()]
@@ -246,9 +278,9 @@ export function buildTraitSummary(board: any, activeData: any, query: SearchPara
         );
 }
 
-export function collectUnitTraitLabels(unit: any) {
+export function collectUnitTraitLabels(unit: UnitLike) {
     const traitNames = new Set<string>();
-    const addTraitNames = (entity) => {
+    const addTraitNames = (entity: UnitLike) => {
         if (!entity || typeof entity !== 'object') return;
         if (entity.traitContributions && typeof entity.traitContributions === 'object') {
             Object.keys(entity.traitContributions).forEach((traitName) => traitName && traitNames.add(traitName));
