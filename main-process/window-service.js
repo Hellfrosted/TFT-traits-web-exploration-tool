@@ -1,3 +1,5 @@
+const path = require('path');
+
 function createWindowService({
     app,
     BrowserWindow,
@@ -6,6 +8,8 @@ function createWindowService({
     ipcChannels,
     rendererContract,
     isSmokeTest,
+    appRoot = path.join(__dirname, '..'),
+    rendererDevServerUrl = '',
     smokeTimeoutMs = 20000
 }) {
     let mainWindow;
@@ -189,7 +193,11 @@ function createWindowService({
         mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
             console.log(`[Renderer:${level}] ${message} (${sourceId}:${line})`);
         });
-        mainWindow.loadFile('index.html');
+        if (rendererDevServerUrl) {
+            mainWindow.loadURL(rendererDevServerUrl);
+        } else {
+            mainWindow.loadFile(path.join(appRoot, 'renderer-dist', 'index.html'));
+        }
         return mainWindow;
     }
 

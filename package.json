@@ -5,20 +5,31 @@
   "main": "main.js",
   "license": "Apache-2.0",
   "scripts": {
-    "start": "electron .",
+    "start": "npm run build:renderer && electron .",
+    "dev:renderer": "vite",
+    "dev:electron": "node tools/run-electron-dev.js",
+    "build:renderer": "vite build",
+    "help": "npm run",
     "test": "node tools/run-node-tests.js",
-    "test:smoke": "node tools/run-electron-smoke.js",
+    "test:smoke": "npm run build:renderer && node tools/run-electron-smoke.js",
     "test:smoke:unit": "node --test test/window-service.test.js",
     "test:all": "npm test && npm run test:smoke && npm run lint",
-    "lint": "eslint *.js components/*.js renderer/*.js renderer/**/*.js data-engine/*.js data-engine/**/*.js engine/*.js main-process/*.js tools/*.js test/ test/**/*.js",
+    "lint": "eslint *.js src/renderer/**/*.js src/renderer/**/*.jsx data-engine/*.js data-engine/**/*.js engine/*.js main-process/*.js tools/*.js test/ test/**/*.js",
     "validate:data": "node tools/validate-data-sources.js",
-    "pack:win": "electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --icon=assets/app-icon.ico --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\"",
+    "pack:win": "npm run build:renderer && electron-packager . \"TFT Board Exploration Tool\" --platform=win32 --arch=x64 --icon=assets/app-icon.ico --out=dist --overwrite --asar --ignore=\"^/dist($|/)\" --ignore=\"^/\\.git($|/)\" --ignore=\"^/\\.appdata($|/)\" --ignore=\"^/tools/node($|/)\" --ignore=\"\\.log$\"",
     "pack:smoke": "node tools/run-packaged-smoke.js"
   },
   "devDependencies": {
     "@electron/packager": "^19.1.0",
     "@eslint/js": "^10.0.1",
+    "@vitejs/plugin-react": "^6.0.1",
     "electron": "^41.1.1",
-    "eslint": "^10.1.0"
+    "eslint": "^10.1.0",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.24",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   }
 }

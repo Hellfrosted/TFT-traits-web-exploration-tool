@@ -26,6 +26,7 @@ function createMainRuntime(options = {}) {
     const processRef = options.processRef || process;
     const argv = options.argv || processRef.argv || [];
     const appRoot = options.appRoot || path.join(__dirname, '..');
+    const rendererDevServerUrl = options.rendererDevServerUrl || processRef.env?.TFT_RENDERER_DEV_SERVER_URL || '';
     const appIconPath = options.appIconPath || path.join(appRoot, 'assets', 'app-icon.ico');
     const setTimeoutFn = options.setTimeoutFn || setTimeout;
     const fatalExitDelayMs = Number.isFinite(options.fatalExitDelayMs) ? options.fatalExitDelayMs : 150;
@@ -73,7 +74,9 @@ function createMainRuntime(options = {}) {
         iconPath: appIconPath,
         ipcChannels: IPC_CHANNELS,
         rendererContract: RENDERER_CONTRACT,
-        isSmokeTest
+        isSmokeTest,
+        appRoot,
+        rendererDevServerUrl
     });
 
     const searchService = createSearchService({
@@ -304,12 +307,17 @@ function createMainRuntime(options = {}) {
             ? senderFrame.url
             : sender?.getURL?.();
 
+        const isFileRenderer = typeof senderUrl === 'string' && senderUrl.startsWith('file://');
+        const isTrustedDevRenderer = rendererDevServerUrl
+            && typeof senderUrl === 'string'
+            && senderUrl.startsWith(rendererDevServerUrl);
+
         if (
             !hasLiveMainWindow
             || !senderMatchesMainWindow
             || !isMainFrame
             || typeof senderUrl !== 'string'
-            || !senderUrl.startsWith('file://')
+            || (!isFileRenderer && !isTrustedDevRenderer)
         ) {
             console.warn(`Rejected unauthorized IPC sender for ${channel}.`);
             throw new Error('Unauthorized IPC sender.');

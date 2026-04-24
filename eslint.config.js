@@ -20,7 +20,7 @@ module.exports = [
                 setInterval: 'readonly',
                 clearTimeout: 'readonly',
                 clearInterval: 'readonly',
-                // Browser globals (for renderer.js)
+                // Browser globals
                 window: 'readonly',
                 document: 'readonly',
                 fetch: 'readonly',
@@ -28,17 +28,9 @@ module.exports = [
                 CustomEvent: 'readonly',
                 HTMLElement: 'readonly',
                 Event: 'readonly',
-                // Project-specific globals (from components/*.js)
+                // Project-specific globals used in retained tests
                 electronAPI: 'readonly',
-                setupMultiSelect: 'readonly',
-                showDialog: 'readonly',
-                showAlert: 'readonly',
-                showConfirm: 'readonly',
-                updateHistoryList: 'readonly',
-                summarizeParams: 'readonly',
-                formatTimestamp: 'readonly',
-                loadSearchFromHistory: 'readonly',
-                renderCacheList: 'readonly'
+                showDialog: 'readonly'
             }
         },
         rules: {
@@ -51,5 +43,26 @@ module.exports = [
     },
     {
         ignores: ['node_modules/**']
+    },
+    {
+        files: ['src/renderer/**/*.js', 'src/renderer/**/*.jsx'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            parserOptions: {
+                ecmaFeatures: {
+                    jsx: true
+                }
+            },
+            globals: {
+                window: 'readonly',
+                document: 'readonly',
+                console: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+                CustomEvent: 'readonly',
+                Intl: 'readonly'
+            }
+        }
     }
 ];
