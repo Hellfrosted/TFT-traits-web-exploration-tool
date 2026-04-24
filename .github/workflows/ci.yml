@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Out
+        uses: actions/checkout@v4
+
+      - name: Set Up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Electron System Dependencies
+        run: |
+          if ! command -v apt-get >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          if command -v sudo >/dev/null 2>&1; then
+            APT_PREFIX="sudo"
+          else
+            APT_PREFIX=""
+          fi
+
+          ALSA_PACKAGE="libasound2"
+          if ! apt-cache show "$ALSA_PACKAGE" >/dev/null 2>&1; then
+            ALSA_PACKAGE="libasound2t64"
+          fi
+
+          $APT_PREFIX apt-get update
+          $APT_PREFIX apt-get install -y xvfb libgtk-3-0 libnss3 libatk-bridge2.0-0 libgbm1 "$ALSA_PACKAGE"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Unit Tests
+        run: npm test
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Run Electron Smoke Test
+        run: xvfb-run -a npm run test:smoke
