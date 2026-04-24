@@ -12,7 +12,7 @@ module.exports = {
         };
 
         if (unit.traitContributions && typeof unit.traitContributions === 'object') {
-            Object.entries(unit.traitContributions).forEach(([traitName, count]) => {
+            Object.entries(unit.traitContributions as LooseRecord).forEach(([traitName, count]) => {
                 addContribution(traitName, count);
             });
         } else {

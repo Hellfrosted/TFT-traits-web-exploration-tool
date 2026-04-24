@@ -297,7 +297,7 @@ module.exports = {
         }, 0);
     },
 
-    _looksLikeShopData(shopData) {
+    _looksLikeShopData(shopData: LooseRecord) {
         if (!shopData || typeof shopData !== 'object') {
             return false;
         }
@@ -315,7 +315,7 @@ module.exports = {
         ].some((value) => typeof value === 'string' && value.length > 0);
     },
 
-    _buildRawShopDataLookup(rawJSON) {
+    _buildRawShopDataLookup(rawJSON: LooseRecord) {
         const lookup = new Map();
 
         for (const [key, value] of Object.entries(rawJSON || {})) {
@@ -388,7 +388,7 @@ module.exports = {
         return championIdentities;
     },
 
-    _buildRawChampionRecordMap(rawJSON) {
+    _buildRawChampionRecordMap(rawJSON: LooseRecord) {
         const recordMap = new Map();
 
         for (const [key, value] of Object.entries(rawJSON || {})) {
@@ -414,7 +414,7 @@ module.exports = {
         return championReferenceMap;
     },
 
-    _resolveRawShopIcon(shopData, source = DEFAULT_DATA_SOURCE) {
+    _resolveRawShopIcon(shopData: LooseRecord, source = DEFAULT_DATA_SOURCE) {
         if (!shopData || typeof shopData !== 'object') {
             return null;
         }
@@ -569,7 +569,7 @@ module.exports = {
         return traitIcons;
     },
 
-    _buildRawTraitMetadata(rawJSON, source = DEFAULT_DATA_SOURCE) {
+    _buildRawTraitMetadata(rawJSON: LooseRecord, source = DEFAULT_DATA_SOURCE) {
         const traitBreakpoints = {};
         const traitIcons = {};
         const traitRecords = [];

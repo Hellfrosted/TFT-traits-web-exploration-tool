@@ -13,8 +13,7 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node", "react", "react-dom"],
-    "noEmitOnError": false
+    "types": ["node", "react", "react-dom"]
   },
   "include": [
     "*.ts",

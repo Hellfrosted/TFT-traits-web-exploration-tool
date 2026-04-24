@@ -25,13 +25,13 @@ function getSetOverrides({ setNumber = null }: LooseRecord = {}) {
         ...GLOBAL_OVERRIDES.unitOverrides,
         ...(setOverrides.unitOverrides || {})
     };
-    const unitOverrideNotes = Object.entries(unitOverrides).reduce((notes: LooseRecord, [unitId, override]) => {
+    const unitOverrideNotes = Object.entries(unitOverrides as LooseRecord).reduce((notes: LooseRecord, [unitId, override]) => {
         if (override?.note) {
             notes[unitId] = override.note;
         }
         return notes;
     }, {});
-    const unitOverrideUnknownRoleUnits = Object.entries(unitOverrides)
+    const unitOverrideUnknownRoleUnits = Object.entries(unitOverrides as LooseRecord)
         .filter(([, override]) => override?.allowUnknownRole)
         .map(([unitId]) => unitId);
 

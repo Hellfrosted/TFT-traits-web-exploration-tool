@@ -1,21 +1,41 @@
 import { useMemo, useState } from 'react';
 
-function getOptionValue(option) {
+type MultiSelectOption = string | {
+    value?: string;
+    id?: string;
+    name?: string;
+    label?: string;
+    displayName?: string;
+    pillLabel?: string;
+    dropdownMeta?: string;
+    iconUrl?: string;
+};
+
+type MultiSelectProps = {
+    id: string;
+    label: string;
+    options: MultiSelectOption[];
+    value: string[];
+    onChange: (value: string[]) => void;
+    placeholder?: string;
+};
+
+function getOptionValue(option: MultiSelectOption) {
     if (typeof option === 'string') return option;
     return option?.value ?? option?.id ?? option?.name ?? option?.label ?? '';
 }
 
-function getOptionLabel(option) {
+function getOptionLabel(option: MultiSelectOption) {
     if (typeof option === 'string') return option;
     return option?.label ?? option?.displayName ?? option?.name ?? option?.id ?? option?.value ?? '';
 }
 
-function getOptionPillLabel(option) {
+function getOptionPillLabel(option: MultiSelectOption) {
     if (typeof option === 'string') return option;
     return option?.pillLabel ?? getOptionLabel(option);
 }
 
-export function MultiSelect({ id, label, options, value, onChange, placeholder }) {
+export function MultiSelect({ id, label, options, value, onChange, placeholder }: MultiSelectProps) {
     const [query, setQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const optionMap = useMemo(() => {
@@ -27,8 +47,8 @@ export function MultiSelect({ id, label, options, value, onChange, placeholder }
                 value: optionValue,
                 label: getOptionLabel(option),
                 pillLabel: getOptionPillLabel(option),
-                meta: option?.dropdownMeta || '',
-                iconUrl: option?.iconUrl || ''
+                meta: typeof option === 'string' ? '' : option.dropdownMeta || '',
+                iconUrl: typeof option === 'string' ? '' : option.iconUrl || ''
             });
         });
         return map;
@@ -46,14 +66,14 @@ export function MultiSelect({ id, label, options, value, onChange, placeholder }
             .slice(0, 50);
     }, [optionMap, query, selectedSet]);
 
-    function addValue(nextValue) {
+    function addValue(nextValue: string) {
         if (!nextValue || selectedSet.has(nextValue)) return;
         onChange([...selected, nextValue]);
         setQuery('');
         setIsOpen(false);
     }
 
-    function removeValue(nextValue) {
+    function removeValue(nextValue: string) {
         onChange(selected.filter((entry) => entry !== nextValue));
     }
 

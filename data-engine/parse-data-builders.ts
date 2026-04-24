@@ -70,7 +70,7 @@ function buildParsedUnits({
         traitNamesByAlias
     } = parseContext;
 
-    for (const [key, val] of Object.entries(rawJSON)) {
+    for (const [key, val] of Object.entries(rawJSON as LooseRecord)) {
         if (!shouldIncludeChampionRecord({
             key,
             value: val,

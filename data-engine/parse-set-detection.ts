@@ -29,7 +29,7 @@ module.exports = {
     _detectLatestSetFromRaw(rawJSON) {
         const setNumbers = new Set<number>();
 
-        for (const [key, val] of Object.entries(rawJSON || {})) {
+        for (const [key, val] of Object.entries((rawJSON || {}) as LooseRecord)) {
             if (!this._isChampionRecord(key, val)) {
                 if (val?.__type === 'TftShopData') {
                     this._extractSetNumbersFromText([
