@@ -73,7 +73,7 @@ async function waitForWorker(count = 1) {
     assert.fail(`Expected ${count} worker instance(s), found ${FakeWorker.instances.length}.`);
 }
 
-function createCacheService({ cachedResults = null, readCacheImpl = null } = {}) {
+function createCacheService({ cachedResults = null, readCacheImpl = null }: LooseRecord = {}) {
     const writes = [];
     const cacheKeyParams = [];
     const preparedContextParams = [];
@@ -98,7 +98,7 @@ function createCacheService({ cachedResults = null, readCacheImpl = null } = {})
     };
 }
 
-function createSearchServiceUnderTest(options = {}) {
+function createSearchServiceUnderTest(options: LooseRecord = {}) {
     const cacheService = createCacheService(options);
     const progressMessages = [];
     const getDataCache = options.getDataCache || (() => ({

@@ -8,7 +8,7 @@ const {
 } = require('./parse-data-builders.js');
 
 module.exports = {
-    parseData(rawJSON, cdragonJSON, assetSources = {}, parseOptions = {}) {
+    parseData(rawJSON, cdragonJSON, assetSources: LooseRecord = {}, parseOptions: LooseRecord = {}) {
         const parseHooks = buildParseDataHooks(this);
         const parseContext = buildParseDataContext(rawJSON, cdragonJSON, assetSources, parseOptions, parseHooks);
         const {

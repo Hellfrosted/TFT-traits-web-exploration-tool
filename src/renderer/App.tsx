@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { MultiSelect } from './components/MultiSelect.jsx';
+import { MultiSelect } from './components/MultiSelect';
 import {
     DEFAULT_QUERY,
     buildTraitSummary,
@@ -19,7 +19,7 @@ import {
     normalizeSearchParams,
     sortBoards,
     summarizeParams
-} from './helpers.js';
+} from './helpers';
 
 const api = window.electronAPI;
 
@@ -243,12 +243,12 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }) {
     if (results.length === 0) {
         return (
             <div className="results-table-wrap">
-                <table id="resTable" role="grid" aria-label="Board results" aria-rowcount="0" aria-colcount="6">
+                <table id="resTable" role="grid" aria-label="Board results" aria-rowcount={0} aria-colcount={6}>
                     <thead>
                         <tr role="row"><th>Rank</th><th>Score</th><th>Traits</th><th>1-Star Cost</th><th>2-Star Cost</th><th>Units</th></tr>
                     </thead>
                     <tbody id="resBody">
-                        <tr role="row"><td role="gridcell" colSpan="6" className="table-awaiting">Awaiting execution...</td></tr>
+                        <tr role="row"><td role="gridcell" colSpan={6} className="table-awaiting">Awaiting execution...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -257,7 +257,7 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }) {
 
     return (
         <div className="results-table-wrap virtual-results-wrap" ref={parentRef}>
-            <div id="resTable" className="virtual-results-table" role="grid" aria-label="Board results" aria-rowcount={results.length} aria-colcount="6">
+            <div id="resTable" className="virtual-results-table" role="grid" aria-label="Board results" aria-rowcount={results.length} aria-colcount={6}>
                 <div className="virtual-results-header" role="row">
                     <span>Rank</span><span>Score</span><span>Traits</span><span>1-Star Cost</span><span>2-Star Cost</span><span>Units</span>
                 </div>
@@ -317,7 +317,7 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory })
     }, [isOpen]);
 
     if (!isOpen) {
-        return <div id="cacheModal" className="modal-overlay" aria-hidden="true" inert="" />;
+        return <div id="cacheModal" className="modal-overlay" aria-hidden="true" inert />;
     }
 
     return (

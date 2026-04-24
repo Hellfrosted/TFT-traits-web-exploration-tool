@@ -27,7 +27,7 @@ module.exports = {
     },
 
     _detectLatestSetFromRaw(rawJSON) {
-        const setNumbers = new Set();
+        const setNumbers = new Set<number>();
 
         for (const [key, val] of Object.entries(rawJSON || {})) {
             if (!this._isChampionRecord(key, val)) {

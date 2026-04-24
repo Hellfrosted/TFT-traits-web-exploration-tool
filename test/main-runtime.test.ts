@@ -4,7 +4,7 @@ const { EventEmitter } = require('node:events');
 const path = require('node:path');
 
 const { createMainRuntime } = require('../main-process/runtime.js');
-const { createMainRuntime: createMainRuntimeFromEntry } = require('../main.js');
+const { createMainRuntime: createMainRuntimeFromEntry } = require('../main');
 
 function createDeferred() {
     let resolve;
@@ -47,6 +47,8 @@ class FakeApp extends EventEmitter {
 }
 
 class FakeIpcMain {
+    handlers: Map<any, any>;
+
     constructor() {
         this.handlers = new Map();
     }
@@ -60,7 +62,7 @@ class FakeIpcMain {
     }
 }
 
-function createMainWindowStub({ url = 'file:///index.html', destroyed = false } = {}) {
+function createMainWindowStub({ url = 'file:///index.html', destroyed = false }: LooseRecord = {}) {
     const webContents = {
         id: 101,
         getURL: () => url
@@ -72,7 +74,7 @@ function createMainWindowStub({ url = 'file:///index.html', destroyed = false } 
     };
 }
 
-function createRuntimeUnderTest(options = {}) {
+function createRuntimeUnderTest(options: LooseRecord = {}) {
     const fakeApp = new FakeApp();
     const fakeIpcMain = new FakeIpcMain();
     const fakeProcess = new EventEmitter();
@@ -103,7 +105,7 @@ function createRuntimeUnderTest(options = {}) {
         },
         fsp: options.fsp || {
             readFile: async () => {
-                const error = new Error('missing');
+                const error = new Error('missing') as Error & LooseRecord;
                 error.code = 'ENOENT';
                 throw error;
             },
@@ -215,7 +217,7 @@ function createRuntimeUnderTest(options = {}) {
         appRoot: 'C:\\Users\\tester\\dev\\repo'
     });
 
-    function createInvokeEvent(overrides = {}) {
+    function createInvokeEvent(overrides: LooseRecord = {}) {
         const sender = overrides.sender || mainWindow.webContents;
         const senderUrl = overrides.senderUrl || sender.getURL?.() || mainWindow.webContents.getURL();
         if (typeof sender.getURL !== 'function') {

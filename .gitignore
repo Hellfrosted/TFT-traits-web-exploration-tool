@@ -1,6 +1,7 @@
 node_modules/
 dist/
 renderer-dist/
+build/
 tools/node/
 .appdata/
 .DS_Store

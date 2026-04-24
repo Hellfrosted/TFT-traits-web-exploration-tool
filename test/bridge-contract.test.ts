@@ -18,6 +18,10 @@ function loadPreloadBridge() {
         process: {
             argv: []
         },
+        exports: {},
+        module: {
+            exports: {}
+        },
         require: (name) => {
             if (name === 'electron') {
                 return {

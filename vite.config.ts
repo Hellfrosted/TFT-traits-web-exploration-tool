@@ -6,7 +6,7 @@ module.exports = defineConfig({
     base: './',
     plugins: [react()],
     build: {
-        outDir: 'renderer-dist',
+        outDir: 'build/renderer-dist',
         emptyOutDir: true
     },
     server: {

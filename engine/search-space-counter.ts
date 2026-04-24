@@ -8,7 +8,7 @@ function countPreparedSearchSpaceCandidates({
     variantLocks = {},
     getUnitSlotCostRange,
     limits = LIMITS
-} = {}) {
+}: LooseRecord = {}) {
     if (!hasAllRequiredUnits || remainingSlots < 0) {
         return 0;
     }

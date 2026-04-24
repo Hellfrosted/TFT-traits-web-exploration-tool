@@ -1,7 +1,5 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 let helpersPromise = null;
 
@@ -11,10 +9,7 @@ async function loadHelpers() {
     }
 
     helpersPromise = (async () => {
-        const sourcePath = path.join(__dirname, '..', 'src', 'renderer', 'helpers.js');
-        const source = await fs.promises.readFile(sourcePath, 'utf8');
-        const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-        return await import(moduleUrl);
+        return require('../src/renderer/helpers');
     })();
 
     return await helpersPromise;

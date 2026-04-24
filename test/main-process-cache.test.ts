@@ -282,7 +282,7 @@ describe('main-process cache service', () => {
 
     it('does not quarantine fallback snapshots for filesystem read errors', async () => {
         const renameCalls = [];
-        const readError = new Error('snapshot is locked');
+        const readError = new Error('snapshot is locked') as Error & LooseRecord;
         readError.code = 'EPERM';
         const service = createSearchCacheService({
             storagePaths: {

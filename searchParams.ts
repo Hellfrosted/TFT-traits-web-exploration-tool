@@ -85,7 +85,7 @@ function normalizeBoolean(value) {
     return !!value;
 }
 
-function normalizeSearchParams(params = {}) {
+function normalizeSearchParams(params: LooseRecord = {}) {
     return {
         boardSize: clampInteger(params.boardSize, 9, UI_LIMITS.MIN_BOARD_SIZE, UI_LIMITS.MAX_BOARD_SIZE),
         maxResults: clampInteger(

@@ -31,10 +31,11 @@ function parseContentLength(headers) {
 
 function createResponseTooLargeError(responseType, actualBytes, limitBytes) {
     const error = new Error(`Response too large for ${responseType}: ${actualBytes} bytes exceeds limit of ${limitBytes} bytes.`);
-    error.code = RESPONSE_TOO_LARGE_CODE;
-    error.responseType = responseType;
-    error.actualBytes = actualBytes;
-    error.limitBytes = limitBytes;
+    const typedError = error as Error & LooseRecord;
+    typedError.code = RESPONSE_TOO_LARGE_CODE;
+    typedError.responseType = responseType;
+    typedError.actualBytes = actualBytes;
+    typedError.limitBytes = limitBytes;
     return error;
 }
 
@@ -105,7 +106,7 @@ async function readResponseTextWithinLimit(res, responseType, limitBytes, contro
 }
 
 module.exports = {
-    async fetchAndParse(options = {}) {
+    async fetchAndParse(options: LooseRecord = {}) {
         const source = this.normalizeDataSource(options.source);
         const urls = this.getSourceUrls(source);
         const fetchJson = options.fetchJson || (async (url) => await this._fetchJsonWithRetry(url));
@@ -188,7 +189,7 @@ module.exports = {
         };
     },
 
-    async fetchAndParsePBE(options = {}) {
+    async fetchAndParsePBE(options: LooseRecord = {}) {
         return this.fetchAndParse({
             ...options,
             source: DATA_SOURCES.PBE
