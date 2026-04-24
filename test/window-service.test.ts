@@ -7,7 +7,7 @@ const { RENDERER_CONTRACT } = require('../bridge-contract.js');
 function createWindowServiceUnderTest({
     executeJavaScriptImpl,
     smokeTimeoutMs = 20000
-} = {}) {
+}: LooseRecord = {}) {
     const EXIT_TIMEOUT_MS = 500;
     const app = {
         exitCalls: [],

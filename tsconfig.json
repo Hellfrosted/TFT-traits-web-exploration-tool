@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "rootDir": ".",
+    "outDir": "build",
+    "jsx": "react-jsx",
+    "strict": false,
+    "moduleDetection": "force",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node", "react", "react-dom"],
+    "noEmitOnError": false
+  },
+  "include": [
+    "*.ts",
+    "data-engine/**/*.ts",
+    "engine/**/*.ts",
+    "main-process/**/*.ts",
+    "set-overrides/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "tools/**/*.ts"
+  ],
+  "exclude": [
+    "build",
+    "dist",
+    "node_modules",
+    "renderer-dist"
+  ]
+}

@@ -14,6 +14,27 @@ export const DEFAULT_QUERY = {
     includeUnique: false
 };
 
+type SearchParams = {
+    boardSize?: unknown;
+    maxResults?: unknown;
+    mustInclude?: unknown[];
+    mustExclude?: unknown[];
+    mustIncludeTraits?: unknown[];
+    mustExcludeTraits?: unknown[];
+    tankRoles?: unknown[];
+    carryRoles?: unknown[];
+    extraEmblems?: unknown[];
+    variantLocks?: Record<string, unknown>;
+    onlyActive?: unknown;
+    tierRank?: unknown;
+    includeUnique?: unknown;
+};
+
+type RendererLimits = {
+    DEFAULT_MAX_RESULTS?: number;
+    MAX_RESULTS?: number;
+};
+
 export function formatNumber(value) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return '-';
@@ -76,7 +97,7 @@ export function normalizeStringList(values) {
     return normalized;
 }
 
-export function normalizeSearchParams(params = {}, limits = {}) {
+export function normalizeSearchParams(params: SearchParams = {}, limits: RendererLimits = {}) {
     const maxResultsLimit = limits.MAX_RESULTS || 1000;
     const defaultMaxResults = limits.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults;
     const variantLocks = {};
@@ -117,7 +138,7 @@ export function deriveDefaultCarryRoles(roles) {
     return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
 }
 
-export function summarizeParams(params = {}) {
+export function summarizeParams(params: SearchParams = {}) {
     const parts = [];
     if (params.boardSize) parts.push(`Level ${params.boardSize}`);
     if (params.mustInclude?.length) parts.push(`include ${params.mustInclude.length} units`);
@@ -133,11 +154,11 @@ export function summarizeParams(params = {}) {
     return parts.length ? parts.join(' • ') : 'Default query';
 }
 
-export function getBoardMetric(board) {
+export function getBoardMetric(board: any) {
     return Number(board?.synergyScore ?? board?.traitsCount ?? 0);
 }
 
-export function sortBoards(results, sortMode) {
+export function sortBoards(results: any[], sortMode: string) {
     const sorters = {
         mostTraits: (left, right) => getBoardMetric(right) - getBoardMetric(left) || Number(right.totalCost || 0) - Number(left.totalCost || 0),
         lowestCost: (left, right) => Number(left.totalCost || 0) - Number(right.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
@@ -147,7 +168,7 @@ export function sortBoards(results, sortMode) {
     return [...(Array.isArray(results) ? results : [])].sort(sorters[sortMode] || sorters.mostTraits);
 }
 
-export function createActiveData(response, fallbackSource) {
+export function createActiveData(response: any, fallbackSource: string) {
     return {
         units: response.units || [],
         unitMap: new Map((response.units || []).map((unit) => [unit.id, unit])),
@@ -165,7 +186,7 @@ export function createActiveData(response, fallbackSource) {
     };
 }
 
-export function getAssetCoverageLabel(assetValidation) {
+export function getAssetCoverageLabel(assetValidation: any) {
     if (!assetValidation) return 'N/A';
     const valid = Number(assetValidation.valid ?? assetValidation.validCount);
     const total = Number(assetValidation.total ?? assetValidation.totalCount);
@@ -176,14 +197,14 @@ export function getAssetCoverageLabel(assetValidation) {
     return 'N/A';
 }
 
-export function getVariantAssignment(board, unitId) {
+export function getVariantAssignment(board: any, unitId: string) {
     const assignment = board?.variantAssignments?.[unitId];
     if (!assignment) return null;
     if (typeof assignment === 'string') return { id: assignment, label: assignment };
     return assignment;
 }
 
-export function buildTraitSummary(board, activeData, query) {
+export function buildTraitSummary(board: any, activeData: any, query: SearchParams) {
     if (!board || !activeData) return [];
     const counts = new Map();
     Object.entries(board.traitCounts || {}).forEach(([trait, count]) => {
@@ -225,8 +246,8 @@ export function buildTraitSummary(board, activeData, query) {
         );
 }
 
-export function collectUnitTraitLabels(unit) {
-    const traitNames = new Set();
+export function collectUnitTraitLabels(unit: any) {
+    const traitNames = new Set<string>();
     const addTraitNames = (entity) => {
         if (!entity || typeof entity !== 'object') return;
         if (entity.traitContributions && typeof entity.traitContributions === 'object') {

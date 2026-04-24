@@ -22,7 +22,7 @@ function findPackagedExecutable(distRoot) {
 
 async function runExecutable(exePath) {
     const timeoutMs = 30_000;
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const child = spawn(exePath, ['--smoke-test'], {
             cwd: path.dirname(exePath),
             stdio: 'inherit',
@@ -60,7 +60,8 @@ async function runExecutable(exePath) {
 }
 
 async function main() {
-    const repoRoot = path.resolve(__dirname, '..');
+    const buildRoot = path.resolve(__dirname, '..');
+    const repoRoot = path.basename(buildRoot) === 'build' ? path.resolve(buildRoot, '..') : buildRoot;
     const distRoot = path.join(repoRoot, 'dist');
     const packagedApp = findPackagedExecutable(distRoot);
 

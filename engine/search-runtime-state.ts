@@ -43,7 +43,7 @@ function createProgressTracker({
     totalCombinations,
     shouldEmitProgress,
     progressInterval = LIMITS.PROGRESS_INTERVAL
-} = {}) {
+}: LooseRecord = {}) {
     let combinationsChecked = 0;
     let lastProgressReport = 0;
 

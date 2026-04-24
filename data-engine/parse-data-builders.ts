@@ -7,7 +7,7 @@ const {
     resolvePreferredChampionIcon
 } = require('./parse-data-units.js');
 
-function buildParseDataHooks(dataEngine) {
+function buildParseDataHooks(dataEngine: LooseRecord) {
     return {
         normalizeDataSource: dataEngine.normalizeDataSource.bind(dataEngine),
         buildRawTraitMetadata: dataEngine._buildRawTraitMetadata.bind(dataEngine),
@@ -52,7 +52,7 @@ function buildParsedUnits({
     rawJSON,
     parseContext,
     hooks
-}) {
+}: LooseRecord) {
     const units = [];
     const traits = new Set();
     const roles = new Set();

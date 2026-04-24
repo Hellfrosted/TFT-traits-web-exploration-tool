@@ -4,7 +4,7 @@ const { TextEncoder } = require('node:util');
 const DataEngine = require('../data.js');
 const { NETWORK } = require('../constants.js');
 
-function createHeaders(headerMap = {}) {
+function createHeaders(headerMap: LooseRecord = {}) {
     const normalized = Object.fromEntries(
         Object.entries(headerMap).map(([key, value]) => [String(key).toLowerCase(), value])
     );
@@ -16,7 +16,7 @@ function createHeaders(headerMap = {}) {
     };
 }
 
-function createStreamingResponse(chunks, options = {}) {
+function createStreamingResponse(chunks, options: LooseRecord = {}) {
     const encoder = new TextEncoder();
     const encodedChunks = chunks.map((chunk) => chunk instanceof Uint8Array ? chunk : encoder.encode(chunk));
     let index = 0;

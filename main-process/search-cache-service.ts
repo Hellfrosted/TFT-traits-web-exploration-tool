@@ -38,7 +38,7 @@ function createSearchCacheService({
     limits,
     searchCacheVersion,
     serializeSearchParams = defaultSerializeSearchParams
-}) {
+}: LooseRecord) {
     const searchResultMemoryCache = new Map();
     const searchEstimateMemoryCache = new Map();
     const preparedSearchContextMemoryCache = new Map();
@@ -64,7 +64,7 @@ function createSearchCacheService({
     let cacheIndexEntries = null;
     let cacheIndexLoadPromise = null;
 
-    function createCacheIndexEntry(key, payload = {}) {
+    function createCacheIndexEntry(key, payload: LooseRecord = {}) {
         if (typeof key !== 'string' || !key) {
             return null;
         }
@@ -170,7 +170,7 @@ function createSearchCacheService({
         return crypto.createHash('md5').update(normalized).digest('hex');
     }
 
-    function buildPreparedSearchContextCacheParams(params = {}) {
+    function buildPreparedSearchContextCacheParams(params: LooseRecord = {}) {
         return {
             boardSize: params.boardSize,
             mustInclude: params.mustInclude,
@@ -297,7 +297,7 @@ function createSearchCacheService({
         }
     }
 
-    async function migrateCanonicalParams({ canonicalizeByFingerprint } = {}) {
+    async function migrateCanonicalParams({ canonicalizeByFingerprint }: LooseRecord = {}) {
         const files = await cacheStore.listCacheFiles();
         if (files.length === 0) {
             cacheIndexEntries = new Map();
@@ -446,7 +446,7 @@ function createSearchCacheService({
         }
     }
 
-    async function listCacheEntries(activeDataFingerprint = null, options = {}) {
+    async function listCacheEntries(activeDataFingerprint = null, options: LooseRecord = {}) {
         const limit = Number.isFinite(options?.limit) && options.limit > 0
             ? Math.trunc(options.limit)
             : null;

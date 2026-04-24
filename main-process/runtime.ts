@@ -2,7 +2,7 @@ const path = require('path');
 
 const SEARCH_CACHE_VERSION = 4;
 
-function createMainRuntime(options = {}) {
+function createMainRuntime(options: LooseRecord = {}) {
     const electron = options.electron || require('electron');
     const fsp = options.fsp || require('fs').promises;
     const crypto = options.crypto || require('crypto');

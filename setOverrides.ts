@@ -19,13 +19,13 @@ function mergeUnique(...lists) {
     return merged;
 }
 
-function getSetOverrides({ setNumber = null } = {}) {
+function getSetOverrides({ setNumber = null }: LooseRecord = {}) {
     const setOverrides = setNumber ? (SET_OVERRIDES[String(setNumber)] || {}) : {};
     const unitOverrides = {
         ...GLOBAL_OVERRIDES.unitOverrides,
         ...(setOverrides.unitOverrides || {})
     };
-    const unitOverrideNotes = Object.entries(unitOverrides).reduce((notes, [unitId, override]) => {
+    const unitOverrideNotes = Object.entries(unitOverrides).reduce((notes: LooseRecord, [unitId, override]) => {
         if (override?.note) {
             notes[unitId] = override.note;
         }

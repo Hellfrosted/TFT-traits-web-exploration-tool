@@ -324,7 +324,7 @@ module.exports = {
             result.push(resolvedName);
             return result;
         }, []);
-        const uniqueCloneTraits = [...new Set(cloneTraits)].filter((trait) => !baseTraits.includes(trait));
+        const uniqueCloneTraits = [...new Set<string>(cloneTraits)].filter((trait) => !baseTraits.includes(trait));
         if (uniqueCloneTraits.length === 0) {
             return null;
         }

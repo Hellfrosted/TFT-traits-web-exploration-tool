@@ -2,7 +2,8 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 
 const electronBinary = require('electron');
-const repoRoot = path.resolve(__dirname, '..');
+const buildRoot = path.resolve(__dirname, '..');
+const repoRoot = path.basename(buildRoot) === 'build' ? path.resolve(buildRoot, '..') : buildRoot;
 const child = spawn(electronBinary, [repoRoot], {
     cwd: repoRoot,
     stdio: 'inherit',

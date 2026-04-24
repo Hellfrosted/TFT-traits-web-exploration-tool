@@ -39,13 +39,14 @@ npm install
 npm start
 ```
 
-`npm start` builds the Vite/React renderer and opens the Electron app.
+`npm start` builds the TypeScript main process plus the Vite/React renderer and opens the Electron app.
 
 ## Development
 
 ```sh
 npm run dev:renderer
 npm run dev:electron
+npm run typecheck
 npm test
 npm run lint
 npm run validate:data

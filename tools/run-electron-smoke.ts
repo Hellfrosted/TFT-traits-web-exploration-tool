@@ -3,7 +3,8 @@ const path = require('node:path');
 
 async function main() {
     const electronBinary = require('electron');
-    const repoRoot = path.resolve(__dirname, '..');
+    const buildRoot = path.resolve(__dirname, '..');
+    const repoRoot = path.basename(buildRoot) === 'build' ? path.resolve(buildRoot, '..') : buildRoot;
     const timeoutMs = 30_000;
     const electronArgs = [repoRoot, '--smoke-test'];
 
@@ -15,7 +16,7 @@ async function main() {
         electronArgs.push('--disable-gpu', '--disable-dev-shm-usage');
     }
 
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const child = spawn(electronBinary, electronArgs, {
             cwd: repoRoot,
             stdio: 'inherit',

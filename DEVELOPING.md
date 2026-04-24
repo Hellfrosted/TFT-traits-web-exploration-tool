@@ -8,9 +8,10 @@ Electron responsibilities are split across three areas:
 
 - Main process: window bootstrap, data fetch/fallback orchestration, worker-backed search execution, cache management, and IPC registration.
 - Preload: the narrow renderer bridge only. Keep it self-contained; its mirrored IPC/data-source/limit contract is checked against `bridge-contract.js` by `test/bridge-contract.test.js`.
+- TypeScript app source: main process, preload, worker, tests, tools, parser, engine, and React renderer.
 - Renderer: Vite/React UI under `src/renderer/`.
 
-The Electron app loads `renderer-dist/index.html` in normal mode. Use `npm run build:renderer` before launching Electron directly. For hot reload, run `npm run dev:renderer` in one terminal and `npm run dev:electron` in another.
+The Electron app loads compiled Node output from `build/` and renderer output from `build/renderer-dist/index.html` in normal mode. Use `npm run build` before launching Electron directly. For hot reload, run `npm run dev:renderer` in one terminal and `npm run dev:electron` in another.
 
 ## Search Pipeline
 
@@ -56,7 +57,7 @@ When adding new TFT mechanics, prefer extending existing variant/conditional abs
 Put set-specific behavior in data-driven files first:
 
 - `setOverrides.js`: excluded traits/units, role overrides, unit overrides, conditional profiles/effects, selection groups
-- `src/renderer/helpers.js`: default tank/carry role derivation from fetched roles
+- `src/renderer/helpers.ts`: default tank/carry role derivation from fetched roles
 
 Do not hardcode stale role names or set-specific mechanics directly into HTML or renderer glue.
 
@@ -65,7 +66,8 @@ Do not hardcode stale role names or set-specific mechanics directly into HTML or
 Use the local Windows wrapper when `tools/node/` exists:
 
 ```powershell
-npm run build:renderer
+npm run build
+npm run typecheck
 .\npmw.cmd run test
 .\npmw.cmd run lint
 .\npmw.cmd run test:smoke
@@ -77,7 +79,7 @@ npm run build:renderer
 
 Fallback to plain `npm` if the local wrapper runtime is missing.
 
-`npm run test:smoke` builds the Vite renderer, then boots the actual Electron app through `--smoke-test`.
+`npm run test:smoke` builds TypeScript and the Vite renderer, then boots the actual Electron app through `--smoke-test`.
 
 `npm run test:smoke:unit` keeps the window-service contract test available when you only want the stubbed unit-level smoke assertions.
 

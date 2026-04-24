@@ -5,7 +5,7 @@ const { Worker } = require('node:worker_threads');
 
 const { mockDataCache, createBaseSearchParams } = require('./fixtures/engine-fixtures.js');
 
-function waitForWorkerMessage(worker) {
+function waitForWorkerMessage(worker): Promise<LooseRecord> {
     return new Promise((resolve, reject) => {
         const handleMessage = (message) => {
             if (message?.type === 'progress') {

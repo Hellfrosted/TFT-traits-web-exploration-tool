@@ -4,7 +4,7 @@ const {
     mergeRawTraitMetadata
 } = require('./parse-data-state.js');
 
-function buildHashDictionary(rawJSON) {
+function buildHashDictionary(rawJSON: LooseRecord) {
     const hashDictionary = {};
 
     for (const [key, val] of Object.entries(rawJSON)) {
@@ -27,7 +27,7 @@ function buildHashDictionary(rawJSON) {
     return hashDictionary;
 }
 
-function buildParseDataContext(rawJSON, cdragonJSON, assetSources = {}, parseOptions = {}, hooks = {}) {
+function buildParseDataContext(rawJSON, cdragonJSON, assetSources: LooseRecord = {}, parseOptions: LooseRecord = {}, hooks: LooseRecord = {}) {
     const source = hooks.normalizeDataSource(parseOptions.source);
     const hashDictionary = buildHashDictionary(rawJSON);
     const rawTraitMetadata = hooks.buildRawTraitMetadata(rawJSON, source);
