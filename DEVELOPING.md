@@ -68,8 +68,10 @@ Use the local Windows wrapper when `tools/node/` exists:
 ```powershell
 npm run build
 npm run typecheck
+.\npmw.cmd run check
 .\npmw.cmd run test
 .\npmw.cmd run lint
+.\npmw.cmd run knip
 .\npmw.cmd run test:smoke
 .\npmw.cmd run test:smoke:unit
 .\npmw.cmd run validate:data
@@ -84,6 +86,8 @@ Fallback to plain `npm` if the local wrapper runtime is missing.
 `npm run test:smoke:unit` keeps the window-service contract test available when you only want the stubbed unit-level smoke assertions.
 
 `npm run validate:data` is intentionally live and network-dependent. Use it as a manual parser health check, not as a local offline gate.
+
+`npm run check` is the local static gate: TypeScript, ESLint, Biome unused-symbol linting, and Knip. Use `npm run format:check` or `npm run format` for Biome formatting, and keep `npm run knip` clean when removing or renaming exports/files.
 
 ## Testing Notes
 

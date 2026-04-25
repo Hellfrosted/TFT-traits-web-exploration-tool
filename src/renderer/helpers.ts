@@ -104,13 +104,13 @@ export function getDataSourceLabel(source: unknown) {
     return source === 'latest' ? 'Live' : 'PBE';
 }
 
-export function clampInteger(value: unknown, fallback: number, min: number, max: number) {
+function clampInteger(value: unknown, fallback: number, min: number, max: number) {
     const parsed = Number.parseInt(String(value), 10);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(Math.max(parsed, min), max);
 }
 
-export function normalizeStringList(values: unknown) {
+function normalizeStringList(values: unknown) {
     if (!Array.isArray(values)) return [];
     const seen = new Set();
     const normalized: string[] = [];

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "main.ts",
+    "preload.ts",
+    "worker.ts",
+    "src/renderer/main.tsx",
+    "tools/*.ts",
+    "test/**/*.ts",
+    "vite.config.ts"
+  ],
+  "project": [
+    "**/*.{ts,tsx}",
+    "!build/**",
+    "!dist/**",
+    "!node_modules/**",
+    "!renderer-dist/**",
+    "!tools/node/**"
+  ],
+  "vite": false
+}
