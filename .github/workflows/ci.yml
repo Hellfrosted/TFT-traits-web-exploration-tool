@@ -35,9 +35,9 @@ jobs:
             APT_PREFIX=""
           fi
 
-          ALSA_PACKAGE="libasound2"
+          ALSA_PACKAGE="libasound2t64"
           if ! apt-cache show "$ALSA_PACKAGE" >/dev/null 2>&1; then
-            ALSA_PACKAGE="libasound2t64"
+            ALSA_PACKAGE="libasound2"
           fi
 
           $APT_PREFIX apt-get update
