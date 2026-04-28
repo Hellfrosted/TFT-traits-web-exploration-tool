@@ -10,6 +10,7 @@ tools/node/
 # ── GSD baseline (auto-generated) ──
 .gsd
 .gsd-id
+.serena/
 .mcp.json
 .bg-shell/
 Thumbs.db
