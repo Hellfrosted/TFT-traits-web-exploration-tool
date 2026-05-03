@@ -34,3 +34,7 @@ coverage/
 .cache/
 tmp/
 DEVELOPING.md
+
+# Local-only agent instructions and working docs.
+AGENTS.md
+docs/agents/
