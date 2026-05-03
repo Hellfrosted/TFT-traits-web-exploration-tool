@@ -4,6 +4,11 @@
   "description": "TFT Traits Web Exploration Tool - Desktop app for exploring optimal TFT board compositions",
   "main": "build/main.js",
   "packageManager": "pnpm@10.33.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
   "license": "Apache-2.0",
   "scripts": {
     "start": "pnpm build && electron .",
