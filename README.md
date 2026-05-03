@@ -30,26 +30,26 @@ No. It is for exploration and constraint-based searches, not meta snapshots.
 ## Setup
 
 ```sh
-npm install
+pnpm install
 ```
 
 ## Run
 
 ```sh
-npm start
+pnpm start
 ```
 
-`npm start` builds the TypeScript main process plus the Vite/React renderer and opens the Electron app.
+`pnpm start` builds the TypeScript main process plus the Vite/React renderer and opens the Electron app.
 
 ## Development
 
 ```sh
-npm run dev:renderer
-npm run dev:electron
-npm run typecheck
-npm test
-npm run lint
-npm run validate:data
+pnpm dev:renderer
+pnpm dev:electron
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm validate:data
 ```
 
 Run the two dev commands in separate terminals when you want Vite hot reload inside Electron.
