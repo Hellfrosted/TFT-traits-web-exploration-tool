@@ -23,6 +23,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+.worktree-sync.local.yml
 .next/
 __pycache__/
 *.pyc

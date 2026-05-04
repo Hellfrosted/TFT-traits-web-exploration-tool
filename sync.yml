@@ -1,0 +1,114 @@
+version: 1
+
+branches:
+  main: main
+  development: indev
+
+sync:
+  style: local-fast-forward
+  auto_push_on_commit:
+    enabled: true
+    scope: local-cross-remotes-only
+    main:
+      branch: main
+      refspec: HEAD:main
+    development:
+      branch: indev
+      refspec: HEAD:indev
+    notes:
+      - "Post-commit hooks push the committed branch to the companion clone."
+      - "Hooks do not push to origin."
+  auto_merge_on_commit:
+    enabled: true
+    mode: fast-forward-only
+    receiver_dirty_policy: stop-and-log
+    conflict_policy: stop-and-log
+    result_shape: both-local-clones-fast-forwarded
+    checks: none
+    origin_push: false
+    notes:
+      - "Post-commit hooks fast-forward the receiving checked-out indev branch only when it is clean."
+      - "Divergence stops sync for manual resolution; hooks do not create merge commits, stash, create WIP commits, or force-push."
+      - "main syncs locally between clones, but origin pushes are manual from main."
+  remotes:
+    wsl_to_windows: win-local
+    windows_to_wsl: wsl-local
+  push_policy: explicit-approval-only
+
+generated_dirs:
+  - node_modules/
+  - build/
+  - dist/
+  - renderer-dist/
+  - tools/node/
+  - .appdata/
+  - .next/
+  - .turbo/
+  - .vite/
+  - coverage/
+  - .cache/
+  - tmp/
+
+dependencies:
+  install:
+    wsl: pnpm install --frozen-lockfile
+    windows: pnpm install --frozen-lockfile
+  reinstall_triggers:
+    - package.json
+    - pnpm-lock.yaml
+    - pnpm-workspace.yaml
+
+checks:
+  wsl:
+    static_gate: pnpm check
+    typecheck: pnpm typecheck
+    lint: pnpm lint
+    tests: pnpm test
+    full: pnpm test:all
+  windows:
+    static_gate: pnpm check
+    typecheck: pnpm typecheck
+    lint: pnpm lint
+    tests: pnpm test
+    full: pnpm test:all
+
+auto_wip:
+  message:
+    main: "wip(sync): main {timestamp}"
+    development: "wip(sync): indev {timestamp}"
+  include_tracked_changes: true
+  auto_add_allowlist:
+    - "*.ts"
+    - "*.tsx"
+    - "*.css"
+    - "*.html"
+    - "*.json"
+    - "*.md"
+    - "*.yml"
+    - "*.yaml"
+    - "assets/**"
+    - "data-engine/**"
+    - "engine/**"
+    - "main-process/**"
+    - "set-overrides/**"
+    - "src/**"
+    - "test/**"
+    - "tools/**"
+  denylist:
+    - ".env"
+    - ".env.*"
+    - "*.pem"
+    - "*.key"
+    - "*secret*"
+    - "*token*"
+    - "*credential*"
+    - ".appdata/**"
+
+platform_files:
+  require_windows:
+    - "assets/app-icon.ico"
+    - "package.json#scripts.pack:win"
+    - "package.json#scripts.pack:smoke"
+  require_wsl:
+    - "docs/agents/**"
+    - "AGENTS.md"
