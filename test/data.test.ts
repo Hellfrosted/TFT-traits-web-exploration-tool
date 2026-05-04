@@ -129,6 +129,16 @@ describe('DataEngine asset URL trust boundaries', () => {
 
         assert.equal(championAssets.get('kaisa').url, 'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png');
     });
+
+    it('skips malformed directory hrefs while preserving valid champion splash entries', () => {
+        const championAssets = DataEngine._buildChampionAssetMap(`
+            <a href="%E0%A4%A.png">malformed</a>
+            <a href="tft17_kaisa_teamplanner_splash.png">safe</a>
+        `, '17', 'pbe');
+
+        assert.deepEqual([...championAssets.keys()], ['kaisa']);
+        assert.equal(championAssets.get('kaisa').url, 'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png');
+    });
 });
 
 describe('DataEngine.fetchAndParse', () => {
@@ -541,4 +551,3 @@ describe('DataEngine._fetchWithRetry', () => {
         assert.equal(fetchCalls, 2);
     });
 });
-

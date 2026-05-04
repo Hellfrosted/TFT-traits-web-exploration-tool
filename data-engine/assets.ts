@@ -47,7 +47,13 @@ module.exports = {
         }
 
         return [...directoryHtml.matchAll(/href="([^"]+)"/gi)]
-            .map((match) => decodeURIComponent(match[1] || ''))
+            .map((match) => {
+                try {
+                    return decodeURIComponent(match[1] || '');
+                } catch {
+                    return '';
+                }
+            })
             .map((href) => href.split('/').pop())
             .filter((name) => name && name !== '..');
     },
