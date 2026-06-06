@@ -494,6 +494,28 @@ describe('DataEngine._fetchWithRetry', () => {
         assert.equal(textResult, 'hello');
     });
 
+    it('accepts JSON payload headers above the legacy 24 MiB ceiling', async () => {
+        const declaredBytes = 25 * 1024 * 1024;
+        const fetchJson = async () => ({
+            ok: true,
+            headers: createHeaders({
+                'content-length': String(declaredBytes)
+            }),
+            body: null,
+            text: async () => '{"ok":true}'
+        });
+
+        const result = await DataEngine._fetchWithRetry(
+            'https://example.com/large-live-data.json',
+            'json',
+            fetchJson,
+            NETWORK
+        );
+
+        assert.ok(NETWORK.MAX_RESPONSE_BYTES_BY_TYPE.json > 24 * 1024 * 1024);
+        assert.deepEqual(result, { ok: true });
+    });
+
     it('times out stalled requests and retries per-attempt with AbortController', async () => {
         let fetchCalls = 0;
         const fetchTimeoutMs = 25;

@@ -1,10 +1,12 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const { resolveElectronLaunch } = require('./electron-launch.js');
 
 const electronBinary = require('electron');
 const buildRoot = path.resolve(__dirname, '..');
 const repoRoot = path.basename(buildRoot) === 'build' ? path.resolve(buildRoot, '..') : buildRoot;
-const child = spawn(electronBinary, [repoRoot], {
+const electronLaunch = resolveElectronLaunch(electronBinary, repoRoot, []);
+const child = spawn(electronLaunch.command, electronLaunch.args, {
     cwd: repoRoot,
     stdio: 'inherit',
     env: {

@@ -17,5 +17,8 @@
     "!renderer-dist/**",
     "!tools/node/**"
   ],
+  "ignoreDependencies": [
+    "@biomejs/biome"
+  ],
   "vite": false
 }
