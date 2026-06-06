@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const os = require('node:os');
+const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -45,6 +46,14 @@ function resolveLocalBinCommand(binName, binArgs, runtime = {
     wslDistroName: process.env.WSL_DISTRO_NAME
 }, cwd = process.cwd()) {
     if (isWslRuntime(runtime)) {
+        const windowsShim = path.join(cwd, 'node_modules', '.bin', `${binName}.CMD`);
+        if (!fs.existsSync(windowsShim)) {
+            return {
+                command: path.join(cwd, 'node_modules', '.bin', binName),
+                args: [...binArgs]
+            };
+        }
+
         const windowsCwd = toWindowsPath(cwd);
         const command = [
             'cd',
