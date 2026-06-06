@@ -16,7 +16,7 @@ sync:
       branch: indev
       refspec: HEAD:indev
     notes:
-      - "Post-commit hooks push the committed branch to the companion clone."
+      - "Post-commit hooks push the committed branch to the configured companion clone."
       - "Hooks do not push to origin."
   auto_merge_on_commit:
     enabled: true
@@ -32,7 +32,6 @@ sync:
       - "main syncs locally between clones, but origin pushes are manual from main."
   remotes:
     wsl_to_windows: win-local
-    windows_to_wsl: wsl-local
   push_policy: explicit-approval-only
 
 generated_dirs:
