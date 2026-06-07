@@ -16,55 +16,6 @@ async function loadHelpers() {
 }
 
 describe('react renderer helpers', () => {
-    it('normalizes query params to the renderer contract', async () => {
-        const { normalizeSearchParams } = await loadHelpers();
-
-        assert.deepEqual(normalizeSearchParams({
-            boardSize: '30',
-            maxResults: '5000',
-            mustInclude: ['Aatrox', { id: 'Jax' }, 'Aatrox', ''],
-            mustExcludeTraits: [{ value: 'Bruiser' }],
-            variantLocks: {
-                MissFortune: 'conduit',
-                AutoUnit: 'auto',
-                EmptyUnit: ''
-            },
-            onlyActive: 0,
-            tierRank: 1,
-            includeUnique: ''
-        }, {
-            DEFAULT_MAX_RESULTS: 250,
-            MAX_RESULTS: 1000
-        }), {
-            boardSize: 20,
-            maxResults: 1000,
-            mustInclude: ['Aatrox', 'Jax'],
-            mustExclude: [],
-            mustIncludeTraits: [],
-            mustExcludeTraits: ['Bruiser'],
-            tankRoles: [],
-            carryRoles: [],
-            extraEmblems: [],
-            variantLocks: {
-                MissFortune: 'conduit'
-            },
-            onlyActive: false,
-            tierRank: true,
-            includeUnique: false
-        });
-    });
-
-    it('derives default role filters without surfacing unknown carry roles', async () => {
-        const {
-            deriveDefaultTankRoles,
-            deriveDefaultCarryRoles
-        } = await loadHelpers();
-        const roles = ['Tank', 'Magic Tank', 'Carry', 'Ranged', 'Unknown', 'Carry'];
-
-        assert.deepEqual(deriveDefaultTankRoles(roles), ['Tank', 'Magic Tank']);
-        assert.deepEqual(deriveDefaultCarryRoles(roles), ['Carry', 'Ranged']);
-    });
-
     it('sorts boards by the active result ordering mode', async () => {
         const { sortBoards } = await loadHelpers();
         const boards = [

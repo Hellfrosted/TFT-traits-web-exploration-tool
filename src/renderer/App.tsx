@@ -2,12 +2,9 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MultiSelect } from './components/MultiSelect';
 import {
-    DEFAULT_QUERY,
     buildTraitSummary,
     collectUnitTraitLabels,
     createActiveData,
-    deriveDefaultCarryRoles,
-    deriveDefaultTankRoles,
     formatBoardEstimate,
     formatNumber,
     formatSnapshotAge,
@@ -16,10 +13,15 @@ import {
     getBoardMetric,
     getDataSourceLabel,
     getVariantAssignment,
-    normalizeSearchParams,
-    sortBoards,
-    summarizeParams
+    sortBoards
 } from './helpers';
+import {
+    DEFAULT_QUERY,
+    createDefaultSearchQuery,
+    normalizeSearchParams,
+    summarizeSearchParams,
+    withDefaultRoleFilters
+} from '../shared/board-search-query';
 
 const api = window.electronAPI;
 
@@ -334,7 +336,7 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory })
                             <tbody>
                                 {entries.map((entry) => (
                                     <tr key={entry.key}>
-                                        <td className="cache-table-summary-cell" title={summarizeParams(entry.params)}>{summarizeParams(entry.params)}</td>
+                                        <td className="cache-table-summary-cell" title={summarizeSearchParams(entry.params)}>{summarizeSearchParams(entry.params)}</td>
                                         <td>{entry.resultCount}</td>
                                         <td className="cache-table-timestamp-cell">{formatTimestamp(entry.timestamp)}</td>
                                         <td>
@@ -390,7 +392,7 @@ export function App() {
     const [status, setStatus] = useState(api ? 'Initializing UI...' : 'Electron preload bridge unavailable.');
     const [summaryMeta, setSummaryMeta] = useState(api ? 'Initializing UI...' : 'Electron bridge unavailable');
     const [activeData, setActiveData] = useState(null);
-    const [query, setQuery] = useState(() => normalizeSearchParams(DEFAULT_QUERY, api?.limits || {}));
+    const [query, setQuery] = useState(() => createDefaultSearchQuery(null, api?.limits || {}));
     const [lastSearchParams, setLastSearchParams] = useState(null);
     const [results, setResults] = useState([]);
     const deferredResults = useDeferredValue(results);
@@ -470,11 +472,7 @@ export function App() {
             if (nextData.dataFingerprint) statusParts.push(nextData.dataFingerprint.slice(0, 8));
             startTransition(() => {
                 setActiveData(nextData);
-                setQuery((current) => normalizeSearchParams({
-                    ...current,
-                    tankRoles: current.tankRoles?.length ? current.tankRoles : deriveDefaultTankRoles(nextData.roles),
-                    carryRoles: current.carryRoles?.length ? current.carryRoles : deriveDefaultCarryRoles(nextData.roles)
-                }, api?.limits || {}));
+                setQuery((current) => withDefaultRoleFilters(current, nextData, api?.limits || {}));
                 setSummaryMeta(`Loaded ${setLabel}`);
                 setStatus(statusParts.join(' • '));
             });
@@ -595,12 +593,7 @@ export function App() {
             void dialogState.showAlert('Cancel the current search before resetting filters.');
             return;
         }
-        setQuery(normalizeSearchParams({
-            ...DEFAULT_QUERY,
-            maxResults: api?.limits?.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults,
-            tankRoles: activeData ? deriveDefaultTankRoles(activeData.roles) : [],
-            carryRoles: activeData ? deriveDefaultCarryRoles(activeData.roles) : []
-        }, api?.limits || {}));
+        setQuery(createDefaultSearchQuery(activeData, api?.limits || {}));
         setLastSearchParams(null);
         setResults([]);
         setSelectedIndex(-1);
@@ -754,7 +747,7 @@ export function App() {
                                         }}
                                     >
                                         <div className="history-title">{entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search'}</div>
-                                        <div className="history-params">{summarizeParams(entry.params)}</div>
+                                        <div className="history-params">{summarizeSearchParams(entry.params)}</div>
                                         <div className="history-meta"><span>{entry.resultCount} results</span><span>{formatTimestamp(entry.timestamp)}</span></div>
                                     </button>
                                 )) : <div className="history-empty">No recent searches yet</div>}

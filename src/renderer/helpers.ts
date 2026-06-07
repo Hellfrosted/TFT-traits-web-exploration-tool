@@ -1,39 +1,4 @@
-export const DEFAULT_QUERY = {
-    boardSize: 9,
-    maxResults: 500,
-    mustInclude: [],
-    mustExclude: [],
-    mustIncludeTraits: [],
-    mustExcludeTraits: [],
-    tankRoles: [],
-    carryRoles: [],
-    extraEmblems: [],
-    variantLocks: {},
-    onlyActive: true,
-    tierRank: true,
-    includeUnique: false
-};
-
-type SearchParams = {
-    boardSize?: unknown;
-    maxResults?: unknown;
-    mustInclude?: unknown[];
-    mustExclude?: unknown[];
-    mustIncludeTraits?: unknown[];
-    mustExcludeTraits?: unknown[];
-    tankRoles?: unknown[];
-    carryRoles?: unknown[];
-    extraEmblems?: unknown[];
-    variantLocks?: Record<string, unknown>;
-    onlyActive?: unknown;
-    tierRank?: unknown;
-    includeUnique?: unknown;
-};
-
-type RendererLimits = {
-    DEFAULT_MAX_RESULTS?: number;
-    MAX_RESULTS?: number;
-};
+import type { SearchParamsInput } from '../shared/board-search-query';
 
 type VariantAssignment = {
     id?: string;
@@ -104,85 +69,6 @@ export function getDataSourceLabel(source: unknown) {
     return source === 'latest' ? 'Live' : 'PBE';
 }
 
-function clampInteger(value: unknown, fallback: number, min: number, max: number) {
-    const parsed = Number.parseInt(String(value), 10);
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.min(Math.max(parsed, min), max);
-}
-
-function normalizeStringList(values: unknown) {
-    if (!Array.isArray(values)) return [];
-    const seen = new Set();
-    const normalized: string[] = [];
-    values.forEach((value) => {
-        const candidate = typeof value === 'object' && value
-            ? value.value ?? value.id ?? value.name ?? value.label
-            : value;
-        const stringValue = String(candidate ?? '').trim();
-        if (!stringValue || seen.has(stringValue)) return;
-        seen.add(stringValue);
-        normalized.push(stringValue);
-    });
-    return normalized;
-}
-
-export function normalizeSearchParams(params: SearchParams = {}, limits: RendererLimits = {}) {
-    const maxResultsLimit = limits.MAX_RESULTS || 1000;
-    const defaultMaxResults = limits.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults;
-    const variantLocks = {};
-    if (params.variantLocks && typeof params.variantLocks === 'object' && !Array.isArray(params.variantLocks)) {
-        Object.keys(params.variantLocks).sort().forEach((unitId) => {
-            const key = String(unitId ?? '').trim();
-            const value = String(params.variantLocks[unitId] ?? '').trim();
-            if (key && value && value !== 'auto') {
-                variantLocks[key] = value;
-            }
-        });
-    }
-
-    return {
-        boardSize: clampInteger(params.boardSize, DEFAULT_QUERY.boardSize, 1, 20),
-        maxResults: clampInteger(params.maxResults, defaultMaxResults, 1, maxResultsLimit),
-        mustInclude: normalizeStringList(params.mustInclude),
-        mustExclude: normalizeStringList(params.mustExclude),
-        mustIncludeTraits: normalizeStringList(params.mustIncludeTraits),
-        mustExcludeTraits: normalizeStringList(params.mustExcludeTraits),
-        tankRoles: normalizeStringList(params.tankRoles),
-        carryRoles: normalizeStringList(params.carryRoles),
-        extraEmblems: normalizeStringList(params.extraEmblems),
-        variantLocks,
-        onlyActive: !!params.onlyActive,
-        tierRank: !!params.tierRank,
-        includeUnique: !!params.includeUnique
-    };
-}
-
-export function deriveDefaultTankRoles(roles: unknown) {
-    return normalizeStringList(roles).filter((role) => /tank/i.test(role));
-}
-
-export function deriveDefaultCarryRoles(roles: unknown) {
-    const normalizedRoles = normalizeStringList(roles);
-    const tankRoles = new Set(deriveDefaultTankRoles(normalizedRoles).map((role) => role.toLowerCase()));
-    return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
-}
-
-export function summarizeParams(params: SearchParams = {}) {
-    const parts: string[] = [];
-    if (params.boardSize) parts.push(`Level ${params.boardSize}`);
-    if (params.mustInclude?.length) parts.push(`include ${params.mustInclude.length} units`);
-    if (params.mustExclude?.length) parts.push(`ban ${params.mustExclude.length} units`);
-    if (params.mustIncludeTraits?.length) parts.push(`force ${params.mustIncludeTraits.length} traits`);
-    if (params.mustExcludeTraits?.length) parts.push(`exclude ${params.mustExcludeTraits.length} traits`);
-    if (params.extraEmblems?.length) parts.push(`${params.extraEmblems.length} emblems`);
-    const lockCount = Object.keys(params.variantLocks || {}).length;
-    if (lockCount) parts.push(`${lockCount} locked modes`);
-    if (params.includeUnique) parts.push('unique traits on');
-    if (params.onlyActive === false) parts.push('inactive counted');
-    if (params.tierRank === false) parts.push('flat ranking');
-    return parts.length ? parts.join(' • ') : 'Default query';
-}
-
 export function getBoardMetric(board: BoardLike) {
     return Number(board?.synergyScore ?? board?.traitsCount ?? 0);
 }
@@ -233,7 +119,7 @@ export function getVariantAssignment(board: BoardLike, unitId: string) {
     return assignment;
 }
 
-export function buildTraitSummary(board: BoardLike, activeData: ActiveData, query: SearchParams) {
+export function buildTraitSummary(board: BoardLike, activeData: ActiveData, query: SearchParamsInput) {
     if (!board || !activeData) return [];
     const counts = new Map<string, number>();
     Object.entries(board.traitCounts || {}).forEach(([trait, count]) => {
