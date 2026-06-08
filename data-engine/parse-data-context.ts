@@ -27,18 +27,48 @@ function buildHashDictionary(rawJSON: LooseRecord) {
     return hashDictionary;
 }
 
-function buildParseDataContext(rawJSON, cdragonJSON, assetSources: LooseRecord = {}, parseOptions: LooseRecord = {}, hooks: LooseRecord = {}) {
-    const source = hooks.normalizeDataSource(parseOptions.source);
-    const hashDictionary = buildHashDictionary(rawJSON);
-    const rawTraitMetadata = hooks.buildRawTraitMetadata(rawJSON, source);
-    const rawChampionRecordMap = hooks.buildRawChampionRecordMap(rawJSON);
-    const rawShopDataLookup = hooks.buildRawShopDataLookup(rawJSON);
+function buildRawMetadataIndex(rawJSON: LooseRecord, source, hooks: LooseRecord) {
+    return {
+        hashDictionary: buildHashDictionary(rawJSON),
+        rawTraitMetadata: hooks.buildRawTraitMetadata(rawJSON, source),
+        rawChampionRecordMap: hooks.buildRawChampionRecordMap(rawJSON),
+        rawShopDataLookup: hooks.buildRawShopDataLookup(rawJSON)
+    };
+}
+
+function resolveSetParseContext({
+    rawJSON,
+    cdragonJSON,
+    parseOptions,
+    rawShopDataLookup,
+    source,
+    hooks
+}) {
     const latestSet = hooks.detectLatestSet(cdragonJSON) || hooks.detectLatestSetFromRaw(rawJSON);
     const setOverrides = parseOptions.setOverrides || getSetOverrides({ setNumber: latestSet });
     const setData = hooks.getLatestSetData(cdragonJSON);
     const setChampionRecords = hooks.buildSetChampionRecords(setData, source, setOverrides);
-    const setChampionIdentitySet = hooks.buildChampionIdentitySet(setChampionRecords);
-    const championReferenceMap = hooks.buildChampionReferenceMap(setChampionRecords);
+
+    return {
+        latestSet,
+        setOverrides,
+        setData,
+        setChampionRecords,
+        setChampionIdentitySet: hooks.buildChampionIdentitySet(setChampionRecords),
+        championReferenceMap: hooks.buildChampionReferenceMap(setChampionRecords),
+        rawShopDataLookup
+    };
+}
+
+function prepareAssetLookupContext({
+    assetSources,
+    setData,
+    latestSet,
+    source,
+    rawTraitMetadata,
+    setOverrides,
+    hooks
+}) {
     const championAssets = hooks.buildChampionAssetMap(assetSources.rawChampionSplashesHtml, latestSet, source);
     const traitIcons = hooks.buildTraitIconMap(
         assetSources.rawTraitIconsHtml,
@@ -66,21 +96,50 @@ function buildParseDataContext(rawJSON, cdragonJSON, assetSources: LooseRecord =
     });
 
     return {
-        source,
-        hashDictionary,
-        rawTraitMetadata,
-        rawChampionRecordMap,
-        rawShopDataLookup,
-        latestSet,
-        setOverrides,
-        setData,
-        setChampionRecords,
-        setChampionIdentitySet,
-        championReferenceMap,
         championAssets,
         traitIcons,
         traitBreakpoints,
         traitNamesByAlias
+    };
+}
+
+function buildParseDataContext(rawJSON, cdragonJSON, assetSources: LooseRecord = {}, parseOptions: LooseRecord = {}, hooks: LooseRecord = {}) {
+    const source = hooks.normalizeDataSource(parseOptions.source);
+    const rawMetadataIndex = buildRawMetadataIndex(rawJSON, source, hooks);
+    const setContext = resolveSetParseContext({
+        rawJSON,
+        cdragonJSON,
+        parseOptions,
+        rawShopDataLookup: rawMetadataIndex.rawShopDataLookup,
+        source,
+        hooks
+    });
+    const assetLookupContext = prepareAssetLookupContext({
+        assetSources,
+        setData: setContext.setData,
+        latestSet: setContext.latestSet,
+        source,
+        rawTraitMetadata: rawMetadataIndex.rawTraitMetadata,
+        setOverrides: setContext.setOverrides,
+        hooks
+    });
+
+    return {
+        source,
+        hashDictionary: rawMetadataIndex.hashDictionary,
+        rawTraitMetadata: rawMetadataIndex.rawTraitMetadata,
+        rawChampionRecordMap: rawMetadataIndex.rawChampionRecordMap,
+        rawShopDataLookup: rawMetadataIndex.rawShopDataLookup,
+        latestSet: setContext.latestSet,
+        setOverrides: setContext.setOverrides,
+        setData: setContext.setData,
+        setChampionRecords: setContext.setChampionRecords,
+        setChampionIdentitySet: setContext.setChampionIdentitySet,
+        championReferenceMap: setContext.championReferenceMap,
+        championAssets: assetLookupContext.championAssets,
+        traitIcons: assetLookupContext.traitIcons,
+        traitBreakpoints: assetLookupContext.traitBreakpoints,
+        traitNamesByAlias: assetLookupContext.traitNamesByAlias
     };
 }
 
@@ -131,7 +190,10 @@ function buildParsedDataResult({
 }
 
 module.exports = {
+    buildRawMetadataIndex,
     buildHashDictionary,
+    prepareAssetLookupContext,
     buildParseDataContext,
-    buildParsedDataResult
+    buildParsedDataResult,
+    resolveSetParseContext
 };
