@@ -9,6 +9,9 @@ const {
     runSearchDfs
 } = require('./search-dfs-runner.js');
 const {
+    createSearchExecutionDependencies
+} = require('./search-execution-dependencies.js');
+const {
     buildSearchExecutionContext
 } = require('./search-execution-context.js');
 
@@ -214,7 +217,7 @@ module.exports = {
                 hasVariableSlotCosts
             },
             onProgress,
-            engine: this
+            dependencies: createSearchExecutionDependencies(this)
         });
 
         if (searchSpaceError) {

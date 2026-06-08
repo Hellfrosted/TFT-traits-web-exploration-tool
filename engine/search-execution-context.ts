@@ -41,7 +41,7 @@ function buildSearchExecutionContext({
     normalizedParams,
     preparedSearchContext,
     onProgress,
-    engine,
+    dependencies,
     limits = LIMITS
 }) {
     const {
@@ -92,12 +92,12 @@ function buildSearchExecutionContext({
         tankRoleSet,
         carryRoleSet,
         unitSortRank,
-        buildTraitContributionEntries: engine.buildTraitContributionEntries.bind(engine),
-        getEntitySlotCost: engine.getEntitySlotCost.bind(engine),
-        buildConditionalEffectEntries: engine.buildConditionalEffectEntries.bind(engine),
-        buildConditionalProfileEntries: engine.buildConditionalProfileEntries.bind(engine),
-        compileConditions: engine.compileConditions.bind(engine),
-        summarizeVariantProfiles: engine.summarizeVariantProfiles.bind(engine)
+        buildTraitContributionEntries: dependencies.buildTraitContributionEntries,
+        getEntitySlotCost: dependencies.getEntitySlotCost,
+        buildConditionalEffectEntries: dependencies.buildConditionalEffectEntries,
+        buildConditionalProfileEntries: dependencies.buildConditionalProfileEntries,
+        compileConditions: dependencies.compileConditions,
+        summarizeVariantProfiles: dependencies.summarizeVariantProfiles
     });
 
     const {
@@ -130,7 +130,7 @@ function buildSearchExecutionContext({
 
     const topBoardTracker = createTopBoardTracker({
         maxBoards,
-        findWorstBoardIndex: engine.findWorstBoardIndex.bind(engine),
+        findWorstBoardIndex: dependencies.findWorstBoardIndex,
         createBoardResult: ({ unitIds, evaluation, totalCost }) => createBoardResult({
             unitIds,
             evaluation,
@@ -143,9 +143,9 @@ function buildSearchExecutionContext({
         ? countPreparedSearchSpaceCandidates({
             ...preparedSearchContext,
             variantLocks,
-            getUnitSlotCostRange: engine.getUnitSlotCostRange.bind(engine)
+            getUnitSlotCostRange: dependencies.getUnitSlotCostRange
         })
-        : engine.combinations(availableIndices.length, remainingSlots);
+        : dependencies.combinations(availableIndices.length, remainingSlots);
     const progressTracker = createProgressTracker({
         onProgress,
         totalCombinations,
@@ -191,9 +191,9 @@ function buildSearchExecutionContext({
         mustIncludeTraitTargets,
         allTraitNames,
         calculateSynergyScore: calculateBoardSynergyScore,
-        isCompiledConditionSatisfied: engine.isCompiledConditionSatisfied.bind(engine),
-        findFirstSatisfiedProfile: engine.findFirstSatisfiedProfile.bind(engine),
-        traitCountsToRecord: engine.traitCountsToRecord.bind(engine)
+        isCompiledConditionSatisfied: dependencies.isCompiledConditionSatisfied,
+        findFirstSatisfiedProfile: dependencies.findFirstSatisfiedProfile,
+        traitCountsToRecord: dependencies.traitCountsToRecord
     });
 
     const canRunSearch = (
@@ -247,9 +247,9 @@ function buildSearchExecutionContext({
                 calculateSynergyScore: calculateBoardSynergyScore,
                 scoreBoard,
                 topBoardTracker,
-                buildSortedBoardUnits: engine.buildSortedBoardUnits.bind(engine),
+                buildSortedBoardUnits: dependencies.buildSortedBoardUnits,
                 unitInfo,
-                traitCountsToRecord: engine.traitCountsToRecord.bind(engine),
+                traitCountsToRecord: dependencies.traitCountsToRecord,
                 allTraitNames,
                 mustHaveVariantUnitIndices,
                 evaluateBoardSelection: evaluateResolvedBoardSelection

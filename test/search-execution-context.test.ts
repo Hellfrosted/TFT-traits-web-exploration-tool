@@ -3,11 +3,14 @@ const assert = require('node:assert/strict');
 
 const Engine = require('../engine.js');
 const { normalizeSearchParams } = require('../searchParams.js');
+const { createSearchExecutionDependencies } = require('../engine/search-execution-dependencies.js');
 const { buildSearchExecutionContext } = require('../engine/search-execution-context.js');
 const {
     mechaSlotDataCache,
     mockDataCache
 } = require('./fixtures/engine-fixtures.js');
+
+const searchExecutionDependencies = createSearchExecutionDependencies(Engine);
 
 function createExecutionContext(dataCache, params) {
     const normalizedParams = normalizeSearchParams(params);
@@ -15,7 +18,7 @@ function createExecutionContext(dataCache, params) {
         dataCache,
         normalizedParams,
         preparedSearchContext: Engine.prepareSearchContext(dataCache, normalizedParams),
-        engine: Engine
+        dependencies: searchExecutionDependencies
     });
 }
 
