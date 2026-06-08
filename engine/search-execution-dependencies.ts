@@ -6,7 +6,6 @@ function createSearchExecutionDependencies(engine) {
         buildConditionalProfileEntries: engine.buildConditionalProfileEntries.bind(engine),
         compileConditions: engine.compileConditions.bind(engine),
         summarizeVariantProfiles: engine.summarizeVariantProfiles.bind(engine),
-        findWorstBoardIndex: engine.findWorstBoardIndex.bind(engine),
         getUnitSlotCostRange: engine.getUnitSlotCostRange.bind(engine),
         combinations: engine.combinations.bind(engine),
         isCompiledConditionSatisfied: engine.isCompiledConditionSatisfied.bind(engine),

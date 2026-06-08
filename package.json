@@ -18,6 +18,7 @@
     "test:smoke:unit": "pnpm build:node && node --test build/test/window-service.test.js",
     "test:all": "pnpm test && pnpm test:smoke && pnpm check",
     "verify:ci": "pnpm test && pnpm lint && pnpm test:smoke",
+    "benchmark:search": "pnpm build:node && node build/tools/benchmark-search.js",
     "check": "pnpm typecheck && pnpm lint && pnpm knip",
     "lint": "pnpm lint:eslint && pnpm lint:biome",
     "lint:eslint": "node tools/run-eslint.cjs",

@@ -22,16 +22,6 @@ module.exports = {
             .map((unitIndex) => unitInfo[unitIndex].id);
     },
 
-    findWorstBoardIndex(topBoards) {
-        let worstIndex = 0;
-        for (let i = 1; i < topBoards.length; i++) {
-            if (topBoards[i]._score < topBoards[worstIndex]._score) {
-                worstIndex = i;
-            }
-        }
-        return worstIndex;
-    },
-
     getValidUnits(dataCache, mustExclude, mustExcludeTraits = [], variantLocks = {}) {
         const excludedUnits = new Set(mustExclude);
         const excludedTraits = new Set(mustExcludeTraits);

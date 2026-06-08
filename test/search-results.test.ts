@@ -10,7 +10,6 @@ describe('search results helpers', () => {
     it('tracks only the strongest boards up to the configured max', () => {
         const tracker = createTopBoardTracker({
             maxBoards: 2,
-            findWorstBoardIndex: (boards) => boards[0]._score <= boards[1]._score ? 0 : 1,
             createBoardResult: ({ unitIds, evaluation, totalCost }) => ({
                 units: unitIds,
                 ...evaluation,

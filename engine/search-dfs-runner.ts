@@ -24,6 +24,38 @@ function createSearchDfsRunner({
     }) {
         const currentIdxList = [];
         const currentVariantUnitIndices = [];
+        const prunePayload = {
+            ...pruneState,
+            startIdx: 0,
+            currentMinSlots: 0,
+            currentSlotFlex: 0,
+            boardSize,
+            tankThreePlusCount: 0,
+            tankFourPlusCount: 0,
+            carryFourPlusCount: 0,
+            currentTraitCounts
+        };
+        const selectionPayload = {
+            idx: 0,
+            info: null,
+            currentTraitCounts,
+            activeUnitFlags,
+            currentIdxList,
+            currentVariantUnitIndices
+        };
+        const evaluationPayload = {
+            ...evaluationContext,
+            currentMinSlots: 0,
+            boardSize,
+            tankThreePlusCount: 0,
+            tankFourPlusCount: 0,
+            carryFourPlusCount: 0,
+            currentCost: 0,
+            currentComplexUnitCount: 0,
+            currentIdxList,
+            currentTraitCounts,
+            currentVariantUnitIndices
+        };
 
         const dfs = (
             startIdx,
@@ -35,36 +67,26 @@ function createSearchDfsRunner({
             currentComplexUnitCount,
             currentSlotFlex
         ) => {
-            if (shouldPruneSearchBranch({
-                ...pruneState,
-                startIdx,
-                currentMinSlots,
-                currentSlotFlex,
-                boardSize,
-                tankThreePlusCount,
-                tankFourPlusCount,
-                carryFourPlusCount,
-                currentTraitCounts
-            })) {
+            prunePayload.startIdx = startIdx;
+            prunePayload.currentMinSlots = currentMinSlots;
+            prunePayload.currentSlotFlex = currentSlotFlex;
+            prunePayload.tankThreePlusCount = tankThreePlusCount;
+            prunePayload.tankFourPlusCount = tankFourPlusCount;
+            prunePayload.carryFourPlusCount = carryFourPlusCount;
+            if (shouldPruneSearchBranch(prunePayload)) {
                 return;
             }
 
             if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
                 progressTracker.markChecked();
 
-                evaluateSearchCandidate({
-                    ...evaluationContext,
-                    currentMinSlots,
-                    boardSize,
-                    tankThreePlusCount,
-                    tankFourPlusCount,
-                    carryFourPlusCount,
-                    currentCost,
-                    currentComplexUnitCount,
-                    currentIdxList,
-                    currentTraitCounts,
-                    currentVariantUnitIndices
-                });
+                evaluationPayload.currentMinSlots = currentMinSlots;
+                evaluationPayload.tankThreePlusCount = tankThreePlusCount;
+                evaluationPayload.tankFourPlusCount = tankFourPlusCount;
+                evaluationPayload.carryFourPlusCount = carryFourPlusCount;
+                evaluationPayload.currentCost = currentCost;
+                evaluationPayload.currentComplexUnitCount = currentComplexUnitCount;
+                evaluateSearchCandidate(evaluationPayload);
             }
 
             if (currentMinSlots === boardSize) {
@@ -79,14 +101,9 @@ function createSearchDfsRunner({
                     continue;
                 }
 
-                applyUnitSelectionState({
-                    idx,
-                    info,
-                    currentTraitCounts,
-                    activeUnitFlags,
-                    currentIdxList,
-                    currentVariantUnitIndices
-                });
+                selectionPayload.idx = idx;
+                selectionPayload.info = info;
+                applyUnitSelectionState(selectionPayload);
                 dfs(
                     index + 1,
                     nextMinSlots,
@@ -97,14 +114,9 @@ function createSearchDfsRunner({
                     currentComplexUnitCount + info.hasComplexEvaluation,
                     currentSlotFlex + info.slotFlex
                 );
-                rollbackUnitSelectionState({
-                    idx,
-                    info,
-                    currentTraitCounts,
-                    activeUnitFlags,
-                    currentIdxList,
-                    currentVariantUnitIndices
-                });
+                selectionPayload.idx = idx;
+                selectionPayload.info = info;
+                rollbackUnitSelectionState(selectionPayload);
             }
         };
 

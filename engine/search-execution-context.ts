@@ -130,7 +130,6 @@ function buildSearchExecutionContext({
 
     const topBoardTracker = createTopBoardTracker({
         maxBoards,
-        findWorstBoardIndex: dependencies.findWorstBoardIndex,
         createBoardResult: ({ unitIds, evaluation, totalCost }) => createBoardResult({
             unitIds,
             evaluation,
