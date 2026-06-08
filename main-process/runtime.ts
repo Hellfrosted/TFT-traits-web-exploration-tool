@@ -1,4 +1,6 @@
 const path = require('path');
+const { createCacheMigrationService } = require('./cache-migration-service.js');
+const { createIpcRouter } = require('./ipc-router.js');
 
 const SEARCH_CACHE_VERSION = 4;
 
@@ -23,6 +25,7 @@ function createMainRuntime(options: LooseRecord = {}) {
     const createDataService = options.createDataService || require('./data-service.js').createDataService;
     const createSearchService = options.createSearchService || require('./search-service.js').createSearchService;
     const createWindowService = options.createWindowService || require('./window-service.js').createWindowService;
+    const createCacheMigrationServiceFactory = options.createCacheMigrationService || createCacheMigrationService;
     const processRef = options.processRef || process;
     const argv = options.argv || processRef.argv || [];
     const appRoot = options.appRoot || path.join(__dirname, '..');
@@ -91,131 +94,32 @@ function createMainRuntime(options: LooseRecord = {}) {
         getMainWindow: windowService.getMainWindow,
         getDataCache: dataService.getDataCache
     });
-    const cacheMigrationStatePath = path.join(storagePaths.storageRoot, 'cache-migration-state.json');
-    const strictlyMigratedFingerprints = new Set();
+    const cacheMigrationService = createCacheMigrationServiceFactory({
+        cacheService,
+        dataService,
+        fsp,
+        processRef,
+        storagePaths,
+        normalizeSearchParams,
+        normalizeSearchParamsForData,
+        searchCacheVersion: SEARCH_CACHE_VERSION
+    });
+    const ipcRouter = createIpcRouter({
+        ipcMain,
+        ipcChannels: IPC_CHANNELS,
+        defaultDataSource: DEFAULT_DATA_SOURCE,
+        rendererDevServerUrl,
+        getMainWindow: windowService.getMainWindow,
+        dataService,
+        searchService,
+        cacheService,
+        normalizeSearchParams,
+        serializeSearchParams,
+        onDataFingerprintLoaded: (dataFingerprint) => {
+            void cacheMigrationService.migrateFingerprintWithStrictNormalization(dataFingerprint);
+        }
+    });
     let fatalExitScheduled = false;
-    let cacheMigrationState = null;
-    let cacheMigrationStatePromise = null;
-
-    async function writeJsonFileAtomically(filePath, payload) {
-        const tempPath = `${filePath}.${processRef.pid || 'runtime'}.${Date.now()}.tmp`;
-        await fsp.writeFile(tempPath, payload, 'utf-8');
-        try {
-            await fsp.rename(tempPath, filePath);
-        } catch (renameError) {
-            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
-                throw renameError;
-            }
-            await fsp.unlink(filePath).catch(() => {});
-            await fsp.rename(tempPath, filePath);
-        }
-    }
-
-    function normalizeCacheMigrationState(rawState) {
-        const strictFingerprints = Array.isArray(rawState?.strictFingerprints)
-            ? rawState.strictFingerprints.filter((value) => typeof value === 'string' && value)
-            : [];
-        strictFingerprints.forEach((value) => strictlyMigratedFingerprints.add(value));
-        return {
-            version: Number.isFinite(rawState?.version) ? rawState.version : null,
-            strictFingerprints
-        };
-    }
-
-    async function loadCacheMigrationState() {
-        if (cacheMigrationState) {
-            return cacheMigrationState;
-        }
-        if (cacheMigrationStatePromise) {
-            return await cacheMigrationStatePromise;
-        }
-
-        cacheMigrationStatePromise = (async () => {
-            try {
-                const rawState = JSON.parse(await fsp.readFile(cacheMigrationStatePath, 'utf-8'));
-                cacheMigrationState = normalizeCacheMigrationState(rawState);
-            } catch (error) {
-                if (error?.code !== 'ENOENT') {
-                    console.warn('Failed to read cache migration state:', error.message || String(error));
-                }
-                cacheMigrationState = normalizeCacheMigrationState(null);
-            } finally {
-                cacheMigrationStatePromise = null;
-            }
-
-            return cacheMigrationState;
-        })();
-
-        return await cacheMigrationStatePromise;
-    }
-
-    async function saveCacheMigrationState(nextState) {
-        cacheMigrationState = normalizeCacheMigrationState(nextState);
-        await writeJsonFileAtomically(cacheMigrationStatePath, JSON.stringify(cacheMigrationState));
-    }
-
-    async function migrateAllCachedParamsWithBaseNormalization() {
-        if (typeof cacheService.migrateCanonicalParams !== 'function') {
-            return;
-        }
-
-        try {
-            const migrationState = await loadCacheMigrationState();
-            if (migrationState.version === SEARCH_CACHE_VERSION) {
-                return;
-            }
-            await cacheService.migrateCanonicalParams({
-                canonicalizeByFingerprint: (_dataFingerprint, params) => normalizeSearchParams(params)
-            });
-            await saveCacheMigrationState({
-                ...migrationState,
-                version: SEARCH_CACHE_VERSION
-            });
-        } catch (error) {
-            console.warn('Failed to migrate cached search params during startup:', error.message || String(error));
-        }
-    }
-
-    async function migrateFingerprintWithStrictNormalization(dataFingerprint) {
-        if (
-            typeof cacheService.migrateCanonicalParams !== 'function'
-            || typeof dataFingerprint !== 'string'
-            || !dataFingerprint
-            || strictlyMigratedFingerprints.has(dataFingerprint)
-        ) {
-            return;
-        }
-
-        try {
-            const migrationState = await loadCacheMigrationState();
-            if (strictlyMigratedFingerprints.has(dataFingerprint)) {
-                return;
-            }
-            await cacheService.migrateCanonicalParams({
-                canonicalizeByFingerprint: (entryFingerprint, params) => {
-                    const baseNormalized = normalizeSearchParams(params);
-                    if (entryFingerprint !== dataFingerprint) {
-                        return baseNormalized;
-                    }
-
-                    const activeDataCache = dataService.getDataCache();
-                    if (!activeDataCache || activeDataCache.dataFingerprint !== dataFingerprint) {
-                        return baseNormalized;
-                    }
-
-                    return normalizeSearchParamsForData(params, activeDataCache);
-                }
-            });
-            strictlyMigratedFingerprints.add(dataFingerprint);
-            await saveCacheMigrationState({
-                ...migrationState,
-                version: migrationState.version ?? SEARCH_CACHE_VERSION,
-                strictFingerprints: [...strictlyMigratedFingerprints].sort()
-            });
-        } catch (error) {
-            console.warn(`Failed to migrate cached params for fingerprint ${dataFingerprint}:`, error.message || String(error));
-        }
-    }
 
     function scheduleFatalExit() {
         if (fatalExitScheduled) {
@@ -265,7 +169,7 @@ function createMainRuntime(options: LooseRecord = {}) {
         windowService.createWindow();
         windowService.scheduleSmokeTimeout();
         if (storageReady) {
-            void migrateAllCachedParamsWithBaseNormalization();
+            void cacheMigrationService.migrateAllCachedParamsWithBaseNormalization();
         }
     }
 
@@ -285,132 +189,12 @@ function createMainRuntime(options: LooseRecord = {}) {
         };
     }
 
-    function assertTrustedIpcSender(event, channel) {
-        const mainWindow = windowService.getMainWindow();
-        const hasLiveMainWindow = !!mainWindow
-            && (typeof mainWindow.isDestroyed !== 'function' || !mainWindow.isDestroyed());
-        const sender = event?.sender;
-        const senderFrame = event?.senderFrame || sender?.mainFrame || null;
-        const expectedWebContents = mainWindow?.webContents;
-        const senderMatchesMainWindow = !!sender
-            && !!expectedWebContents
-            && (
-                sender === expectedWebContents
-                || (
-                    Number.isInteger(sender.id)
-                    && Number.isInteger(expectedWebContents.id)
-                    && sender.id === expectedWebContents.id
-                )
-            );
-        const isMainFrame = senderFrame?.isMainFrame !== false;
-        const senderUrl = typeof senderFrame?.url === 'string' && senderFrame.url
-            ? senderFrame.url
-            : sender?.getURL?.();
-
-        const isFileRenderer = typeof senderUrl === 'string' && senderUrl.startsWith('file://');
-        const isTrustedDevRenderer = rendererDevServerUrl
-            && typeof senderUrl === 'string'
-            && senderUrl.startsWith(rendererDevServerUrl);
-
-        if (
-            !hasLiveMainWindow
-            || !senderMatchesMainWindow
-            || !isMainFrame
-            || typeof senderUrl !== 'string'
-            || (!isFileRenderer && !isTrustedDevRenderer)
-        ) {
-            console.warn(`Rejected unauthorized IPC sender for ${channel}.`);
-            throw new Error('Unauthorized IPC sender.');
-        }
-    }
-
     function handleTrustedIpc(channel, handler) {
-        ipcMain.handle(channel, async (event, ...args) => {
-            assertTrustedIpcSender(event, channel);
-            return await handler(event, ...args);
-        });
+        ipcRouter.handleTrusted(channel, handler);
     }
 
     function registerIpcHandlers() {
-        handleTrustedIpc(IPC_CHANNELS.FETCH_DATA, async (_event, requestedSource = DEFAULT_DATA_SOURCE) => {
-            try {
-                const response = await dataService.fetchData(requestedSource);
-                if (response?.success && response.dataFingerprint) {
-                    void migrateFingerprintWithStrictNormalization(response.dataFingerprint);
-                }
-                return response;
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.GET_SEARCH_ESTIMATE, async (_event, params) => {
-            return await searchService.getSearchEstimate(params);
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS, async (_event, params) => {
-            if (typeof searchService.normalizePayload === 'function') {
-                return searchService.normalizePayload(params);
-            }
-
-            const fallbackParams = normalizeSearchParams(params);
-            return {
-                params: fallbackParams,
-                comparisonKey: serializeSearchParams(fallbackParams),
-                dataFingerprint: dataService.getDataCache()?.dataFingerprint || null
-            };
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.SEARCH_BOARDS, async (_event, params) => {
-            return await searchService.searchBoards(params);
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.CANCEL_SEARCH, async () => {
-            return await searchService.cancelSearch();
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.LIST_CACHE, async (_event, options = null) => {
-            try {
-                const activeDataFingerprint = dataService.getDataCache()?.dataFingerprint || null;
-                const entries = await cacheService.listCacheEntries(activeDataFingerprint, options || {});
-                return { success: true, entries };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.DELETE_CACHE_ENTRY, async (_event, key) => {
-            try {
-                await cacheService.deleteCacheEntry(key);
-                return { success: true };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        handleTrustedIpc(IPC_CHANNELS.CLEAR_ALL_CACHE, async () => {
-            try {
-                const summary = await cacheService.clearAllCache();
-                return {
-                    success: true,
-                    deleted: summary.deleted,
-                    failures: summary.failures || []
-                };
-            } catch (error) {
-                return { success: false, error: error.toString() };
-            }
-        });
-
-        return () => {
-            ipcMain.removeHandler(IPC_CHANNELS.FETCH_DATA);
-            ipcMain.removeHandler(IPC_CHANNELS.GET_SEARCH_ESTIMATE);
-            ipcMain.removeHandler(IPC_CHANNELS.NORMALIZE_SEARCH_PARAMS);
-            ipcMain.removeHandler(IPC_CHANNELS.SEARCH_BOARDS);
-            ipcMain.removeHandler(IPC_CHANNELS.CANCEL_SEARCH);
-            ipcMain.removeHandler(IPC_CHANNELS.LIST_CACHE);
-            ipcMain.removeHandler(IPC_CHANNELS.DELETE_CACHE_ENTRY);
-            ipcMain.removeHandler(IPC_CHANNELS.CLEAR_ALL_CACHE);
-        };
+        return ipcRouter.registerHandlers();
     }
 
     function start() {
@@ -434,7 +218,9 @@ function createMainRuntime(options: LooseRecord = {}) {
         dataService,
         searchService,
         windowService,
-        assertTrustedIpcSender,
+        cacheMigrationService,
+        ipcRouter,
+        assertTrustedIpcSender: ipcRouter.assertTrustedSender,
         handleTrustedIpc,
         registerProcessHandlers,
         registerAppLifecycle,
