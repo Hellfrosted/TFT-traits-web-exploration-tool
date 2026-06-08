@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MultiSelect } from './components/MultiSelect';
+import type { ActiveData } from './active-data';
 import {
     buildTraitSummary,
     collectUnitTraitLabels,
@@ -22,10 +23,74 @@ import {
     summarizeSearchParams,
     withDefaultRoleFilters
 } from '../shared/board-search-query';
+import type { SearchParamsInput } from '../shared/board-search-query';
 
 const api = window.electronAPI;
 
-function Dialog({ dialog, onResolve }) {
+type DialogData = {
+    type: 'alert' | 'confirm';
+    message: string;
+    title: string;
+};
+
+type DialogProps = {
+    dialog: DialogData | null;
+    onResolve: (value: boolean) => void;
+};
+
+type SearchParams = ReturnType<typeof normalizeSearchParams>;
+
+type RendererUnit = LooseRecord & {
+    id: string;
+    displayName?: string;
+    iconUrl?: string;
+    variants?: RendererVariant[];
+};
+
+type RendererVariant = {
+    id?: string;
+    label?: string;
+};
+
+type RendererActiveData = ActiveData & {
+    units: RendererUnit[];
+    unitMap: Map<string, RendererUnit>;
+    traits: string[];
+    roles: string[];
+    traitIcons: Record<string, string>;
+};
+
+type BoardResult = LooseRecord & {
+    units?: string[];
+    totalCost?: number;
+    occupiedSlots?: number;
+    variantAssignments?: Record<string, string | RendererVariant>;
+};
+
+type TraitSummary = {
+    trait: string;
+    label: string;
+    iconUrl?: string | null;
+    isActive?: boolean;
+};
+
+type SearchEstimate = LooseRecord & {
+    count?: number;
+    remainingSlots?: number;
+};
+
+type CacheEntry = {
+    key: string;
+    params: SearchParamsInput;
+    resultCount: number;
+    timestamp: string | number;
+};
+
+type SearchProgress = {
+    pct?: number;
+};
+
+function Dialog({ dialog, onResolve }: DialogProps) {
     if (!dialog) return null;
     return (
         <div id="dialogModal" className="modal-overlay active" aria-hidden="false">
@@ -49,25 +114,25 @@ function Dialog({ dialog, onResolve }) {
 }
 
 function useDialog() {
-    const resolverRef = useRef(null);
-    const [dialog, setDialog] = useState(null);
+    const resolverRef = useRef<((value: boolean) => void) | null>(null);
+    const [dialog, setDialog] = useState<DialogData | null>(null);
 
-    function resolve(value) {
+    function resolve(value: boolean) {
         const resolver = resolverRef.current;
         resolverRef.current = null;
         setDialog(null);
         resolver?.(value);
     }
 
-    function showAlert(message, title = 'Attention') {
-        return new Promise((resolvePromise) => {
+    function showAlert(message: string, title = 'Attention') {
+        return new Promise<boolean>((resolvePromise) => {
             resolverRef.current = resolvePromise;
             setDialog({ type: 'alert', message, title });
         });
     }
 
-    function showConfirm(message, title = 'Confirmation') {
-        return new Promise((resolvePromise) => {
+    function showConfirm(message: string, title = 'Confirmation') {
+        return new Promise<boolean>((resolvePromise) => {
             resolverRef.current = resolvePromise;
             setDialog({ type: 'confirm', message, title });
         });
@@ -76,7 +141,7 @@ function useDialog() {
     return { dialog, resolve, showAlert, showConfirm };
 }
 
-function QuerySummary({ query, meta }) {
+function QuerySummary({ query, meta }: { query: SearchParams; meta: string }) {
     const chips = useMemo(() => {
         if (!query) return [];
         const items = [];
@@ -115,7 +180,7 @@ function QuerySummary({ query, meta }) {
     );
 }
 
-function DataStats({ activeData }) {
+function DataStats({ activeData }: { activeData: RendererActiveData | null }) {
     const coverage = activeData ? getAssetCoverageLabel(activeData.assetValidation) : '-';
     const stats = [
         ['Units', activeData?.units?.length ?? '-'],
@@ -135,7 +200,7 @@ function DataStats({ activeData }) {
     );
 }
 
-function UnitPill({ unitId, board, activeData }) {
+function UnitPill({ unitId, board, activeData }: { unitId: string; board: BoardResult; activeData: RendererActiveData | null }) {
     const unit = activeData?.unitMap?.get(unitId);
     const baseLabel = unit?.displayName || unitId;
     const variant = getVariantAssignment(board, unitId);
@@ -148,7 +213,7 @@ function UnitPill({ unitId, board, activeData }) {
     );
 }
 
-function TraitChip({ trait }) {
+function TraitChip({ trait }: { trait: TraitSummary }) {
     return (
         <span className={`trait-chip${trait.isActive ? '' : ' trait-chip-muted'}`} title={trait.label}>
             {trait.iconUrl ? <img className="pill-icon trait-icon" src={trait.iconUrl} alt={trait.trait} loading="lazy" /> : null}
@@ -157,7 +222,7 @@ function TraitChip({ trait }) {
     );
 }
 
-function ResultsSummary({ results, estimate }) {
+function ResultsSummary({ results, estimate }: { results: BoardResult[]; estimate: SearchEstimate | null }) {
     if (estimate && (!results || results.length === 0)) {
         return (
             <div id="resultsSummary" className="results-summary">
@@ -183,7 +248,7 @@ function ResultsSummary({ results, estimate }) {
     );
 }
 
-function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }) {
+function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }: { board: BoardResult | null; rankIndex: number; activeData: RendererActiveData | null; query: SearchParams; sortMode: string }) {
     if (!board) {
         return (
             <div id="boardSpotlight" className="board-spotlight empty">
@@ -207,7 +272,7 @@ function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }) {
         highestCost: 'Highest Cost',
         bestValue: 'Best Value'
     };
-    const traits = buildTraitSummary(board, activeData, query).slice(0, 14);
+    const traits = buildTraitSummary(board, activeData, query).slice(0, 14) as TraitSummary[];
     return (
         <div id="boardSpotlight" className="board-spotlight">
             <div className="board-spotlight-header">
@@ -233,8 +298,8 @@ function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }) {
     );
 }
 
-function ResultsTable({ results, activeData, query, selectedIndex, onSelect }) {
-    const parentRef = useRef(null);
+function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: { results: BoardResult[]; activeData: RendererActiveData | null; query: SearchParams; selectedIndex: number; onSelect: (index: number) => void }) {
+    const parentRef = useRef<HTMLDivElement | null>(null);
     const rowVirtualizer = useVirtualizer({
         count: results.length,
         getScrollElement: () => parentRef.current,
@@ -267,7 +332,7 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }) {
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                         const board = results[virtualRow.index];
                         const metric = getBoardMetric(board);
-                        const traits = buildTraitSummary(board, activeData, query).slice(0, 6);
+                        const traits = buildTraitSummary(board, activeData, query).slice(0, 6) as TraitSummary[];
                         return (
                             <button
                                 type="button"
@@ -293,8 +358,8 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }) {
     );
 }
 
-function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }) {
-    const [entries, setEntries] = useState([]);
+function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }: { isOpen: boolean; onClose: () => void; showAlert: (message: string, title?: string) => Promise<boolean>; showConfirm: (message: string, title?: string) => Promise<boolean>; refreshHistory: () => void }) {
+    const [entries, setEntries] = useState<CacheEntry[]>([]);
     const [message, setMessage] = useState('Loading...');
 
     async function loadCache() {
@@ -310,7 +375,7 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory })
             setMessage(response.entries?.length ? '' : 'No cached searches found.');
         } catch (error) {
             setEntries([]);
-            setMessage(`Failed to load cache: ${error.message || String(error)}`);
+            setMessage(`Failed to load cache: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -391,20 +456,20 @@ export function App() {
     const [source, setSource] = useState(api?.defaultDataSource || 'pbe');
     const [status, setStatus] = useState(api ? 'Initializing UI...' : 'Electron preload bridge unavailable.');
     const [summaryMeta, setSummaryMeta] = useState(api ? 'Initializing UI...' : 'Electron bridge unavailable');
-    const [activeData, setActiveData] = useState(null);
+    const [activeData, setActiveData] = useState<RendererActiveData | null>(null);
     const [query, setQuery] = useState(() => createDefaultSearchQuery(null, api?.limits || {}));
-    const [lastSearchParams, setLastSearchParams] = useState(null);
-    const [results, setResults] = useState([]);
+    const [lastSearchParams, setLastSearchParams] = useState<SearchParams | null>(null);
+    const [results, setResults] = useState<BoardResult[]>([]);
     const deferredResults = useDeferredValue(results);
     const [sortMode, setSortMode] = useState('mostTraits');
     const [selectedIndex, setSelectedIndex] = useState(-1);
-    const [estimate, setEstimate] = useState(null);
-    const [history, setHistory] = useState([]);
+    const [estimate, setEstimate] = useState<SearchEstimate | null>(null);
+    const [history, setHistory] = useState<CacheEntry[]>([]);
     const [isFetching, setIsFetching] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
     const [cacheOpen, setCacheOpen] = useState(false);
-    const [progress, setProgress] = useState(null);
+    const [progress, setProgress] = useState<SearchProgress | null>(null);
     const sortedResults = useMemo(() => sortBoards(deferredResults, sortMode), [deferredResults, sortMode]);
     const selectedBoard = selectedIndex >= 0 ? sortedResults[selectedIndex] : null;
 
@@ -421,11 +486,11 @@ export function App() {
     const roleOptions = activeData?.roles || [];
     const variantUnits = useMemo(() => (activeData?.units || []).filter((unit) => unit.variants?.length > 0), [activeData]);
 
-    function updateQuery(patch) {
+    function updateQuery(patch: SearchParamsInput) {
         setQuery((current) => normalizeSearchParams({ ...current, ...patch }, api?.limits || {}));
     }
 
-    async function normalizeThroughBridge(params = query) {
+    async function normalizeThroughBridge(params: SearchParamsInput = query) {
         if (api?.normalizeSearchParams) {
             try {
                 const payload = await api.normalizeSearchParams(params);
@@ -460,7 +525,7 @@ export function App() {
                 await dialogState.showAlert(response?.error || 'Unknown error', 'Data Fetch Failed');
                 return;
             }
-            const nextData = createActiveData(response, selectedSource);
+            const nextData = createActiveData(response, selectedSource) as RendererActiveData;
             const assetCoverage = getAssetCoverageLabel(nextData.assetValidation);
             const setLabel = nextData.setNumber
                 ? `${getDataSourceLabel(nextData.dataSource)} Set ${nextData.setNumber}`
@@ -478,14 +543,14 @@ export function App() {
             });
             await refreshHistory();
         } catch (error) {
-            setStatus(`Failed to communicate with main process: ${error.message || String(error)}.`);
+            setStatus(`Failed to communicate with main process: ${error instanceof Error ? error.message : String(error)}.`);
             console.error(error);
         } finally {
             setIsFetching(false);
         }
     }
 
-    async function refreshEstimate(params = query) {
+    async function refreshEstimate(params: SearchParamsInput = query) {
         if (!activeData || !api?.getSearchEstimate || isSearching || isFetching) return;
         try {
             const normalized = await normalizeThroughBridge(params);
@@ -496,7 +561,7 @@ export function App() {
         }
     }
 
-    async function runSearch(params = query) {
+    async function runSearch(params: SearchParamsInput = query) {
         if (isSearching) return;
         if (isFetching) {
             setStatus('Data refresh is still in progress. Wait for it to finish before searching.');
@@ -563,7 +628,7 @@ export function App() {
             setSummaryMeta(nextResults.length ? `Computed in ${elapsed}s${response.fromCache ? ' from cache' : ''}` : 'No results');
             await refreshHistory();
         } catch (error) {
-            setStatus(`Search failed: ${error.message || String(error)}`);
+            setStatus(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
             setSummaryMeta('Search failed');
             console.error(error);
         } finally {
@@ -583,7 +648,7 @@ export function App() {
                 setIsCancelling(false);
             }
         } catch (error) {
-            setStatus(`Unable to cancel search: ${error.message || String(error)}`);
+            setStatus(`Unable to cancel search: ${error instanceof Error ? error.message : String(error)}`);
             setIsCancelling(false);
         }
     }
@@ -630,7 +695,7 @@ export function App() {
     }, []);
 
     useEffect(() => {
-        const handler = (event) => {
+        const handler = (event: globalThis.KeyboardEvent) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
                 void runSearch();
