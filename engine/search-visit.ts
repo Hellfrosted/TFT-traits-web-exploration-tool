@@ -68,7 +68,6 @@ function evaluateSearchCandidate({
     if (!meetsCarryRequirement(carryFourPlusCount)) return;
 
     const totalCost = mustHaveTotalCost + currentCost;
-    const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
     const totalComplexUnitCount = mustHaveComplexUnitCount + currentComplexUnitCount;
 
     if (totalComplexUnitCount === 0) {
@@ -87,6 +86,7 @@ function evaluateSearchCandidate({
         const totalScore = scoreBoard(synergyScore, totalCost);
         if (!topBoardTracker.canAcceptScore(totalScore)) return;
 
+        const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
         topBoardTracker.addBoard({
             unitIds: buildSortedBoardUnits(selectedUnitIndices, unitInfo),
             evaluation: {
@@ -99,6 +99,7 @@ function evaluateSearchCandidate({
         return;
     }
 
+    const selectedUnitIndices = mustHaveUnitIndices.concat(currentIdxList);
     const selectedVariantIndices = mustHaveVariantUnitIndices.concat(currentVariantUnitIndices);
     const evaluation = evaluateBoardSelection({
         selectedUnitIndices,
