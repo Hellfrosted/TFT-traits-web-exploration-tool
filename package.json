@@ -19,6 +19,7 @@
     "test:all": "pnpm test && pnpm test:smoke && pnpm check",
     "verify:ci": "pnpm test && pnpm lint && pnpm test:smoke",
     "benchmark:search": "pnpm build:node && node build/tools/benchmark-search.js",
+    "bench": "pnpm build:node && node build/benchmarks/search.bench.js",
     "check": "pnpm typecheck && pnpm lint && pnpm knip",
     "lint": "pnpm lint:eslint && pnpm lint:biome",
     "lint:eslint": "node tools/run-eslint.cjs",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.13",
+    "@codspeed/tinybench-plugin": "^5.5.0",
     "@electron/packager": "^19.1.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
@@ -43,6 +45,7 @@
     "eslint": "^10.1.0",
     "jiti": "^2.6.1",
     "knip": "6.6.3",
+    "tinybench": "^5.1.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
     "vite": "^8.0.10"
