@@ -1,0 +1,10 @@
+$schema: https://raw.githubusercontent.com/CodSpeedHQ/codspeed/refs/heads/main/schemas/codspeed.schema.json
+
+options:
+  warmup-time: 0s
+  min-rounds: 1
+  max-rounds: 3
+
+benchmarks:
+  - name: search-generated-30-units-board-7-top-500
+    exec: node build/tools/benchmark-search.js
