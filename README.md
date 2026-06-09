@@ -1,5 +1,7 @@
 # TFT Board Exploration Tool
 
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/Hellfrosted/TFT-traits-web-exploration-tool?utm_source=badge)
+
 Desktop app for exploring high-cap Teamfight Tactics boards from raw Community Dragon data.
 
 This project exists because `tactics.tools` Perfect Synergy was slow enough on my PC to get in the way during live games. It stays narrower on purpose: fast local search for expensive late-game boards built around augments, units, traits, roles, and emblems.
