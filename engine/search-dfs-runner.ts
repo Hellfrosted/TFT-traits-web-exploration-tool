@@ -77,7 +77,7 @@ function createSearchDfsRunner({
                 return;
             }
 
-            if (currentMinSlots <= boardSize && (currentMinSlots + currentSlotFlex) >= boardSize) {
+            if (currentMinSlots <= boardSize && currentMinSlots + currentSlotFlex >= boardSize) {
                 progressTracker.markChecked();
 
                 evaluationPayload.currentMinSlots = currentMinSlots;

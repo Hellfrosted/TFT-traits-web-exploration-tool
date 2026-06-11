@@ -3,7 +3,8 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 function findPackagedExecutable(distRoot) {
-    const candidates = fs.readdirSync(distRoot, { withFileTypes: true })
+    const candidates = fs
+        .readdirSync(distRoot, { withFileTypes: true })
         .filter((entry) => entry.isDirectory() && /-win32-x64$/i.test(entry.name))
         .map((entry) => {
             const appDir = path.join(distRoot, entry.name);

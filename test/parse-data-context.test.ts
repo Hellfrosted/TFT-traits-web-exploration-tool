@@ -32,19 +32,23 @@ describe('parse-data context helpers', () => {
             traitIcons: { Bruiser: 'raw-bruiser.png' }
         };
 
-        const rawMetadataIndex = buildRawMetadataIndex({
-            '{TraitRaw}': { mName: 'Bruiser' },
-            '{RoleTank}': { mDisplayName: 'Tank' },
-            'Characters/Set17Aurora': { mCharacterName: 'TFT17_Aurora' }
-        }, 'pbe', {
-            buildRawTraitMetadata: (rawJSON, source) => {
-                assert.equal(rawJSON['{TraitRaw}'].mName, 'Bruiser');
-                assert.equal(source, 'pbe');
-                return rawTraitMetadata;
+        const rawMetadataIndex = buildRawMetadataIndex(
+            {
+                '{TraitRaw}': { mName: 'Bruiser' },
+                '{RoleTank}': { mDisplayName: 'Tank' },
+                'Characters/Set17Aurora': { mCharacterName: 'TFT17_Aurora' }
             },
-            buildRawChampionRecordMap: () => rawChampionRecordMap,
-            buildRawShopDataLookup: () => rawShopDataLookup
-        });
+            'pbe',
+            {
+                buildRawTraitMetadata: (rawJSON, source) => {
+                    assert.equal(rawJSON['{TraitRaw}'].mName, 'Bruiser');
+                    assert.equal(source, 'pbe');
+                    return rawTraitMetadata;
+                },
+                buildRawChampionRecordMap: () => rawChampionRecordMap,
+                buildRawShopDataLookup: () => rawShopDataLookup
+            }
+        );
 
         assert.deepEqual(rawMetadataIndex.hashDictionary, {
             '{TraitRaw}': 'Bruiser',
@@ -155,43 +159,49 @@ describe('parse-data context helpers', () => {
     });
 
     it('builds parse context and merges set/raw trait metadata', () => {
-        const context = buildParseDataContext({
-            '{TraitRaw}': { mName: 'Bruiser' }
-        }, {
-            sets: {
-                '17': {
-                    traits: [
-                        {
-                            apiName: 'BruiserApi',
-                            displayName: 'Bruiser',
-                            effects: [{ minUnits: 2 }]
-                        }
-                    ]
+        const context = buildParseDataContext(
+            {
+                '{TraitRaw}': { mName: 'Bruiser' }
+            },
+            {
+                sets: {
+                    '17': {
+                        traits: [
+                            {
+                                apiName: 'BruiserApi',
+                                displayName: 'Bruiser',
+                                effects: [{ minUnits: 2 }]
+                            }
+                        ]
+                    }
                 }
+            },
+            {
+                rawChampionSplashesHtml: '<html></html>',
+                rawTraitIconsHtml: '<html></html>'
+            },
+            {},
+            {
+                normalizeDataSource: () => 'pbe',
+                buildRawTraitMetadata: () => ({
+                    traitBreakpoints: { Bruiser: [2, 4] },
+                    traitIcons: { Bruiser: 'raw-bruiser.png' }
+                }),
+                buildRawChampionRecordMap: () => new Map(),
+                buildRawShopDataLookup: () => new Map(),
+                detectLatestSet: () => '17',
+                detectLatestSetFromRaw: () => null,
+                getLatestSetData: (cdragonJSON) => cdragonJSON.sets['17'],
+                buildSetChampionRecords: () => [{ displayName: 'Aurora' }],
+                buildChampionIdentitySet: () => new Set(['aurora']),
+                buildChampionReferenceMap: () => new Map(),
+                buildChampionAssetMap: () => new Map(),
+                buildTraitIconMap: () => ({ BruiserApi: 'cdragon-bruiser.png' }),
+                normalizeBreakpoints: (effects) => effects.map((effect) => effect.minUnits),
+                isExcludedTraitName: () => false,
+                shouldPreferRawAsset: () => true
             }
-        }, {
-            rawChampionSplashesHtml: '<html></html>',
-            rawTraitIconsHtml: '<html></html>'
-        }, {}, {
-            normalizeDataSource: () => 'pbe',
-            buildRawTraitMetadata: () => ({
-                traitBreakpoints: { Bruiser: [2, 4] },
-                traitIcons: { Bruiser: 'raw-bruiser.png' }
-            }),
-            buildRawChampionRecordMap: () => new Map(),
-            buildRawShopDataLookup: () => new Map(),
-            detectLatestSet: () => '17',
-            detectLatestSetFromRaw: () => null,
-            getLatestSetData: (cdragonJSON) => cdragonJSON.sets['17'],
-            buildSetChampionRecords: () => [{ displayName: 'Aurora' }],
-            buildChampionIdentitySet: () => new Set(['aurora']),
-            buildChampionReferenceMap: () => new Map(),
-            buildChampionAssetMap: () => new Map(),
-            buildTraitIconMap: () => ({ BruiserApi: 'cdragon-bruiser.png' }),
-            normalizeBreakpoints: (effects) => effects.map((effect) => effect.minUnits),
-            isExcludedTraitName: () => false,
-            shouldPreferRawAsset: () => true
-        });
+        );
 
         assert.equal(context.source, 'pbe');
         assert.equal(context.latestSet, '17');
@@ -211,10 +221,7 @@ describe('parse-data context helpers', () => {
 
     it('builds the final parsed data payload and asset validation summary', () => {
         const result = buildParsedDataResult({
-            units: [
-                { displayName: 'Aurora', iconUrl: 'aurora.png' },
-                { displayName: 'Morgana' }
-            ],
+            units: [{ displayName: 'Aurora', iconUrl: 'aurora.png' }, { displayName: 'Morgana' }],
             traits: new Set(['Bruiser', 'Invoker']),
             roles: new Set(['Carry', 'Tank']),
             traitBreakpoints: { Bruiser: [2] },
@@ -229,10 +236,7 @@ describe('parse-data context helpers', () => {
         });
 
         assert.deepEqual(result, {
-            units: [
-                { displayName: 'Aurora', iconUrl: 'aurora.png' },
-                { displayName: 'Morgana' }
-            ],
+            units: [{ displayName: 'Aurora', iconUrl: 'aurora.png' }, { displayName: 'Morgana' }],
             traits: ['Bruiser', 'Invoker'],
             roles: ['Carry', 'Tank'],
             traitBreakpoints: { Bruiser: [2] },

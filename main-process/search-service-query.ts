@@ -16,9 +16,7 @@ function createSearchServiceQuery({
 
     function normalizePayload(params) {
         const dataCache = getDataCache();
-        const normalized = dataCache
-            ? normalizeForData(params, dataCache)
-            : normalizeSearchParams(params);
+        const normalized = dataCache ? normalizeForData(params, dataCache) : normalizeSearchParams(params);
         return {
             params: normalized,
             comparisonKey: serializeForComparison(normalized),
@@ -33,9 +31,10 @@ function createSearchServiceQuery({
         }
 
         const normalizedParams = normalizeForActiveData(params);
-        const estimateKey = typeof cacheService.getPreparedSearchContextKey === 'function'
-            ? cacheService.getPreparedSearchContextKey(dataCache.dataFingerprint, normalizedParams)
-            : cacheService.getCacheKey(dataCache.dataFingerprint, normalizedParams);
+        const estimateKey =
+            typeof cacheService.getPreparedSearchContextKey === 'function'
+                ? cacheService.getPreparedSearchContextKey(dataCache.dataFingerprint, normalizedParams)
+                : cacheService.getCacheKey(dataCache.dataFingerprint, normalizedParams);
         const cachedEstimate = cacheService.getCachedEstimate(estimateKey);
         if (cachedEstimate) {
             return cachedEstimate;

@@ -1,9 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-    buildUnitOverrideComposition
-} = require('../data-engine/parse-data-unit-overrides.js');
+const { buildUnitOverrideComposition } = require('../data-engine/parse-data-unit-overrides.js');
 
 describe('parse-data unit overrides', () => {
     it('composes manual and auto-detected overrides into output-ready unit override data', () => {
@@ -38,18 +36,24 @@ describe('parse-data unit overrides', () => {
                 ...Object.fromEntries(traits.map((trait) => [trait, 1])),
                 ...(unitOverride?.traitContributions || {})
             }),
-            buildUnitVariants: (traits, role, unitOverride) => unitOverride.variants.map((variant) => ({
-                id: variant.id,
-                label: variant.label,
-                role: variant.role || role,
-                traits: [...traits, ...(variant.addTraits || [])],
-                traitContributions: Object.fromEntries([...traits, ...(variant.addTraits || [])].map((trait) => [trait, 1]))
-            })),
+            buildUnitVariants: (traits, role, unitOverride) =>
+                unitOverride.variants.map((variant) => ({
+                    id: variant.id,
+                    label: variant.label,
+                    role: variant.role || role,
+                    traits: [...traits, ...(variant.addTraits || [])],
+                    traitContributions: Object.fromEntries(
+                        [...traits, ...(variant.addTraits || [])].map((trait) => [trait, 1])
+                    )
+                })),
             normalizeConditionalEffects: (effects) => effects || [],
-            buildConditionalProfiles: (traits, profiles) => profiles.map((profile) => ({
-                traits: [...traits, ...(profile.addTraits || [])],
-                traitContributions: Object.fromEntries([...traits, ...(profile.addTraits || [])].map((trait) => [trait, 1]))
-            })),
+            buildConditionalProfiles: (traits, profiles) =>
+                profiles.map((profile) => ({
+                    traits: [...traits, ...(profile.addTraits || [])],
+                    traitContributions: Object.fromEntries(
+                        [...traits, ...(profile.addTraits || [])].map((trait) => [trait, 1])
+                    )
+                })),
             deriveStableVariantRole: (_roleName, variants) => variants[0].role
         };
         const linkedTraitState = {
@@ -80,9 +84,7 @@ describe('parse-data unit overrides', () => {
             Base: 1,
             Bonus: 2
         });
-        assert.deepEqual(composition.conditionalEffects, [
-            { traitContributions: { Effect: 1 } }
-        ]);
+        assert.deepEqual(composition.conditionalEffects, [{ traitContributions: { Effect: 1 } }]);
         assert.deepEqual(composition.conditionalProfiles, [
             {
                 traits: ['Base', 'Bonus', 'Profile'],

@@ -101,10 +101,12 @@ function createCacheService({ cachedResults = null, readCacheImpl = null }: Loos
 function createSearchServiceUnderTest(options: LooseRecord = {}) {
     const cacheService = createCacheService(options);
     const progressMessages = [];
-    const getDataCache = options.getDataCache || (() => ({
-        dataFingerprint: 'fingerprint-1',
-        units: []
-    }));
+    const getDataCache =
+        options.getDataCache ||
+        (() => ({
+            dataFingerprint: 'fingerprint-1',
+            units: []
+        }));
     const normalizeSearchParams = options.normalizeSearchParams || ((params) => ({ ...params }));
     const normalizeSearchParamsForData = options.normalizeSearchParamsForData || ((params) => ({ ...params }));
     const serializeSearchParams = options.serializeSearchParams || ((params) => JSON.stringify(params));

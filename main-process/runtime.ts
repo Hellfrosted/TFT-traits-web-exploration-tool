@@ -13,15 +13,16 @@ function createMainRuntime(options: LooseRecord = {}) {
     const engine = options.engine || require('../engine.js');
     const searchParamUtils = options.searchParamUtils || require('../searchParams.js');
     const normalizeSearchParams = options.normalizeSearchParams || searchParamUtils.normalizeSearchParams;
-    const normalizeSearchParamsForData = options.normalizeSearchParamsForData
-        || searchParamUtils.normalizeSearchParamsForData
-        || normalizeSearchParams;
-    const serializeSearchParams = options.serializeSearchParams
-        || searchParamUtils.serializeSearchParams
-        || ((params) => JSON.stringify(normalizeSearchParams(params)));
+    const normalizeSearchParamsForData =
+        options.normalizeSearchParamsForData || searchParamUtils.normalizeSearchParamsForData || normalizeSearchParams;
+    const serializeSearchParams =
+        options.serializeSearchParams ||
+        searchParamUtils.serializeSearchParams ||
+        ((params) => JSON.stringify(normalizeSearchParams(params)));
     const storage = options.storage || require('../storage.js');
     const constants = options.constants || require('../constants.js');
-    const createSearchCacheService = options.createSearchCacheService || require('./search-cache-service.js').createSearchCacheService;
+    const createSearchCacheService =
+        options.createSearchCacheService || require('./search-cache-service.js').createSearchCacheService;
     const createDataService = options.createDataService || require('./data-service.js').createDataService;
     const createSearchService = options.createSearchService || require('./search-service.js').createSearchService;
     const createWindowService = options.createWindowService || require('./window-service.js').createWindowService;
@@ -33,18 +34,8 @@ function createMainRuntime(options: LooseRecord = {}) {
     const appIconPath = options.appIconPath || path.join(appRoot, 'assets', 'app-icon.ico');
     const setTimeoutFn = options.setTimeoutFn || setTimeout;
     const fatalExitDelayMs = Number.isFinite(options.fatalExitDelayMs) ? options.fatalExitDelayMs : 150;
-    const {
-        app,
-        BrowserWindow,
-        ipcMain
-    } = electron;
-    const {
-        DEFAULT_DATA_SOURCE,
-        IPC_CHANNELS,
-        LIMITS,
-        SMOKE_TEST_FLAG,
-        RENDERER_CONTRACT
-    } = constants;
+    const { app, BrowserWindow, ipcMain } = electron;
+    const { DEFAULT_DATA_SOURCE, IPC_CHANNELS, LIMITS, SMOKE_TEST_FLAG, RENDERER_CONTRACT } = constants;
     const isSmokeTest = argv.includes(SMOKE_TEST_FLAG);
 
     const storagePaths = storage.getStoragePaths({

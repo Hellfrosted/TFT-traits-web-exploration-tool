@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 
-type MultiSelectOption = string | {
-    value?: string;
-    id?: string;
-    name?: string;
-    label?: string;
-    displayName?: string;
-    pillLabel?: string;
-    dropdownMeta?: string;
-    iconUrl?: string;
-};
+type MultiSelectOption =
+    | string
+    | {
+          value?: string;
+          id?: string;
+          name?: string;
+          label?: string;
+          displayName?: string;
+          pillLabel?: string;
+          dropdownMeta?: string;
+          iconUrl?: string;
+      };
 
 type MultiSelectProps = {
     id: string;
@@ -87,11 +89,25 @@ export function MultiSelect({ id, label, options, value, onChange, placeholder }
                         const labelText = option?.pillLabel || option?.label || entry;
                         return (
                             <div className="pill" key={entry}>
-                                {option?.iconUrl ? <img className="pill-icon option-icon" src={option.iconUrl} alt={labelText} loading="lazy" /> : null}
+                                {option?.iconUrl ? (
+                                    <img
+                                        className="pill-icon option-icon"
+                                        src={option.iconUrl}
+                                        alt={labelText}
+                                        loading="lazy"
+                                    />
+                                ) : null}
                                 <span className="pill-label">
                                     <span className="pill-label-text">{labelText}</span>
                                 </span>
-                                <button type="button" className="remove" aria-label={`Remove ${labelText}`} onClick={() => removeValue(entry)}>x</button>
+                                <button
+                                    type="button"
+                                    className="remove"
+                                    aria-label={`Remove ${labelText}`}
+                                    onClick={() => removeValue(entry)}
+                                >
+                                    x
+                                </button>
                             </div>
                         );
                     })}
@@ -122,22 +138,36 @@ export function MultiSelect({ id, label, options, value, onChange, placeholder }
                         }
                     }}
                 />
-                <div className={`dropdown${isOpen && (filteredOptions.length > 0 || query.trim()) ? '' : ' hidden'}`} role="listbox">
-                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
-                        <button
-                            type="button"
-                            className="dropdown-item"
-                            key={option.value}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => addValue(option.value)}
-                        >
-                            {option.iconUrl ? <img className="pill-icon option-icon" src={option.iconUrl} alt={option.label} loading="lazy" /> : null}
-                            <span className="dropdown-item-content">
-                                <span className="dropdown-item-label">{option.label}</span>
-                                {option.meta ? <span className="dropdown-item-meta">{option.meta}</span> : null}
-                            </span>
-                        </button>
-                    )) : <div className="dropdown-empty">No matching options</div>}
+                <div
+                    className={`dropdown${isOpen && (filteredOptions.length > 0 || query.trim()) ? '' : ' hidden'}`}
+                    role="listbox"
+                >
+                    {filteredOptions.length > 0 ? (
+                        filteredOptions.map((option) => (
+                            <button
+                                type="button"
+                                className="dropdown-item"
+                                key={option.value}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => addValue(option.value)}
+                            >
+                                {option.iconUrl ? (
+                                    <img
+                                        className="pill-icon option-icon"
+                                        src={option.iconUrl}
+                                        alt={option.label}
+                                        loading="lazy"
+                                    />
+                                ) : null}
+                                <span className="dropdown-item-content">
+                                    <span className="dropdown-item-label">{option.label}</span>
+                                    {option.meta ? <span className="dropdown-item-meta">{option.meta}</span> : null}
+                                </span>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="dropdown-empty">No matching options</div>
+                    )}
                 </div>
             </div>
         </div>

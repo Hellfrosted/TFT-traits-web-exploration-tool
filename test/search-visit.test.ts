@@ -81,14 +81,16 @@ describe('search visit helpers', () => {
             evaluateBoardSelection: () => null
         });
 
-        assert.deepEqual(added, [{
-            unitIds: ['Unit-0', 'Unit-1'],
-            evaluation: {
-                synergyScore: 4,
-                occupiedSlots: 2,
-                traitCounts: { Arcane: 2 }
-            },
-            totalCost: 5
-        }]);
+        assert.deepEqual(added, [
+            {
+                unitIds: ['Unit-0', 'Unit-1'],
+                evaluation: {
+                    synergyScore: 4,
+                    occupiedSlots: 2,
+                    traitCounts: { Arcane: 2 }
+                },
+                totalCost: 5
+            }
+        ]);
     });
 });

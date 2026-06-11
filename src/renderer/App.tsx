@@ -94,19 +94,44 @@ function Dialog({ dialog, onResolve }: DialogProps) {
     if (!dialog) return null;
     return (
         <div id="dialogModal" className="modal-overlay active" aria-hidden="false">
-            <div className="modal dialog-modal" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMessage">
+            <div
+                className="modal dialog-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="dialogTitle"
+                aria-describedby="dialogMessage"
+            >
                 <div className="modal-header dialog-header">
-                    <h3 id="dialogTitle" className="dialog-title">{dialog.title}</h3>
-                    <button className="modal-close" id="dialogClose" aria-label="Close dialog" onClick={() => onResolve(false)}>x</button>
+                    <h3 id="dialogTitle" className="dialog-title">
+                        {dialog.title}
+                    </h3>
+                    <button
+                        className="modal-close"
+                        id="dialogClose"
+                        aria-label="Close dialog"
+                        onClick={() => onResolve(false)}
+                    >
+                        x
+                    </button>
                 </div>
                 <div className="modal-body dialog-body">
-                    <p id="dialogMessage" className="dialog-message">{dialog.message}</p>
+                    <p id="dialogMessage" className="dialog-message">
+                        {dialog.message}
+                    </p>
                 </div>
                 <div className="modal-footer dialog-footer">
                     {dialog.type === 'confirm' ? (
-                        <button className="btn-sm btn-outline dialog-btn-cancel" id="dialogCancelBtn" onClick={() => onResolve(false)}>Cancel</button>
+                        <button
+                            className="btn-sm btn-outline dialog-btn-cancel"
+                            id="dialogCancelBtn"
+                            onClick={() => onResolve(false)}
+                        >
+                            Cancel
+                        </button>
                     ) : null}
-                    <button className="btn-sm dialog-btn-ok" id="dialogOkBtn" onClick={() => onResolve(true)}>OK</button>
+                    <button className="btn-sm dialog-btn-ok" id="dialogOkBtn" onClick={() => onResolve(true)}>
+                        OK
+                    </button>
                 </div>
             </div>
         </div>
@@ -146,7 +171,8 @@ function QuerySummary({ query, meta }: { query: SearchParams; meta: string }) {
         if (!query) return [];
         const items = [];
         if (query.boardSize !== DEFAULT_QUERY.boardSize) items.push(`Level ${query.boardSize}`);
-        if (query.maxResults !== (api?.limits?.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults)) items.push(`${query.maxResults} max`);
+        if (query.maxResults !== (api?.limits?.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults))
+            items.push(`${query.maxResults} max`);
         if (query.mustInclude?.length) items.push(`Include ${query.mustInclude.length} units`);
         if (query.mustExclude?.length) items.push(`Exclude ${query.mustExclude.length} units`);
         if (query.mustIncludeTraits?.length) items.push(`Force ${query.mustIncludeTraits.length} traits`);
@@ -162,8 +188,8 @@ function QuerySummary({ query, meta }: { query: SearchParams; meta: string }) {
     const metaClass = /failed|error|cancel|unavailable|reduce|waiting/i.test(meta)
         ? 'query-summary-meta-warning'
         : chips.length > 0
-            ? 'query-summary-meta-active'
-            : '';
+          ? 'query-summary-meta-active'
+          : '';
 
     return (
         <div id="resultsQuerySummary" className="query-summary-card">
@@ -173,7 +199,11 @@ function QuerySummary({ query, meta }: { query: SearchParams; meta: string }) {
             </div>
             {chips.length > 0 ? (
                 <div className="query-chip-list">
-                    {chips.map((chip) => <span className="query-chip" key={chip}>{chip}</span>)}
+                    {chips.map((chip) => (
+                        <span className="query-chip" key={chip}>
+                            {chip}
+                        </span>
+                    ))}
                 </div>
             ) : null}
         </div>
@@ -200,14 +230,24 @@ function DataStats({ activeData }: { activeData: RendererActiveData | null }) {
     );
 }
 
-function UnitPill({ unitId, board, activeData }: { unitId: string; board: BoardResult; activeData: RendererActiveData | null }) {
+function UnitPill({
+    unitId,
+    board,
+    activeData
+}: {
+    unitId: string;
+    board: BoardResult;
+    activeData: RendererActiveData | null;
+}) {
     const unit = activeData?.unitMap?.get(unitId);
     const baseLabel = unit?.displayName || unitId;
     const variant = getVariantAssignment(board, unitId);
     const label = variant?.label ? `${baseLabel} (${variant.label})` : baseLabel;
     return (
         <span className="unit-pill">
-            {unit?.iconUrl ? <img className="pill-icon unit-icon" src={unit.iconUrl} alt={baseLabel} loading="lazy" /> : null}
+            {unit?.iconUrl ? (
+                <img className="pill-icon unit-icon" src={unit.iconUrl} alt={baseLabel} loading="lazy" />
+            ) : null}
             <span>{label}</span>
         </span>
     );
@@ -216,7 +256,9 @@ function UnitPill({ unitId, board, activeData }: { unitId: string; board: BoardR
 function TraitChip({ trait }: { trait: TraitSummary }) {
     return (
         <span className={`trait-chip${trait.isActive ? '' : ' trait-chip-muted'}`} title={trait.label}>
-            {trait.iconUrl ? <img className="pill-icon trait-icon" src={trait.iconUrl} alt={trait.trait} loading="lazy" /> : null}
+            {trait.iconUrl ? (
+                <img className="pill-icon trait-icon" src={trait.iconUrl} alt={trait.trait} loading="lazy" />
+            ) : null}
             {trait.label}
         </span>
     );
@@ -226,29 +268,78 @@ function ResultsSummary({ results, estimate }: { results: BoardResult[]; estimat
     if (estimate && (!results || results.length === 0)) {
         return (
             <div id="resultsSummary" className="results-summary">
-                <div className="summary-card"><span className="summary-label">Estimate</span><span className="summary-value">~{formatBoardEstimate(estimate.count)} boards</span></div>
-                <div className="summary-card"><span className="summary-label">Open Slots</span><span className="summary-value">{Number.isFinite(Number(estimate.remainingSlots)) ? estimate.remainingSlots : '-'}</span></div>
-                <div className="summary-card"><span className="summary-label">Best Score</span><span className="summary-value">-</span></div>
-                <div className="summary-card"><span className="summary-label">Best Value</span><span className="summary-value">-</span></div>
+                <div className="summary-card">
+                    <span className="summary-label">Estimate</span>
+                    <span className="summary-value">~{formatBoardEstimate(estimate.count)} boards</span>
+                </div>
+                <div className="summary-card">
+                    <span className="summary-label">Open Slots</span>
+                    <span className="summary-value">
+                        {Number.isFinite(Number(estimate.remainingSlots)) ? estimate.remainingSlots : '-'}
+                    </span>
+                </div>
+                <div className="summary-card">
+                    <span className="summary-label">Best Score</span>
+                    <span className="summary-value">-</span>
+                </div>
+                <div className="summary-card">
+                    <span className="summary-label">Best Value</span>
+                    <span className="summary-value">-</span>
+                </div>
             </div>
         );
     }
 
     const safeResults = Array.isArray(results) ? results : [];
-    const topScore = safeResults.reduce((best, board) => Math.max(best, getBoardMetric(board)), Number.NEGATIVE_INFINITY);
-    const lowestCost = safeResults.reduce((best, board) => Math.min(best, Number(board.totalCost || 0)), Number.POSITIVE_INFINITY);
-    const bestValue = safeResults.reduce((best, board) => Math.max(best, getBoardMetric(board) / Math.max(Number(board.totalCost || 0), 1)), 0);
+    const topScore = safeResults.reduce(
+        (best, board) => Math.max(best, getBoardMetric(board)),
+        Number.NEGATIVE_INFINITY
+    );
+    const lowestCost = safeResults.reduce(
+        (best, board) => Math.min(best, Number(board.totalCost || 0)),
+        Number.POSITIVE_INFINITY
+    );
+    const bestValue = safeResults.reduce(
+        (best, board) => Math.max(best, getBoardMetric(board) / Math.max(Number(board.totalCost || 0), 1)),
+        0
+    );
     return (
         <div id="resultsSummary" className="results-summary">
-            <div className="summary-card"><span className="summary-label">Boards</span><span className="summary-value">{safeResults.length ? formatNumber(safeResults.length) : 'Awaiting execution'}</span></div>
-            <div className="summary-card"><span className="summary-label">Best Score</span><span className="summary-value">{Number.isFinite(topScore) ? topScore : '-'}</span></div>
-            <div className="summary-card"><span className="summary-label">Cost Floor</span><span className="summary-value">{Number.isFinite(lowestCost) ? lowestCost : '-'}</span></div>
-            <div className="summary-card"><span className="summary-label">Best Value</span><span className="summary-value">{bestValue ? bestValue.toFixed(2) : '-'}</span></div>
+            <div className="summary-card">
+                <span className="summary-label">Boards</span>
+                <span className="summary-value">
+                    {safeResults.length ? formatNumber(safeResults.length) : 'Awaiting execution'}
+                </span>
+            </div>
+            <div className="summary-card">
+                <span className="summary-label">Best Score</span>
+                <span className="summary-value">{Number.isFinite(topScore) ? topScore : '-'}</span>
+            </div>
+            <div className="summary-card">
+                <span className="summary-label">Cost Floor</span>
+                <span className="summary-value">{Number.isFinite(lowestCost) ? lowestCost : '-'}</span>
+            </div>
+            <div className="summary-card">
+                <span className="summary-label">Best Value</span>
+                <span className="summary-value">{bestValue ? bestValue.toFixed(2) : '-'}</span>
+            </div>
         </div>
     );
 }
 
-function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }: { board: BoardResult | null; rankIndex: number; activeData: RendererActiveData | null; query: SearchParams; sortMode: string }) {
+function BoardSpotlight({
+    board,
+    rankIndex,
+    activeData,
+    query,
+    sortMode
+}: {
+    board: BoardResult | null;
+    rankIndex: number;
+    activeData: RendererActiveData | null;
+    query: SearchParams;
+    sortMode: string;
+}) {
     if (!board) {
         return (
             <div id="boardSpotlight" className="board-spotlight empty">
@@ -279,10 +370,14 @@ function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }: { boa
                 <div>
                     <span className="board-spotlight-label">Selected Board</span>
                     <h3 className="board-spotlight-title">
-                        {occupiedSlots === unitCount ? `Level ${occupiedSlots} board` : `${occupiedSlots}-slot board (${unitCount} units)`}
+                        {occupiedSlots === unitCount
+                            ? `Level ${occupiedSlots} board`
+                            : `${occupiedSlots}-slot board (${unitCount} units)`}
                     </h3>
                 </div>
-                <span className="board-spotlight-rank">Rank #{rankIndex + 1} by {sortLabels[sortMode] || sortLabels.mostTraits}</span>
+                <span className="board-spotlight-rank">
+                    Rank #{rankIndex + 1} by {sortLabels[sortMode] || sortLabels.mostTraits}
+                </span>
             </div>
             <div className="spotlight-metrics">
                 <span>Score {metric}</span>
@@ -290,15 +385,33 @@ function BoardSpotlight({ board, rankIndex, activeData, query, sortMode }: { boa
                 <span>2-Star {Number(board.totalCost || 0) * 3}</span>
                 <span>Value {(metric / Math.max(Number(board.totalCost || 0), 1)).toFixed(2)}</span>
             </div>
-            <div className="spotlight-traits">{traits.map((trait) => <TraitChip trait={trait} key={trait.trait} />)}</div>
+            <div className="spotlight-traits">
+                {traits.map((trait) => (
+                    <TraitChip trait={trait} key={trait.trait} />
+                ))}
+            </div>
             <div className="spotlight-units">
-                {(board.units || []).map((unitId) => <UnitPill unitId={unitId} board={board} activeData={activeData} key={unitId} />)}
+                {(board.units || []).map((unitId) => (
+                    <UnitPill unitId={unitId} board={board} activeData={activeData} key={unitId} />
+                ))}
             </div>
         </div>
     );
 }
 
-function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: { results: BoardResult[]; activeData: RendererActiveData | null; query: SearchParams; selectedIndex: number; onSelect: (index: number) => void }) {
+function ResultsTable({
+    results,
+    activeData,
+    query,
+    selectedIndex,
+    onSelect
+}: {
+    results: BoardResult[];
+    activeData: RendererActiveData | null;
+    query: SearchParams;
+    selectedIndex: number;
+    onSelect: (index: number) => void;
+}) {
     const parentRef = useRef<HTMLDivElement | null>(null);
     const rowVirtualizer = useVirtualizer({
         count: results.length,
@@ -312,10 +425,21 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: {
             <div className="results-table-wrap">
                 <table id="resTable" role="grid" aria-label="Board results" aria-rowcount={0} aria-colcount={6}>
                     <thead>
-                        <tr role="row"><th>Rank</th><th>Score</th><th>Traits</th><th>1-Star Cost</th><th>2-Star Cost</th><th>Units</th></tr>
+                        <tr role="row">
+                            <th>Rank</th>
+                            <th>Score</th>
+                            <th>Traits</th>
+                            <th>1-Star Cost</th>
+                            <th>2-Star Cost</th>
+                            <th>Units</th>
+                        </tr>
                     </thead>
                     <tbody id="resBody">
-                        <tr role="row"><td role="gridcell" colSpan={6} className="table-awaiting">Awaiting execution...</td></tr>
+                        <tr role="row">
+                            <td role="gridcell" colSpan={6} className="table-awaiting">
+                                Awaiting execution...
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -324,11 +448,27 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: {
 
     return (
         <div className="results-table-wrap virtual-results-wrap" ref={parentRef}>
-            <div id="resTable" className="virtual-results-table" role="grid" aria-label="Board results" aria-rowcount={results.length} aria-colcount={6}>
+            <div
+                id="resTable"
+                className="virtual-results-table"
+                role="grid"
+                aria-label="Board results"
+                aria-rowcount={results.length}
+                aria-colcount={6}
+            >
                 <div className="virtual-results-header" role="row">
-                    <span>Rank</span><span>Score</span><span>Traits</span><span>1-Star Cost</span><span>2-Star Cost</span><span>Units</span>
+                    <span>Rank</span>
+                    <span>Score</span>
+                    <span>Traits</span>
+                    <span>1-Star Cost</span>
+                    <span>2-Star Cost</span>
+                    <span>Units</span>
                 </div>
-                <div id="resBody" className="virtual-results-body" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+                <div
+                    id="resBody"
+                    className="virtual-results-body"
+                    style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+                >
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                         const board = results[virtualRow.index];
                         const metric = getBoardMetric(board);
@@ -344,11 +484,22 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: {
                                 style={{ transform: `translateY(${virtualRow.start}px)` }}
                             >
                                 <span className="rank-cell">#{virtualRow.index + 1}</span>
-                                <span className="score-stack"><strong>{metric}</strong><span>Value {(metric / Math.max(Number(board.totalCost || 0), 1)).toFixed(2)}</span></span>
-                                <span className="result-trait-list">{traits.map((trait) => <TraitChip trait={trait} key={trait.trait} />)}</span>
+                                <span className="score-stack">
+                                    <strong>{metric}</strong>
+                                    <span>Value {(metric / Math.max(Number(board.totalCost || 0), 1)).toFixed(2)}</span>
+                                </span>
+                                <span className="result-trait-list">
+                                    {traits.map((trait) => (
+                                        <TraitChip trait={trait} key={trait.trait} />
+                                    ))}
+                                </span>
                                 <span>{board.totalCost ?? 0}</span>
                                 <span>{Number(board.totalCost || 0) * 3}</span>
-                                <span className="result-unit-list">{(board.units || []).map((unitId) => <UnitPill unitId={unitId} board={board} activeData={activeData} key={unitId} />)}</span>
+                                <span className="result-unit-list">
+                                    {(board.units || []).map((unitId) => (
+                                        <UnitPill unitId={unitId} board={board} activeData={activeData} key={unitId} />
+                                    ))}
+                                </span>
                             </button>
                         );
                     })}
@@ -358,7 +509,19 @@ function ResultsTable({ results, activeData, query, selectedIndex, onSelect }: {
     );
 }
 
-function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }: { isOpen: boolean; onClose: () => void; showAlert: (message: string, title?: string) => Promise<boolean>; showConfirm: (message: string, title?: string) => Promise<boolean>; refreshHistory: () => void }) {
+function CacheModal({
+    isOpen,
+    onClose,
+    showAlert,
+    showConfirm,
+    refreshHistory
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    showAlert: (message: string, title?: string) => Promise<boolean>;
+    showConfirm: (message: string, title?: string) => Promise<boolean>;
+    refreshHistory: () => void;
+}) {
     const [entries, setEntries] = useState<CacheEntry[]>([]);
     const [message, setMessage] = useState('Loading...');
 
@@ -392,25 +555,51 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }:
             <div className="modal" role="dialog" aria-modal="true" aria-labelledby="cacheModalTitle">
                 <div className="modal-header">
                     <h3 id="cacheModalTitle">Cached Searches</h3>
-                    <button className="modal-close" id="cacheModalClose" aria-label="Close cached searches" onClick={onClose}>x</button>
+                    <button
+                        className="modal-close"
+                        id="cacheModalClose"
+                        aria-label="Close cached searches"
+                        onClick={onClose}
+                    >
+                        x
+                    </button>
                 </div>
                 <div className="modal-body" id="cacheModalBody">
-                    {message ? <p className="cache-empty">{message}</p> : (
+                    {message ? (
+                        <p className="cache-empty">{message}</p>
+                    ) : (
                         <table className="cache-table">
-                            <thead><tr><th>Search Parameters</th><th>Results</th><th>Cached</th><th /></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Search Parameters</th>
+                                    <th>Results</th>
+                                    <th>Cached</th>
+                                    <th />
+                                </tr>
+                            </thead>
                             <tbody>
                                 {entries.map((entry) => (
                                     <tr key={entry.key}>
-                                        <td className="cache-table-summary-cell" title={summarizeSearchParams(entry.params)}>{summarizeSearchParams(entry.params)}</td>
+                                        <td
+                                            className="cache-table-summary-cell"
+                                            title={summarizeSearchParams(entry.params)}
+                                        >
+                                            {summarizeSearchParams(entry.params)}
+                                        </td>
                                         <td>{entry.resultCount}</td>
-                                        <td className="cache-table-timestamp-cell">{formatTimestamp(entry.timestamp)}</td>
+                                        <td className="cache-table-timestamp-cell">
+                                            {formatTimestamp(entry.timestamp)}
+                                        </td>
                                         <td>
                                             <button
                                                 className="btn-sm btn-danger cache-delete-btn"
                                                 onClick={async () => {
                                                     const result = await api?.deleteCacheEntry?.(entry.key);
                                                     if (!result?.success) {
-                                                        await showAlert(result?.error || 'Failed to delete cache entry.', 'Cache Error');
+                                                        await showAlert(
+                                                            result?.error || 'Failed to delete cache entry.',
+                                                            'Cache Error'
+                                                        );
                                                         return;
                                                     }
                                                     refreshHistory();
@@ -431,7 +620,10 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }:
                         className="btn-sm btn-danger"
                         id="clearAllCacheBtn"
                         onClick={async () => {
-                            const confirmed = await showConfirm('Are you sure you want to delete all cached search results and fallback snapshots? This action cannot be undone.', 'Clear All Cache');
+                            const confirmed = await showConfirm(
+                                'Are you sure you want to delete all cached search results and fallback snapshots? This action cannot be undone.',
+                                'Clear All Cache'
+                            );
                             if (!confirmed) return;
                             const result = await api?.clearAllCache?.();
                             if (!result?.success) {
@@ -444,7 +636,9 @@ function CacheModal({ isOpen, onClose, showAlert, showConfirm, refreshHistory }:
                     >
                         Clear All
                     </button>
-                    <button className="btn-sm btn-outline" id="cacheModalDone" onClick={onClose}>Done</button>
+                    <button className="btn-sm btn-outline" id="cacheModalDone" onClick={onClose}>
+                        Done
+                    </button>
                 </div>
             </div>
         </div>
@@ -473,18 +667,29 @@ export function App() {
     const sortedResults = useMemo(() => sortBoards(deferredResults, sortMode), [deferredResults, sortMode]);
     const selectedBoard = selectedIndex >= 0 ? sortedResults[selectedIndex] : null;
 
-    const unitOptions = useMemo(() => (activeData?.units || []).map((unit) => ({
-        ...unit,
-        pillLabel: unit.displayName || unit.id,
-        dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
-    })), [activeData]);
-    const traitOptions = useMemo(() => (activeData?.traits || []).map((trait) => ({
-        value: trait,
-        label: trait,
-        iconUrl: activeData?.traitIcons?.[trait] || ''
-    })), [activeData]);
+    const unitOptions = useMemo(
+        () =>
+            (activeData?.units || []).map((unit) => ({
+                ...unit,
+                pillLabel: unit.displayName || unit.id,
+                dropdownMeta: collectUnitTraitLabels(unit).join(' • ')
+            })),
+        [activeData]
+    );
+    const traitOptions = useMemo(
+        () =>
+            (activeData?.traits || []).map((trait) => ({
+                value: trait,
+                label: trait,
+                iconUrl: activeData?.traitIcons?.[trait] || ''
+            })),
+        [activeData]
+    );
     const roleOptions = activeData?.roles || [];
-    const variantUnits = useMemo(() => (activeData?.units || []).filter((unit) => unit.variants?.length > 0), [activeData]);
+    const variantUnits = useMemo(
+        () => (activeData?.units || []).filter((unit) => unit.variants?.length > 0),
+        [activeData]
+    );
 
     function updateQuery(patch: SearchParamsInput) {
         setQuery((current) => normalizeSearchParams({ ...current, ...patch }, api?.limits || {}));
@@ -543,7 +748,9 @@ export function App() {
             });
             await refreshHistory();
         } catch (error) {
-            setStatus(`Failed to communicate with main process: ${error instanceof Error ? error.message : String(error)}.`);
+            setStatus(
+                `Failed to communicate with main process: ${error instanceof Error ? error.message : String(error)}.`
+            );
             console.error(error);
         } finally {
             setIsFetching(false);
@@ -599,7 +806,10 @@ export function App() {
             }
             const largeSearchThreshold = api?.limits?.LARGE_SEARCH_THRESHOLD ?? 6_000_000_000;
             if (Number.isFinite(Number(nextEstimate?.count)) && nextEstimate.count > largeSearchThreshold) {
-                const confirmed = await dialogState.showConfirm(`Search volume: ~${(nextEstimate.count / 1e9).toFixed(1)}B combinations. This may take a minute. Continue?`, 'Performance Warning');
+                const confirmed = await dialogState.showConfirm(
+                    `Search volume: ~${(nextEstimate.count / 1e9).toFixed(1)}B combinations. This may take a minute. Continue?`,
+                    'Performance Warning'
+                );
                 if (!confirmed) {
                     setStatus('Search cancelled before execution.');
                     setSummaryMeta('Search aborted');
@@ -622,10 +832,14 @@ export function App() {
             const nextResults = Array.isArray(response.results) && !response.results[0]?.error ? response.results : [];
             setResults(nextResults);
             setSelectedIndex(nextResults.length ? 0 : -1);
-            setStatus(nextResults.length
-                ? `${formatNumber(nextResults.length)} boards found${response.fromCache ? ' from cache' : ''} in ${elapsed}s.`
-                : 'No results found for these constraints.');
-            setSummaryMeta(nextResults.length ? `Computed in ${elapsed}s${response.fromCache ? ' from cache' : ''}` : 'No results');
+            setStatus(
+                nextResults.length
+                    ? `${formatNumber(nextResults.length)} boards found${response.fromCache ? ' from cache' : ''} in ${elapsed}s.`
+                    : 'No results found for these constraints.'
+            );
+            setSummaryMeta(
+                nextResults.length ? `Computed in ${elapsed}s${response.fromCache ? ' from cache' : ''}` : 'No results'
+            );
             await refreshHistory();
         } catch (error) {
             setStatus(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -664,7 +878,11 @@ export function App() {
         setSelectedIndex(-1);
         setEstimate(null);
         setSummaryMeta('Filters reset. Build a fresh query and compute when ready.');
-        setStatus(activeData ? `Loaded ${activeData.unitMap.size} parsed champions and ready for a new query.` : 'Status: Unloaded');
+        setStatus(
+            activeData
+                ? `Loaded ${activeData.unitMap.size} parsed champions and ready for a new query.`
+                : 'Status: Unloaded'
+        );
     }
 
     useEffect(() => {
@@ -718,19 +936,42 @@ export function App() {
                 <aside className="controls panel">
                     <div className="controls-header">
                         <div className="controls-heading">
-                            <div className="title-block"><h1 className="app-title">TFT Board Explorer</h1></div>
-                            <button id="manageCacheBtn" className="btn-outline btn-cache-manage" onClick={() => setCacheOpen(true)}>Manage Cache</button>
+                            <div className="title-block">
+                                <h1 className="app-title">TFT Board Explorer</h1>
+                            </div>
+                            <button
+                                id="manageCacheBtn"
+                                className="btn-outline btn-cache-manage"
+                                onClick={() => setCacheOpen(true)}
+                            >
+                                Manage Cache
+                            </button>
                         </div>
                         <div className="toolbar-row toolbar-actions">
-                            <select id="dataSourceSelect" aria-label="Data source" value={source} onChange={(event) => setSource(event.target.value)}>
+                            <select
+                                id="dataSourceSelect"
+                                aria-label="Data source"
+                                value={source}
+                                onChange={(event) => setSource(event.target.value)}
+                            >
                                 <option value="pbe">PBE</option>
                                 <option value="latest">Live</option>
                             </select>
-                            <button id="fetchBtn" disabled={isFetching || isSearching} onClick={() => fetchData(source)}>{isFetching ? 'Fetching...' : 'Fetch Data'}</button>
-                            <button id="resetFiltersBtn" className="btn-outline" onClick={resetFilters}>Reset Filters</button>
+                            <button
+                                id="fetchBtn"
+                                disabled={isFetching || isSearching}
+                                onClick={() => fetchData(source)}
+                            >
+                                {isFetching ? 'Fetching...' : 'Fetch Data'}
+                            </button>
+                            <button id="resetFiltersBtn" className="btn-outline" onClick={resetFilters}>
+                                Reset Filters
+                            </button>
                         </div>
                         <div className="status-panel">
-                            <div id="status" className="status-text" role="status" aria-live="polite">{status}</div>
+                            <div id="status" className="status-text" role="status" aria-live="polite">
+                                {status}
+                            </div>
                             <p className="status-shortcuts">Ctrl/Cmd + Enter runs the current query.</p>
                         </div>
                     </div>
@@ -738,37 +979,90 @@ export function App() {
                     <div className="controls-body">
                         <DataStats activeData={activeData} />
                         <section className="control-section">
-                            <div className="section-heading"><h2>Board Parameters</h2><span className="section-hint">Sets search size and output cap</span></div>
+                            <div className="section-heading">
+                                <h2>Board Parameters</h2>
+                                <span className="section-hint">Sets search size and output cap</span>
+                            </div>
                             <div className="number-grid">
                                 <div className="field-group">
                                     <label htmlFor="boardSize">Board Size</label>
-                                    <input id="boardSize" type="number" min="1" max="20" step="1" value={query.boardSize} onChange={(event) => updateQuery({ boardSize: event.target.value })} />
+                                    <input
+                                        id="boardSize"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        step="1"
+                                        value={query.boardSize}
+                                        onChange={(event) => updateQuery({ boardSize: event.target.value })}
+                                    />
                                 </div>
                                 <div className="field-group">
                                     <label htmlFor="maxResults">Max Results</label>
-                                    <input id="maxResults" type="number" min="1" max={api?.limits?.MAX_RESULTS || 1000} step="1" value={query.maxResults} onChange={(event) => updateQuery({ maxResults: event.target.value })} />
+                                    <input
+                                        id="maxResults"
+                                        type="number"
+                                        min="1"
+                                        max={api?.limits?.MAX_RESULTS || 1000}
+                                        step="1"
+                                        value={query.maxResults}
+                                        onChange={(event) => updateQuery({ maxResults: event.target.value })}
+                                    />
                                 </div>
                             </div>
                         </section>
 
                         <section className="control-section">
-                            <div className="section-heading"><h2>Units</h2><span className="section-hint">Hard includes and bans</span></div>
-                            <MultiSelect id="mustInclude" label="Must Include Units" options={unitOptions} value={query.mustInclude} onChange={(value) => updateQuery({ mustInclude: value })} placeholder="Type to find champions" />
-                            <MultiSelect id="mustExclude" label="Must Exclude Units" options={unitOptions} value={query.mustExclude} onChange={(value) => updateQuery({ mustExclude: value })} placeholder="Type to find champions" />
+                            <div className="section-heading">
+                                <h2>Units</h2>
+                                <span className="section-hint">Hard includes and bans</span>
+                            </div>
+                            <MultiSelect
+                                id="mustInclude"
+                                label="Must Include Units"
+                                options={unitOptions}
+                                value={query.mustInclude}
+                                onChange={(value) => updateQuery({ mustInclude: value })}
+                                placeholder="Type to find champions"
+                            />
+                            <MultiSelect
+                                id="mustExclude"
+                                label="Must Exclude Units"
+                                options={unitOptions}
+                                value={query.mustExclude}
+                                onChange={(value) => updateQuery({ mustExclude: value })}
+                                placeholder="Type to find champions"
+                            />
                         </section>
 
-                        <section id="variantLocksSection" className={`control-section${variantUnits.length ? '' : ' hidden'}`}>
-                            <div className="section-heading"><h2>Variant Locks</h2><span className="section-hint">Optional mode constraints</span></div>
+                        <section
+                            id="variantLocksSection"
+                            className={`control-section${variantUnits.length ? '' : ' hidden'}`}
+                        >
+                            <div className="section-heading">
+                                <h2>Variant Locks</h2>
+                                <span className="section-hint">Optional mode constraints</span>
+                            </div>
                             <div id="variantLocksContainer" className="variant-locks-grid">
                                 {variantUnits.map((unit) => (
                                     <label className="variant-lock-row" key={unit.id}>
                                         <span>{unit.displayName || unit.id}</span>
                                         <select
                                             value={query.variantLocks?.[unit.id] || 'auto'}
-                                            onChange={(event) => updateQuery({ variantLocks: { ...query.variantLocks, [unit.id]: event.target.value } })}
+                                            onChange={(event) =>
+                                                updateQuery({
+                                                    variantLocks: {
+                                                        ...query.variantLocks,
+                                                        [unit.id]: event.target.value
+                                                    }
+                                                })
+                                            }
                                         >
                                             <option value="auto">Auto</option>
-                                            {unit.variants.map((variant) => <option value={variant.id} key={variant.id}>{variant.label || variant.id}</option>)}
+                                            {unit.variants.map((variant) => (
+                                                <option value={variant.id} key={variant.id}>
+                                                    {variant.label || variant.id}
+                                                </option>
+                                            ))}
                                         </select>
                                     </label>
                                 ))}
@@ -776,71 +1070,178 @@ export function App() {
                         </section>
 
                         <section className="control-section">
-                            <div className="section-heading"><h2>Traits</h2><span className="section-hint">Filters and emblem counts</span></div>
-                            <MultiSelect id="mustIncludeTraits" label="Must Include Traits" options={traitOptions} value={query.mustIncludeTraits} onChange={(value) => updateQuery({ mustIncludeTraits: value })} placeholder="Type to find traits" />
-                            <MultiSelect id="mustExcludeTraits" label="Must Exclude Traits" options={traitOptions} value={query.mustExcludeTraits} onChange={(value) => updateQuery({ mustExcludeTraits: value })} placeholder="Type to find traits" />
-                            <MultiSelect id="extraEmblems" label="Extra Emblems" options={traitOptions} value={query.extraEmblems} onChange={(value) => updateQuery({ extraEmblems: value })} placeholder="Type to add emblems" />
+                            <div className="section-heading">
+                                <h2>Traits</h2>
+                                <span className="section-hint">Filters and emblem counts</span>
+                            </div>
+                            <MultiSelect
+                                id="mustIncludeTraits"
+                                label="Must Include Traits"
+                                options={traitOptions}
+                                value={query.mustIncludeTraits}
+                                onChange={(value) => updateQuery({ mustIncludeTraits: value })}
+                                placeholder="Type to find traits"
+                            />
+                            <MultiSelect
+                                id="mustExcludeTraits"
+                                label="Must Exclude Traits"
+                                options={traitOptions}
+                                value={query.mustExcludeTraits}
+                                onChange={(value) => updateQuery({ mustExcludeTraits: value })}
+                                placeholder="Type to find traits"
+                            />
+                            <MultiSelect
+                                id="extraEmblems"
+                                label="Extra Emblems"
+                                options={traitOptions}
+                                value={query.extraEmblems}
+                                onChange={(value) => updateQuery({ extraEmblems: value })}
+                                placeholder="Type to add emblems"
+                            />
                         </section>
 
                         <details className="control-section advanced-settings-panel">
-                            <summary><span>Roles and Scoring</span><span className="details-hint">Role filters, trait scoring, and optional unique traits.</span></summary>
+                            <summary>
+                                <span>Roles and Scoring</span>
+                                <span className="details-hint">
+                                    Role filters, trait scoring, and optional unique traits.
+                                </span>
+                            </summary>
                             <div className="details-content">
                                 <div className="synergy-settings-panel">
                                     <div className="settings-block-title">Synergy Settings</div>
                                     <div className="synergy-options">
-                                        <label className="synergy-label"><input id="onlyActiveToggle" type="checkbox" checked={query.onlyActive} onChange={(event) => updateQuery({ onlyActive: event.target.checked })} /> Only Count Active Synergies</label>
-                                        <label className="synergy-label"><input id="tierRankToggle" type="checkbox" checked={query.tierRank} onChange={(event) => updateQuery({ tierRank: event.target.checked })} /> Rank by Synergy Tier</label>
-                                        <label className="synergy-label"><input id="includeUniqueToggle" type="checkbox" checked={query.includeUnique} onChange={(event) => updateQuery({ includeUnique: event.target.checked })} /> Include Unique (1-unit) Traits</label>
+                                        <label className="synergy-label">
+                                            <input
+                                                id="onlyActiveToggle"
+                                                type="checkbox"
+                                                checked={query.onlyActive}
+                                                onChange={(event) => updateQuery({ onlyActive: event.target.checked })}
+                                            />{' '}
+                                            Only Count Active Synergies
+                                        </label>
+                                        <label className="synergy-label">
+                                            <input
+                                                id="tierRankToggle"
+                                                type="checkbox"
+                                                checked={query.tierRank}
+                                                onChange={(event) => updateQuery({ tierRank: event.target.checked })}
+                                            />{' '}
+                                            Rank by Synergy Tier
+                                        </label>
+                                        <label className="synergy-label">
+                                            <input
+                                                id="includeUniqueToggle"
+                                                type="checkbox"
+                                                checked={query.includeUnique}
+                                                onChange={(event) =>
+                                                    updateQuery({ includeUnique: event.target.checked })
+                                                }
+                                            />{' '}
+                                            Include Unique (1-unit) Traits
+                                        </label>
                                     </div>
                                 </div>
-                                <MultiSelect id="tankRoles" label="Tank Roles" options={roleOptions} value={query.tankRoles} onChange={(value) => updateQuery({ tankRoles: value })} placeholder="Type to find roles" />
-                                <MultiSelect id="carryRoles" label="Carry / Ranged Roles" options={roleOptions} value={query.carryRoles} onChange={(value) => updateQuery({ carryRoles: value })} placeholder="Type to find roles" />
+                                <MultiSelect
+                                    id="tankRoles"
+                                    label="Tank Roles"
+                                    options={roleOptions}
+                                    value={query.tankRoles}
+                                    onChange={(value) => updateQuery({ tankRoles: value })}
+                                    placeholder="Type to find roles"
+                                />
+                                <MultiSelect
+                                    id="carryRoles"
+                                    label="Carry / Ranged Roles"
+                                    options={roleOptions}
+                                    value={query.carryRoles}
+                                    onChange={(value) => updateQuery({ carryRoles: value })}
+                                    placeholder="Type to find roles"
+                                />
                             </div>
                         </details>
 
                         <section className="control-section history-panel">
-                            <div className="section-heading"><h2>Recent Searches</h2><span className="section-hint">Replay and compare</span></div>
+                            <div className="section-heading">
+                                <h2>Recent Searches</h2>
+                                <span className="section-hint">Replay and compare</span>
+                            </div>
                             <div id="historyList" className="history-list">
-                                {history.length ? history.slice(0, 5).map((entry) => (
-                                    <button
-                                        className="history-item"
-                                        key={entry.key || entry.timestamp}
-                                        onClick={async () => {
-                                            const normalized = await normalizeThroughBridge(entry.params);
-                                            setQuery(normalized);
-                                            await runSearch(normalized);
-                                        }}
-                                    >
-                                        <div className="history-title">{entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search'}</div>
-                                        <div className="history-params">{summarizeSearchParams(entry.params)}</div>
-                                        <div className="history-meta"><span>{entry.resultCount} results</span><span>{formatTimestamp(entry.timestamp)}</span></div>
-                                    </button>
-                                )) : <div className="history-empty">No recent searches yet</div>}
+                                {history.length ? (
+                                    history.slice(0, 5).map((entry) => (
+                                        <button
+                                            className="history-item"
+                                            key={entry.key || entry.timestamp}
+                                            onClick={async () => {
+                                                const normalized = await normalizeThroughBridge(entry.params);
+                                                setQuery(normalized);
+                                                await runSearch(normalized);
+                                            }}
+                                        >
+                                            <div className="history-title">
+                                                {entry.params ? `Level ${entry.params.boardSize}` : 'Saved Search'}
+                                            </div>
+                                            <div className="history-params">{summarizeSearchParams(entry.params)}</div>
+                                            <div className="history-meta">
+                                                <span>{entry.resultCount} results</span>
+                                                <span>{formatTimestamp(entry.timestamp)}</span>
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="history-empty">No recent searches yet</div>
+                                )}
                             </div>
                         </section>
                     </div>
 
                     <div className="controls-footer">
                         <div className="footer-actions">
-                            <button id="searchBtn" disabled={!activeData || isFetching || isSearching} className={isSearching ? 'disabled' : ''} onClick={() => runSearch()}>
-                                {isSearching ? (progress?.pct ? `Searching ${Math.round(Number(progress.pct) * 100)}%` : 'Searching...') : 'Compute'}
+                            <button
+                                id="searchBtn"
+                                disabled={!activeData || isFetching || isSearching}
+                                className={isSearching ? 'disabled' : ''}
+                                onClick={() => runSearch()}
+                            >
+                                {isSearching
+                                    ? progress?.pct
+                                        ? `Searching ${Math.round(Number(progress.pct) * 100)}%`
+                                        : 'Searching...'
+                                    : 'Compute'}
                             </button>
-                            <button id="cancelBtn" disabled={!isSearching || isCancelling} onClick={cancelSearch}>{isCancelling ? 'Cancelling...' : 'Cancel Search'}</button>
+                            <button id="cancelBtn" disabled={!isSearching || isCancelling} onClick={cancelSearch}>
+                                {isCancelling ? 'Cancelling...' : 'Cancel Search'}
+                            </button>
                         </div>
                     </div>
                 </aside>
 
-                <main id="resultsWorkspace" className="workspace panel" data-results-mode={sortedResults.length ? 'ready' : 'empty'}>
+                <main
+                    id="resultsWorkspace"
+                    className="workspace panel"
+                    data-results-mode={sortedResults.length ? 'ready' : 'empty'}
+                >
                     <div className="workspace-header">
-                        <div className="results-title-block"><h2 className="results-title">Board Results</h2></div>
+                        <div className="results-title-block">
+                            <h2 className="results-title">Board Results</h2>
+                        </div>
                         <div className="results-header-actions">
-                            <div id="resultsPager" className="results-pager" aria-live="polite">{sortedResults.length ? `${formatNumber(sortedResults.length)} boards` : ''}</div>
+                            <div id="resultsPager" className="results-pager" aria-live="polite">
+                                {sortedResults.length ? `${formatNumber(sortedResults.length)} boards` : ''}
+                            </div>
                             <div className="sorting-controls">
-                                <label className="sorting-label" htmlFor="sortMode">Sort</label>
-                                <select id="sortMode" className="sorting-select" value={sortMode} onChange={(event) => {
-                                    setSortMode(event.target.value);
-                                    setSelectedIndex(sortedResults.length ? 0 : -1);
-                                }}>
+                                <label className="sorting-label" htmlFor="sortMode">
+                                    Sort
+                                </label>
+                                <select
+                                    id="sortMode"
+                                    className="sorting-select"
+                                    value={sortMode}
+                                    onChange={(event) => {
+                                        setSortMode(event.target.value);
+                                        setSelectedIndex(sortedResults.length ? 0 : -1);
+                                    }}
+                                >
                                     <option value="mostTraits">Best Synergy</option>
                                     <option value="lowestCost">Lowest Cost</option>
                                     <option value="highestCost">Highest Cost</option>
@@ -849,12 +1250,28 @@ export function App() {
                             </div>
                         </div>
                     </div>
-                    {!sortedResults.length ? <div id="resultsEmptyState" className="results-empty-state" role="status" aria-live="polite">Run a query to inspect ranked boards.</div> : null}
+                    {!sortedResults.length ? (
+                        <div id="resultsEmptyState" className="results-empty-state" role="status" aria-live="polite">
+                            Run a query to inspect ranked boards.
+                        </div>
+                    ) : null}
                     <div className="results-ready-shell">
                         <QuerySummary query={lastSearchParams || query} meta={summaryMeta} />
                         <ResultsSummary results={sortedResults} estimate={estimate} />
-                        <BoardSpotlight board={selectedBoard} rankIndex={selectedIndex} activeData={activeData} query={lastSearchParams || query} sortMode={sortMode} />
-                        <ResultsTable results={sortedResults} activeData={activeData} query={lastSearchParams || query} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+                        <BoardSpotlight
+                            board={selectedBoard}
+                            rankIndex={selectedIndex}
+                            activeData={activeData}
+                            query={lastSearchParams || query}
+                            sortMode={sortMode}
+                        />
+                        <ResultsTable
+                            results={sortedResults}
+                            activeData={activeData}
+                            query={lastSearchParams || query}
+                            selectedIndex={selectedIndex}
+                            onSelect={setSelectedIndex}
+                        />
                     </div>
                 </main>
             </div>

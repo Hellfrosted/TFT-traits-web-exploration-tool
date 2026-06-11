@@ -10,18 +10,19 @@ function buildUnitOverrideComposition({
     hooks
 }: LooseRecord) {
     const unitOverride = hooks.getUnitOverride(cleanName, rawName, setOverrides);
-    const autoDetectedVariantOverride = !unitOverride?.variants?.length && !unitOverride?.selectionGroups?.length
-        ? hooks.buildDetectedVariantOverrides({
-            rawName,
-            baseRole: roleName,
-            baseTraits: linkedTraitState.linkedTraitNames,
-            hasExcludedLinkedTraits: linkedTraitState.hasExcludedLinkedTraits,
-            rawChampionRecordMap,
-            hashDictionary,
-            traitNamesByAlias,
-            setOverrides
-        })
-        : null;
+    const autoDetectedVariantOverride =
+        !unitOverride?.variants?.length && !unitOverride?.selectionGroups?.length
+            ? hooks.buildDetectedVariantOverrides({
+                  rawName,
+                  baseRole: roleName,
+                  baseTraits: linkedTraitState.linkedTraitNames,
+                  hasExcludedLinkedTraits: linkedTraitState.hasExcludedLinkedTraits,
+                  rawChampionRecordMap,
+                  hashDictionary,
+                  traitNamesByAlias,
+                  setOverrides
+              })
+            : null;
     const mergedUnitOverride = hooks.mergeUnitOverrides(unitOverride, autoDetectedVariantOverride);
     const overrideContributionTraits = Object.entries(mergedUnitOverride?.traitContributions || {})
         .filter(([, count]) => Number(count) > 0)

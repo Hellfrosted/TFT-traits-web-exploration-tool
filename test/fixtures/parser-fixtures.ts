@@ -34,11 +34,7 @@ function createChampionRecord({
     };
 }
 
-function createSetCdragon({
-    setNumber = '17',
-    champions = [],
-    traits = []
-} = {}) {
+function createSetCdragon({ setNumber = '17', champions = [], traits = [] } = {}) {
     return {
         sets: {
             [setNumber]: {

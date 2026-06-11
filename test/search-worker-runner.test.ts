@@ -67,12 +67,14 @@ describe('search worker runner', () => {
 
         const response = await pendingResult;
 
-        assert.deepEqual(progressPayloads, [{
-            searchId: 7,
-            pct: 25,
-            checked: 5,
-            total: 20
-        }]);
+        assert.deepEqual(progressPayloads, [
+            {
+                searchId: 7,
+                pct: 25,
+                checked: 5,
+                total: 20
+            }
+        ]);
         assert.equal(response.success, true);
         assert.equal(response.searchId, 7);
         assert.deepEqual(response.results, [{ units: ['A'] }]);

@@ -17,11 +17,7 @@ function mapDataResponse(dataCache) {
     };
 }
 
-function createDataService({
-    dataEngine,
-    cacheService,
-    defaultDataSource
-}) {
+function createDataService({ dataEngine, cacheService, defaultDataSource }) {
     let dataCache = null;
     let latestRequestedFetchToken = 0;
     const latestRequestedFallbackFetchTokenBySource = new Map();

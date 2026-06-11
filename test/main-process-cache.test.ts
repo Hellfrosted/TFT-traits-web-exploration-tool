@@ -7,17 +7,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const { createSearchCacheService } = require('../main-process/search-cache-service.js');
-const {
-    getStoragePaths,
-    ensureStorageDirs,
-    resolveCacheEntryPath,
-    resolveDataFallbackPath
-} = require('../storage.js');
+const { getStoragePaths, ensureStorageDirs, resolveCacheEntryPath, resolveDataFallbackPath } = require('../storage.js');
 const { LIMITS } = require('../constants.js');
-const {
-    normalizeSearchParams,
-    normalizeSearchParamsForData
-} = require('../searchParams.js');
+const { normalizeSearchParams, normalizeSearchParamsForData } = require('../searchParams.js');
 
 function makeTempDir(prefix) {
     return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -224,7 +216,9 @@ describe('main-process cache service', () => {
                     throw new Error(`Unexpected read: ${filePath}`);
                 },
                 readdir: async () => {
-                    throw new Error('listCacheEntries should not rebuild the cache index when a persisted index is available.');
+                    throw new Error(
+                        'listCacheEntries should not rebuild the cache index when a persisted index is available.'
+                    );
                 },
                 writeFile: async () => {},
                 rename: async () => {},
@@ -237,12 +231,14 @@ describe('main-process cache service', () => {
 
         const listedEntries = await service.listCacheEntries('keep-fingerprint', { limit: 1 });
 
-        assert.deepEqual(listedEntries, [{
-            key: 'second',
-            params: { boardSize: 8, maxResults: 10 },
-            resultCount: 2,
-            timestamp: 200
-        }]);
+        assert.deepEqual(listedEntries, [
+            {
+                key: 'second',
+                params: { boardSize: 8, maxResults: 10 },
+                resultCount: 2,
+                timestamp: 200
+            }
+        ]);
         assert.deepEqual(readFileCalls, [cacheIndexPath]);
     });
 
@@ -337,12 +333,16 @@ describe('main-process cache service', () => {
             const obsoletePath = resolveCacheEntryPath(storagePaths, obsoleteKey);
             const corruptPath = resolveCacheEntryPath(storagePaths, corruptKey);
             const alsoKeepPath = resolveCacheEntryPath(storagePaths, alsoKeepKey);
-            await fsp.writeFile(obsoletePath, JSON.stringify({
-                searchVersion: 3,
-                dataFingerprint: 'obsolete',
-                params: { boardSize: 7 },
-                results: []
-            }), 'utf-8');
+            await fsp.writeFile(
+                obsoletePath,
+                JSON.stringify({
+                    searchVersion: 3,
+                    dataFingerprint: 'obsolete',
+                    params: { boardSize: 7 },
+                    results: []
+                }),
+                'utf-8'
+            );
             await fsp.writeFile(corruptPath, '{not-json', 'utf-8');
 
             await service.pruneCache('keep-fingerprint');
@@ -412,23 +412,27 @@ describe('main-process cache service', () => {
             ensureStorageDirs(storagePaths);
             const legacyKey = 'cccccccccccccccccccccccccccccccc';
             const legacyPath = resolveCacheEntryPath(storagePaths, legacyKey);
-            await fsp.writeFile(legacyPath, JSON.stringify({
-                searchVersion: 4,
-                dataFingerprint: 'fp-legacy',
-                params: {
-                    boardSize: '9',
-                    maxResults: '500',
-                    mustInclude: [{ id: 'Annie' }, 'Annie', '  Annie  '],
-                    variantLocks: {
-                        Annie: { value: 'arcane' }
+            await fsp.writeFile(
+                legacyPath,
+                JSON.stringify({
+                    searchVersion: 4,
+                    dataFingerprint: 'fp-legacy',
+                    params: {
+                        boardSize: '9',
+                        maxResults: '500',
+                        mustInclude: [{ id: 'Annie' }, 'Annie', '  Annie  '],
+                        variantLocks: {
+                            Annie: { value: 'arcane' }
+                        },
+                        onlyActive: 'yes',
+                        tierRank: 'true',
+                        includeUnique: 'false'
                     },
-                    onlyActive: 'yes',
-                    tierRank: 'true',
-                    includeUnique: 'false'
-                },
-                results: [{ units: ['Annie'] }],
-                timestamp: 100
-            }), 'utf-8');
+                    results: [{ units: ['Annie'] }],
+                    timestamp: 100
+                }),
+                'utf-8'
+            );
 
             await service.migrateCanonicalParams({
                 canonicalizeByFingerprint: (_fingerprint, params) => normalizeSearchParams(params)
@@ -469,28 +473,36 @@ describe('main-process cache service', () => {
             const legacyKeyA = 'dddddddddddddddddddddddddddddddd';
             const legacyKeyB = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
-            await fsp.writeFile(resolveCacheEntryPath(storagePaths, legacyKeyA), JSON.stringify({
-                searchVersion: 4,
-                dataFingerprint: 'fp-collision',
-                params: {
-                    boardSize: 9,
-                    maxResults: 500,
-                    mustInclude: ['B', 'A']
-                },
-                results: [{ units: ['old'] }],
-                timestamp: 100
-            }), 'utf-8');
-            await fsp.writeFile(resolveCacheEntryPath(storagePaths, legacyKeyB), JSON.stringify({
-                searchVersion: 4,
-                dataFingerprint: 'fp-collision',
-                params: {
-                    boardSize: 9,
-                    maxResults: 500,
-                    mustInclude: ['A', 'B']
-                },
-                results: [{ units: ['new'] }],
-                timestamp: 200
-            }), 'utf-8');
+            await fsp.writeFile(
+                resolveCacheEntryPath(storagePaths, legacyKeyA),
+                JSON.stringify({
+                    searchVersion: 4,
+                    dataFingerprint: 'fp-collision',
+                    params: {
+                        boardSize: 9,
+                        maxResults: 500,
+                        mustInclude: ['B', 'A']
+                    },
+                    results: [{ units: ['old'] }],
+                    timestamp: 100
+                }),
+                'utf-8'
+            );
+            await fsp.writeFile(
+                resolveCacheEntryPath(storagePaths, legacyKeyB),
+                JSON.stringify({
+                    searchVersion: 4,
+                    dataFingerprint: 'fp-collision',
+                    params: {
+                        boardSize: 9,
+                        maxResults: 500,
+                        mustInclude: ['A', 'B']
+                    },
+                    results: [{ units: ['new'] }],
+                    timestamp: 200
+                }),
+                'utf-8'
+            );
 
             await service.migrateCanonicalParams({
                 canonicalizeByFingerprint: (_fingerprint, params) => normalizeSearchParams(params)
@@ -526,34 +538,42 @@ describe('main-process cache service', () => {
             const fp1Key = 'ffffffffffffffffffffffffffffffff';
             const fp2Key = 'abababababababababababababababab';
 
-            await fsp.writeFile(resolveCacheEntryPath(storagePaths, fp1Key), JSON.stringify({
-                searchVersion: 4,
-                dataFingerprint: 'fp-1',
-                params: {
-                    boardSize: 9,
-                    maxResults: 500,
-                    mustInclude: ['Known', 'Unknown'],
-                    mustIncludeTraits: ['TraitA', 'TraitB'],
-                    tankRoles: ['Tank', 'UnknownRole'],
-                    variantLocks: {
-                        Known: 'variant-a',
-                        Unknown: 'variant-z'
-                    }
-                },
-                results: [{ units: ['Known'] }],
-                timestamp: 100
-            }), 'utf-8');
-            await fsp.writeFile(resolveCacheEntryPath(storagePaths, fp2Key), JSON.stringify({
-                searchVersion: 4,
-                dataFingerprint: 'fp-2',
-                params: {
-                    boardSize: 9,
-                    maxResults: 500,
-                    mustInclude: ['Known', 'Unknown']
-                },
-                results: [{ units: ['Known', 'Unknown'] }],
-                timestamp: 100
-            }), 'utf-8');
+            await fsp.writeFile(
+                resolveCacheEntryPath(storagePaths, fp1Key),
+                JSON.stringify({
+                    searchVersion: 4,
+                    dataFingerprint: 'fp-1',
+                    params: {
+                        boardSize: 9,
+                        maxResults: 500,
+                        mustInclude: ['Known', 'Unknown'],
+                        mustIncludeTraits: ['TraitA', 'TraitB'],
+                        tankRoles: ['Tank', 'UnknownRole'],
+                        variantLocks: {
+                            Known: 'variant-a',
+                            Unknown: 'variant-z'
+                        }
+                    },
+                    results: [{ units: ['Known'] }],
+                    timestamp: 100
+                }),
+                'utf-8'
+            );
+            await fsp.writeFile(
+                resolveCacheEntryPath(storagePaths, fp2Key),
+                JSON.stringify({
+                    searchVersion: 4,
+                    dataFingerprint: 'fp-2',
+                    params: {
+                        boardSize: 9,
+                        maxResults: 500,
+                        mustInclude: ['Known', 'Unknown']
+                    },
+                    results: [{ units: ['Known', 'Unknown'] }],
+                    timestamp: 100
+                }),
+                'utf-8'
+            );
 
             const strictDataCache = {
                 units: [
@@ -567,11 +587,10 @@ describe('main-process cache service', () => {
             };
 
             await service.migrateCanonicalParams({
-                canonicalizeByFingerprint: (fingerprint, params) => (
+                canonicalizeByFingerprint: (fingerprint, params) =>
                     fingerprint === 'fp-1'
                         ? normalizeSearchParamsForData(params, strictDataCache)
                         : normalizeSearchParams(params)
-                )
             });
 
             const fp1Entries = await service.listCacheEntries('fp-1');
@@ -600,9 +619,13 @@ describe('main-process cache service', () => {
             const firstKey = service.getCacheKey('keep-fingerprint', { boardSize: 9, maxResults: 10 });
             const secondKey = service.getCacheKey('keep-fingerprint', { boardSize: 8, maxResults: 10 });
 
-            await service.writeCache(firstKey, 'keep-fingerprint', { boardSize: 9, maxResults: 10 }, [{ units: ['A'] }]);
+            await service.writeCache(firstKey, 'keep-fingerprint', { boardSize: 9, maxResults: 10 }, [
+                { units: ['A'] }
+            ]);
             await new Promise((resolve) => setTimeout(resolve, 5));
-            await service.writeCache(secondKey, 'keep-fingerprint', { boardSize: 8, maxResults: 10 }, [{ units: ['B'] }]);
+            await service.writeCache(secondKey, 'keep-fingerprint', { boardSize: 8, maxResults: 10 }, [
+                { units: ['B'] }
+            ]);
 
             const limitedEntries = await service.listCacheEntries('keep-fingerprint', { limit: 1 });
 

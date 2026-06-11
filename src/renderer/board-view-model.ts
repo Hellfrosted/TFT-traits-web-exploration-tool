@@ -27,10 +27,15 @@ export function getBoardMetric(board: BoardLike) {
 
 export function sortBoards(results: BoardLike[], sortMode: string) {
     const sorters = {
-        mostTraits: (left, right) => getBoardMetric(right) - getBoardMetric(left) || Number(right.totalCost || 0) - Number(left.totalCost || 0),
-        lowestCost: (left, right) => Number(left.totalCost || 0) - Number(right.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
-        highestCost: (left, right) => Number(right.totalCost || 0) - Number(left.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
-        bestValue: (left, right) => (getBoardMetric(right) / Math.max(Number(right.totalCost || 0), 1)) - (getBoardMetric(left) / Math.max(Number(left.totalCost || 0), 1))
+        mostTraits: (left, right) =>
+            getBoardMetric(right) - getBoardMetric(left) || Number(right.totalCost || 0) - Number(left.totalCost || 0),
+        lowestCost: (left, right) =>
+            Number(left.totalCost || 0) - Number(right.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
+        highestCost: (left, right) =>
+            Number(right.totalCost || 0) - Number(left.totalCost || 0) || getBoardMetric(right) - getBoardMetric(left),
+        bestValue: (left, right) =>
+            getBoardMetric(right) / Math.max(Number(right.totalCost || 0), 1) -
+            getBoardMetric(left) / Math.max(Number(left.totalCost || 0), 1)
     };
     return [...(Array.isArray(results) ? results : [])].sort(sorters[sortMode] || sorters.mostTraits);
 }
@@ -79,11 +84,12 @@ export function buildTraitSummary(board: BoardLike, activeData: ActiveData, quer
             };
         })
         .filter(Boolean)
-        .sort((left, right) =>
-            Number(right.isActive) - Number(left.isActive)
-            || right.levelReached - left.levelReached
-            || right.count - left.count
-            || left.trait.localeCompare(right.trait)
+        .sort(
+            (left, right) =>
+                Number(right.isActive) - Number(left.isActive) ||
+                right.levelReached - left.levelReached ||
+                right.count - left.count ||
+                left.trait.localeCompare(right.trait)
         );
 }
 

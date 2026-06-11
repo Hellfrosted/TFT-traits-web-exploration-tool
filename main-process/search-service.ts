@@ -21,12 +21,12 @@ function createSearchService({
     getMainWindow,
     getDataCache
 }) {
-    const normalizeForData = typeof normalizeSearchParamsForData === 'function'
-        ? normalizeSearchParamsForData
-        : normalizeSearchParams;
-    const serializeForComparison = typeof serializeSearchParams === 'function'
-        ? serializeSearchParams
-        : (params) => JSON.stringify(normalizeSearchParams(params));
+    const normalizeForData =
+        typeof normalizeSearchParamsForData === 'function' ? normalizeSearchParamsForData : normalizeSearchParams;
+    const serializeForComparison =
+        typeof serializeSearchParams === 'function'
+            ? serializeSearchParams
+            : (params) => JSON.stringify(normalizeSearchParams(params));
     let activeSearch = null;
     let nextSearchId = 1;
     const runWorkerSearch = createSearchWorkerRunner({

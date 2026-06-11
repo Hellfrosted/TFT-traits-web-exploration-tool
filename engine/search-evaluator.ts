@@ -46,7 +46,8 @@ function evaluateBoardSelection({
                 continue;
             }
 
-            const currentContributionEntries = selectedVariant?.fullTraitContributionEntries || info.baseTraitContributionEntries;
+            const currentContributionEntries =
+                selectedVariant?.fullTraitContributionEntries || info.baseTraitContributionEntries;
             for (const { index, count } of currentContributionEntries) {
                 resolvedCounts[index] -= count;
             }
@@ -114,9 +115,7 @@ function evaluateBoardSelection({
             synergyScore,
             occupiedSlots,
             traitCounts: traitCountsToRecord(resolvedCounts, allTraitNames),
-            ...(variantAssignments && Object.keys(variantAssignments).length > 0
-                ? { variantAssignments }
-                : {})
+            ...(variantAssignments && Object.keys(variantAssignments).length > 0 ? { variantAssignments } : {})
         };
     };
 
@@ -146,12 +145,7 @@ function evaluateBoardSelection({
     return bestEvaluation;
 }
 
-function createBoardResult({
-    unitIds,
-    evaluation,
-    totalCost,
-    scoreBoard
-}) {
+function createBoardResult({ unitIds, evaluation, totalCost, scoreBoard }) {
     const totalScore = scoreBoard(evaluation.synergyScore, totalCost);
     return {
         units: unitIds,

@@ -1,19 +1,9 @@
 const { normalizeSearchParams } = require('../searchParams.js');
-const {
-    finalizeTopBoards
-} = require('./search-results.js');
-const {
-    countPreparedSearchSpaceCandidates
-} = require('./search-space-counter.js');
-const {
-    runSearchDfs
-} = require('./search-dfs-runner.js');
-const {
-    createSearchExecutionDependencies
-} = require('./search-execution-dependencies.js');
-const {
-    buildSearchExecutionContext
-} = require('./search-execution-context.js');
+const { finalizeTopBoards } = require('./search-results.js');
+const { countPreparedSearchSpaceCandidates } = require('./search-space-counter.js');
+const { runSearchDfs } = require('./search-dfs-runner.js');
+const { createSearchExecutionDependencies } = require('./search-execution-dependencies.js');
+const { buildSearchExecutionContext } = require('./search-execution-context.js');
 
 module.exports = {
     buildSortedBoardUnits(selectedUnitIndices, unitInfo) {
@@ -39,7 +29,7 @@ module.exports = {
     buildRequiredUnitMask(units, mustInclude) {
         const requiredUnits = new Set(mustInclude);
         return units.reduce((mask, unit, index) => {
-            return requiredUnits.has(unit.id) ? (mask | (1n << BigInt(index))) : mask;
+            return requiredUnits.has(unit.id) ? mask | (1n << BigInt(index)) : mask;
         }, 0n);
     },
 
@@ -75,13 +65,7 @@ module.exports = {
     },
 
     prepareSearchContext(dataCache, params) {
-        const {
-            boardSize,
-            mustInclude = [],
-            mustExclude = [],
-            mustExcludeTraits = [],
-            variantLocks = {}
-        } = params;
+        const { boardSize, mustInclude = [], mustExclude = [], mustExcludeTraits = [], variantLocks = {} } = params;
 
         const validUnits = this.getValidUnits(dataCache, mustExclude, mustExcludeTraits, variantLocks);
         const mustHaveMask = this.buildRequiredUnitMask(validUnits, mustInclude);
@@ -134,7 +118,7 @@ module.exports = {
         if (k === 0 || k === n) return 1;
         let result = 1;
         for (let i = 0; i < k; i++) {
-            result = result * (n - i) / (i + 1);
+            result = (result * (n - i)) / (i + 1);
         }
         return Math.round(result);
     },
@@ -142,10 +126,7 @@ module.exports = {
     countSearchSpaceCandidates(dataCache, params, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
         return countPreparedSearchSpaceCandidates({
-            ...(
-                preparedSearchContext
-                || this.prepareSearchContext(dataCache, normalizedParams)
-            ),
+            ...(preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams)),
             variantLocks: normalizedParams.variantLocks,
             getUnitSlotCostRange: this.getUnitSlotCostRange.bind(this)
         });
@@ -153,12 +134,8 @@ module.exports = {
 
     getCombinationCount(dataCache, params, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
-        const {
-            remainingSlots,
-            availableCount,
-            hasAllRequiredUnits,
-            hasVariableSlotCosts
-        } = preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
+        const { remainingSlots, availableCount, hasAllRequiredUnits, hasVariableSlotCosts } =
+            preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
 
         if (!hasAllRequiredUnits || remainingSlots < 0) {
             return { count: 0, remainingSlots };
@@ -180,24 +157,14 @@ module.exports = {
     search(dataCache, params, onProgress, preparedSearchContext = null) {
         const normalizedParams = normalizeSearchParams(params);
 
-        const {
-            validUnits,
-            mustHaveMask,
-            remainingSlots,
-            hasAllRequiredUnits,
-            hasVariableSlotCosts
-        } = preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
+        const { validUnits, mustHaveMask, remainingSlots, hasAllRequiredUnits, hasVariableSlotCosts } =
+            preparedSearchContext || this.prepareSearchContext(dataCache, normalizedParams);
 
         if (!hasAllRequiredUnits || remainingSlots < 0) {
             return [];
         }
 
-        const {
-            progressTracker,
-            topBoardTracker,
-            searchSpaceError,
-            dfsInput
-        } = buildSearchExecutionContext({
+        const { progressTracker, topBoardTracker, searchSpaceError, dfsInput } = buildSearchExecutionContext({
             dataCache,
             normalizedParams,
             preparedSearchContext: {

@@ -7,12 +7,7 @@ const {
     createWorkerExitResponse
 } = require('./search-service-state.js');
 
-function createSearchWorkerRunner({
-    Worker,
-    workerPath,
-    ipcChannels,
-    getMainWindow
-}) {
+function createSearchWorkerRunner({ Worker, workerPath, ipcChannels, getMainWindow }) {
     return async function runWorkerSearch({
         searchContext,
         workerData,
@@ -96,7 +91,8 @@ function createSearchWorkerRunner({
                 cleanup();
                 safeResolve(createWorkerDoneResponse(msg, searchContext.searchId));
                 if (shouldPersistSearchResults(msg.results)) {
-                    void cacheService.writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
+                    void cacheService
+                        .writeCache(cacheKey, searchFingerprint, normalizedParams, msg.results)
                         .catch(() => {})
                         .finally(() => {
                             void terminateWorker();
@@ -109,9 +105,7 @@ function createSearchWorkerRunner({
 
             searchContext.worker.on('error', (error) => {
                 cleanup();
-                safeResolve(
-                    createWorkerErrorResponse(error, searchContext.searchId, searchContext.cancelled)
-                );
+                safeResolve(createWorkerErrorResponse(error, searchContext.searchId, searchContext.cancelled));
             });
 
             searchContext.worker.on('exit', (code) => {

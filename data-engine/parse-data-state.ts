@@ -11,12 +11,7 @@ function buildSetTraitIndexes(setData, normalizeBreakpoints) {
         const displayName = trait.displayName || trait.name || trait.apiName || trait.traitId;
         if (!displayName) return;
 
-        const aliases = [
-            trait.apiName,
-            trait.name,
-            trait.displayName,
-            trait.traitId
-        ].filter(Boolean);
+        const aliases = [trait.apiName, trait.name, trait.displayName, trait.traitId].filter(Boolean);
 
         aliases.forEach((alias) => {
             traitNamesByAlias[alias] = displayName;

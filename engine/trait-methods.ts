@@ -51,37 +51,41 @@ module.exports = {
     },
 
     buildConditionalEffectEntries(conditionalEffects, traitIndex, hashMap = {}) {
-        return (conditionalEffects || []).map((effect) => {
-            const traitContributionEntries = this.buildTraitContributionEntries(
-                { traitContributions: effect?.traitContributions || {} },
-                traitIndex,
-                hashMap
-            );
+        return (conditionalEffects || [])
+            .map((effect) => {
+                const traitContributionEntries = this.buildTraitContributionEntries(
+                    { traitContributions: effect?.traitContributions || {} },
+                    traitIndex,
+                    hashMap
+                );
 
-            if (traitContributionEntries.length === 0) {
-                return null;
-            }
+                if (traitContributionEntries.length === 0) {
+                    return null;
+                }
 
-            return {
-                conditions: effect?.conditions || null,
-                traitContributionEntries
-            };
-        }).filter(Boolean);
+                return {
+                    conditions: effect?.conditions || null,
+                    traitContributionEntries
+                };
+            })
+            .filter(Boolean);
     },
 
     buildConditionalProfileEntries(conditionalProfiles, traitIndex, hashMap = {}) {
-        return (conditionalProfiles || []).map((profile) => {
-            const traitContributionEntries = this.buildTraitContributionEntries(profile, traitIndex, hashMap);
-            if (traitContributionEntries.length === 0) {
-                return null;
-            }
+        return (conditionalProfiles || [])
+            .map((profile) => {
+                const traitContributionEntries = this.buildTraitContributionEntries(profile, traitIndex, hashMap);
+                if (traitContributionEntries.length === 0) {
+                    return null;
+                }
 
-            return {
-                conditions: profile?.conditions || null,
-                traits: profile?.traits || [],
-                traitContributionEntries
-            };
-        }).filter(Boolean);
+                return {
+                    conditions: profile?.conditions || null,
+                    traits: profile?.traits || [],
+                    traitContributionEntries
+                };
+            })
+            .filter(Boolean);
     },
 
     getAutomaticConditionalTraitNames(unit) {
@@ -123,34 +127,26 @@ module.exports = {
 
     getUnitTraitProfiles(unit, lockedVariantId = null) {
         const unitConditionalTraits = this.getConditionalEffectTraitNames(unit.conditionalEffects);
-        const unitConditionalProfileTraits = (unit.conditionalProfiles || []).map((profile) => ([
-            ...new Set([
-                ...(profile.traits || []),
-                ...this.getConditionalEffectTraitNames(unit.conditionalEffects)
-            ])
-        ]));
+        const unitConditionalProfileTraits = (unit.conditionalProfiles || []).map((profile) => [
+            ...new Set([...(profile.traits || []), ...this.getConditionalEffectTraitNames(unit.conditionalEffects)])
+        ]);
         if (Array.isArray(unit.variants) && unit.variants.length > 0) {
             const variants = lockedVariantId
                 ? unit.variants.filter((variant) => variant.id === lockedVariantId)
                 : unit.variants;
             return variants.flatMap((variant) => {
                 const variantConditionalTraits = this.getConditionalEffectTraitNames(variant.conditionalEffects);
-                const baseVariantTraits = [...new Set([...(variant.traits || []), ...unitConditionalTraits, ...variantConditionalTraits])];
-                const conditionalVariantTraits = (variant.conditionalProfiles || []).map((profile) => ([
-                    ...new Set([
-                        ...(profile.traits || []),
-                        ...unitConditionalTraits,
-                        ...variantConditionalTraits
-                    ])
-                ]));
+                const baseVariantTraits = [
+                    ...new Set([...(variant.traits || []), ...unitConditionalTraits, ...variantConditionalTraits])
+                ];
+                const conditionalVariantTraits = (variant.conditionalProfiles || []).map((profile) => [
+                    ...new Set([...(profile.traits || []), ...unitConditionalTraits, ...variantConditionalTraits])
+                ]);
                 return [baseVariantTraits, ...conditionalVariantTraits, ...unitConditionalProfileTraits];
             });
         }
 
-        return [
-            [...new Set([...(unit.traits || []), ...unitConditionalTraits])],
-            ...unitConditionalProfileTraits
-        ];
+        return [[...new Set([...(unit.traits || []), ...unitConditionalTraits])], ...unitConditionalProfileTraits];
     },
 
     hasAllowedTraitProfile(unit, excludedTraits, lockedVariantId = null) {
@@ -158,8 +154,9 @@ module.exports = {
             return this.getUnitTraitProfiles(unit, lockedVariantId).length > 0;
         }
 
-        return this.getUnitTraitProfiles(unit, lockedVariantId)
-            .some((traits) => !traits.some((trait) => excludedTraits.has(trait)));
+        return this.getUnitTraitProfiles(unit, lockedVariantId).some(
+            (traits) => !traits.some((trait) => excludedTraits.has(trait))
+        );
     },
 
     contributionEntriesToMap(entries) {
@@ -178,7 +175,9 @@ module.exports = {
             };
         }
 
-        const entryMaps = variantProfiles.map((profile) => this.contributionEntriesToMap(profile.traitContributionEntries));
+        const entryMaps = variantProfiles.map((profile) =>
+            this.contributionEntriesToMap(profile.traitContributionEntries)
+        );
         const allIndexes = new Set();
         entryMaps.forEach((entryMap) => {
             entryMap.forEach((_, index) => allIndexes.add(index));

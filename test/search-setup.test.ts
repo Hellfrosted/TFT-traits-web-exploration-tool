@@ -22,15 +22,17 @@ describe('search setup helpers', () => {
 
     it('builds per-unit search metadata including variant summaries', () => {
         const unitInfo = buildUnitSearchInfo({
-            validUnits: [{
-                id: 'Switcher',
-                cost: 4,
-                role: 'Tank',
-                variants: [
-                    { id: 'alpha', label: 'Alpha', role: 'Carry', traits: ['Arcane'], slotCost: 2 },
-                    { id: 'beta', label: 'Beta', role: 'Carry', traits: ['Shadow'], slotCost: 3 }
-                ]
-            }],
+            validUnits: [
+                {
+                    id: 'Switcher',
+                    cost: 4,
+                    role: 'Tank',
+                    variants: [
+                        { id: 'alpha', label: 'Alpha', role: 'Carry', traits: ['Arcane'], slotCost: 2 },
+                        { id: 'beta', label: 'Beta', role: 'Carry', traits: ['Shadow'], slotCost: 3 }
+                    ]
+                }
+            ],
             traitIndex: { Arcane: 0, Shadow: 1 },
             hashMap: {},
             traitBreakpoints: {},
@@ -40,10 +42,11 @@ describe('search setup helpers', () => {
             tankRoleSet: new Set(['Tank']),
             carryRoleSet: new Set(['Carry']),
             unitSortRank: { Switcher: 0 },
-            buildTraitContributionEntries: (entity) => (entity.traits || []).map((trait) => ({
-                index: trait === 'Arcane' ? 0 : 1,
-                count: 1
-            })),
+            buildTraitContributionEntries: (entity) =>
+                (entity.traits || []).map((trait) => ({
+                    index: trait === 'Arcane' ? 0 : 1,
+                    count: 1
+                })),
             getEntitySlotCost: (entity) => entity.slotCost || 1,
             buildConditionalEffectEntries: () => [],
             buildConditionalProfileEntries: () => [],

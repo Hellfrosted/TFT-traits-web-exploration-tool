@@ -7,9 +7,7 @@ module.exports = {
             ? rawTags.includes('Champion')
             : String(rawTags || '').includes('Champion');
 
-        const looksLikeCharacterRecord =
-            key.includes('CharacterRecords/Root') ||
-            key.includes('Characters/');
+        const looksLikeCharacterRecord = key.includes('CharacterRecords/Root') || key.includes('Characters/');
 
         return looksLikeCharacterRecord && hasChampionTag && typeof val.mCharacterName === 'string';
     },
@@ -32,19 +30,22 @@ module.exports = {
         for (const [key, val] of Object.entries((rawJSON || {}) as LooseRecord)) {
             if (!this._isChampionRecord(key, val)) {
                 if (val?.__type === 'TftShopData') {
-                    this._extractSetNumbersFromText([
-                        val.mName,
-                        val.TeamPlannerPortraitPath,
-                        val.SquareSplashPath,
-                        val.TeamPlannerSplashPath,
-                        val.PcSplashPath,
-                        val.AbilityIconPath
-                    ].join(' ')).forEach((setNumber) => setNumbers.add(Number(setNumber)));
+                    this._extractSetNumbersFromText(
+                        [
+                            val.mName,
+                            val.TeamPlannerPortraitPath,
+                            val.SquareSplashPath,
+                            val.TeamPlannerSplashPath,
+                            val.PcSplashPath,
+                            val.AbilityIconPath
+                        ].join(' ')
+                    ).forEach((setNumber) => setNumbers.add(Number(setNumber)));
                 }
 
                 if (val?.__type === 'TftTraitData') {
-                    this._extractSetNumbersFromText([val.mName, val.mIconPath].join(' '))
-                        .forEach((setNumber) => setNumbers.add(Number(setNumber)));
+                    this._extractSetNumbersFromText([val.mName, val.mIconPath].join(' ')).forEach((setNumber) =>
+                        setNumbers.add(Number(setNumber))
+                    );
                 }
 
                 continue;

@@ -53,12 +53,7 @@ function resolveElectronLaunch(
 
     return {
         command: 'cmd.exe',
-        args: [
-            '/c',
-            toWindowsPath(electronBinary),
-            toWindowsPath(appRoot),
-            ...extraArgs
-        ]
+        args: ['/c', toWindowsPath(electronBinary), toWindowsPath(appRoot), ...extraArgs]
     };
 }
 

@@ -71,20 +71,13 @@ module.exports = {
         return Math.round((localAsUtc - timestamp) / 60000);
     },
 
-    _getZonedDateTimestamp({
-        year,
-        month,
-        day,
-        hour = 0,
-        minute = 0,
-        second = 0
-    }, timeZone) {
+    _getZonedDateTimestamp({ year, month, day, hour = 0, minute = 0, second = 0 }, timeZone) {
         const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
         let timestamp = localAsUtc;
 
         for (let attempt = 0; attempt < 3; attempt++) {
             const offsetMinutes = this._getTimeZoneOffsetMinutes(timestamp, timeZone);
-            const adjustedTimestamp = localAsUtc - (offsetMinutes * 60000);
+            const adjustedTimestamp = localAsUtc - offsetMinutes * 60000;
             if (adjustedTimestamp === timestamp) {
                 break;
             }
@@ -102,31 +95,27 @@ module.exports = {
         const rolloverSecond = Number.isFinite(rollover.second) ? rollover.second : 0;
         const fetchedParts = this._getTimeZoneParts(fetchedAt, timeZone);
 
-        const targetDay = new Date(Date.UTC(
-            fetchedParts.year,
-            (fetchedParts.month || 1) - 1,
-            fetchedParts.day || 1
-        ));
+        const targetDay = new Date(Date.UTC(fetchedParts.year, (fetchedParts.month || 1) - 1, fetchedParts.day || 1));
 
-        const fetchedSecondsIntoDay = ((fetchedParts.hour || 0) * 3600)
-            + ((fetchedParts.minute || 0) * 60)
-            + (fetchedParts.second || 0);
-        const rolloverSecondsIntoDay = (rolloverHour * 3600)
-            + (rolloverMinute * 60)
-            + rolloverSecond;
+        const fetchedSecondsIntoDay =
+            (fetchedParts.hour || 0) * 3600 + (fetchedParts.minute || 0) * 60 + (fetchedParts.second || 0);
+        const rolloverSecondsIntoDay = rolloverHour * 3600 + rolloverMinute * 60 + rolloverSecond;
 
         if (fetchedSecondsIntoDay >= rolloverSecondsIntoDay) {
             targetDay.setUTCDate(targetDay.getUTCDate() + 1);
         }
 
-        return this._getZonedDateTimestamp({
-            year: targetDay.getUTCFullYear(),
-            month: targetDay.getUTCMonth() + 1,
-            day: targetDay.getUTCDate(),
-            hour: rolloverHour,
-            minute: rolloverMinute,
-            second: rolloverSecond
-        }, timeZone);
+        return this._getZonedDateTimestamp(
+            {
+                year: targetDay.getUTCFullYear(),
+                month: targetDay.getUTCMonth() + 1,
+                day: targetDay.getUTCDate(),
+                hour: rolloverHour,
+                minute: rolloverMinute,
+                second: rolloverSecond
+            },
+            timeZone
+        );
     },
 
     _normalizeRawDataSnapshot(snapshot, source = DEFAULT_DATA_SOURCE) {

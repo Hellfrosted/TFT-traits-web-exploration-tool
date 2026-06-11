@@ -18,7 +18,7 @@ function createHeaders(headerMap: LooseRecord = {}) {
 
 function createStreamingResponse(chunks, options: LooseRecord = {}) {
     const encoder = new TextEncoder();
-    const encodedChunks = chunks.map((chunk) => chunk instanceof Uint8Array ? chunk : encoder.encode(chunk));
+    const encodedChunks = chunks.map((chunk) => (chunk instanceof Uint8Array ? chunk : encoder.encode(chunk)));
     let index = 0;
     let cancelCount = 0;
 
@@ -115,29 +115,40 @@ describe('DataEngine._detectLatestSet', () => {
 
 describe('DataEngine asset URL trust boundaries', () => {
     it('rejects absolute off-origin asset URLs', () => {
-        assert.equal(
-            DataEngine._assetPathToRawUrl('https://example.com/evil.png', 'pbe'),
-            null
-        );
+        assert.equal(DataEngine._assetPathToRawUrl('https://example.com/evil.png', 'pbe'), null);
     });
 
     it('ignores champion splash entries that resolve outside the expected asset directory', () => {
-        const championAssets = DataEngine._buildChampionAssetMap(`
+        const championAssets = DataEngine._buildChampionAssetMap(
+            `
             <a href="https://example.com/tft17_kaisa_teamplanner_splash.png">external</a>
             <a href="tft17_kaisa_teamplanner_splash.png">safe</a>
-        `, '17', 'pbe');
+        `,
+            '17',
+            'pbe'
+        );
 
-        assert.equal(championAssets.get('kaisa').url, 'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png');
+        assert.equal(
+            championAssets.get('kaisa').url,
+            'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png'
+        );
     });
 
     it('skips malformed directory hrefs while preserving valid champion splash entries', () => {
-        const championAssets = DataEngine._buildChampionAssetMap(`
+        const championAssets = DataEngine._buildChampionAssetMap(
+            `
             <a href="%E0%A4%A.png">malformed</a>
             <a href="tft17_kaisa_teamplanner_splash.png">safe</a>
-        `, '17', 'pbe');
+        `,
+            '17',
+            'pbe'
+        );
 
         assert.deepEqual([...championAssets.keys()], ['kaisa']);
-        assert.equal(championAssets.get('kaisa').url, 'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png');
+        assert.equal(
+            championAssets.get('kaisa').url,
+            'https://raw.communitydragon.org/pbe/game/assets/ux/tft/championsplashes/patching/tft17_kaisa_teamplanner_splash.png'
+        );
     });
 });
 
@@ -188,7 +199,10 @@ describe('DataEngine.fetchAndParse', () => {
         assert.equal(parsed.usedCachedSnapshot, true);
         assert.equal(parsed.dataSource, 'latest');
         assert.equal(parsed.snapshotFetchedAt > 0, true);
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Skarner']
+        );
     });
 
     it('refreshes Community Dragon data when the cached live snapshot is stale', async () => {
@@ -245,18 +259,24 @@ describe('DataEngine.fetchAndParse', () => {
         assert.ok(cachedSnapshot);
         assert.equal(cachedSnapshot.source, 'latest');
         assert.equal(typeof cachedSnapshot.fetchedAt, 'number');
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Skarner']
+        );
     });
 
     it('keeps a PBE snapshot fresh until the next 11 AM Pacific rollover', () => {
-        const fetchedAt = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 3,
-            hour: 10,
-            minute: 30,
-            second: 0
-        }, 'America/Los_Angeles');
+        const fetchedAt = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 3,
+                hour: 10,
+                minute: 30,
+                second: 0
+            },
+            'America/Los_Angeles'
+        );
 
         const snapshot = {
             source: 'pbe',
@@ -264,36 +284,45 @@ describe('DataEngine.fetchAndParse', () => {
             rawChar: { ok: true }
         };
 
-        const justBeforeRollover = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 3,
-            hour: 10,
-            minute: 59,
-            second: 59
-        }, 'America/Los_Angeles');
-        const justAfterRollover = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 3,
-            hour: 11,
-            minute: 0,
-            second: 1
-        }, 'America/Los_Angeles');
+        const justBeforeRollover = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 3,
+                hour: 10,
+                minute: 59,
+                second: 59
+            },
+            'America/Los_Angeles'
+        );
+        const justAfterRollover = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 3,
+                hour: 11,
+                minute: 0,
+                second: 1
+            },
+            'America/Los_Angeles'
+        );
 
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', justBeforeRollover), true);
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', justAfterRollover), false);
     });
 
     it('extends PBE freshness to the following day when fetched after the daily rollover', () => {
-        const fetchedAt = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 3,
-            hour: 12,
-            minute: 0,
-            second: 0
-        }, 'America/Los_Angeles');
+        const fetchedAt = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 3,
+                hour: 12,
+                minute: 0,
+                second: 0
+            },
+            'America/Los_Angeles'
+        );
 
         const snapshot = {
             source: 'pbe',
@@ -301,22 +330,28 @@ describe('DataEngine.fetchAndParse', () => {
             rawChar: { ok: true }
         };
 
-        const nextMorning = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 4,
-            hour: 10,
-            minute: 59,
-            second: 59
-        }, 'America/Los_Angeles');
-        const afterNextRollover = DataEngine._getZonedDateTimestamp({
-            year: 2026,
-            month: 4,
-            day: 4,
-            hour: 11,
-            minute: 0,
-            second: 1
-        }, 'America/Los_Angeles');
+        const nextMorning = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 4,
+                hour: 10,
+                minute: 59,
+                second: 59
+            },
+            'America/Los_Angeles'
+        );
+        const afterNextRollover = DataEngine._getZonedDateTimestamp(
+            {
+                year: 2026,
+                month: 4,
+                day: 4,
+                hour: 11,
+                minute: 0,
+                second: 1
+            },
+            'America/Los_Angeles'
+        );
 
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', nextMorning), true);
         assert.equal(DataEngine._isRawDataSnapshotFresh(snapshot, 'pbe', afterNextRollover), false);
@@ -359,7 +394,10 @@ describe('DataEngine.fetchAndParse', () => {
         });
 
         assert.equal(parsed.usedCachedSnapshot, true);
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Skarner']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Skarner']
+        );
     });
 
     it('rejects stale cached snapshots when Community Dragon is unreachable', async () => {
@@ -472,11 +510,12 @@ describe('DataEngine._fetchWithRetry', () => {
     });
 
     it('keeps normal JSON and text responses working with bounded reads', async () => {
-        const fetchJson = async () => createStreamingResponse(['{"ok":', 'true}'], {
-            headers: {
-                'content-length': '11'
-            }
-        }).response;
+        const fetchJson = async () =>
+            createStreamingResponse(['{"ok":', 'true}'], {
+                headers: {
+                    'content-length': '11'
+                }
+            }).response;
 
         const fetchText = async () => ({
             ok: true,
@@ -487,7 +526,12 @@ describe('DataEngine._fetchWithRetry', () => {
             text: async () => 'hello'
         });
 
-        const jsonResult = await DataEngine._fetchWithRetry('https://example.com/data.json', 'json', fetchJson, NETWORK);
+        const jsonResult = await DataEngine._fetchWithRetry(
+            'https://example.com/data.json',
+            'json',
+            fetchJson,
+            NETWORK
+        );
         const textResult = await DataEngine._fetchWithRetry('https://example.com/data.txt', 'text', fetchText, NETWORK);
 
         assert.deepEqual(jsonResult, { ok: true });
@@ -519,14 +563,19 @@ describe('DataEngine._fetchWithRetry', () => {
     it('times out stalled requests and retries per-attempt with AbortController', async () => {
         let fetchCalls = 0;
         const fetchTimeoutMs = 25;
-        const stalledFetch = async (_url, { signal }) => await new Promise((_resolve, reject) => {
-            fetchCalls += 1;
-            signal.addEventListener('abort', () => {
-                const abortError = new Error('aborted');
-                abortError.name = 'AbortError';
-                reject(abortError);
-            }, { once: true });
-        });
+        const stalledFetch = async (_url, { signal }) =>
+            await new Promise((_resolve, reject) => {
+                fetchCalls += 1;
+                signal.addEventListener(
+                    'abort',
+                    () => {
+                        const abortError = new Error('aborted');
+                        abortError.name = 'AbortError';
+                        reject(abortError);
+                    },
+                    { once: true }
+                );
+            });
 
         await assert.rejects(
             DataEngine._fetchWithRetry('https://example.com/stalled.json', 'json', stalledFetch, {
@@ -546,11 +595,15 @@ describe('DataEngine._fetchWithRetry', () => {
             fetchCalls += 1;
             if (fetchCalls === 1) {
                 return await new Promise((_resolve, reject) => {
-                    signal.addEventListener('abort', () => {
-                        const abortError = new Error('aborted');
-                        abortError.name = 'AbortError';
-                        reject(abortError);
-                    }, { once: true });
+                    signal.addEventListener(
+                        'abort',
+                        () => {
+                            const abortError = new Error('aborted');
+                            abortError.name = 'AbortError';
+                            reject(abortError);
+                        },
+                        { once: true }
+                    );
                 });
             }
             return {

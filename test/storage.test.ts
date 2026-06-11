@@ -33,10 +33,7 @@ describe('storage helpers', () => {
 
         const validKey = '0123456789abcdef0123456789abcdef';
         assert.match(validKey, CACHE_KEY_PATTERN);
-        assert.equal(
-            resolveCacheEntryPath(paths, validKey),
-            path.resolve(paths.cacheDir, `${validKey}.json`)
-        );
+        assert.equal(resolveCacheEntryPath(paths, validKey), path.resolve(paths.cacheDir, `${validKey}.json`));
 
         assert.throws(() => resolveCacheEntryPath(paths, '..\\escape'), /Invalid cache key/);
         assert.throws(() => resolveCacheEntryPath(paths, 'not-a-real-key'), /Invalid cache key/);
@@ -64,10 +61,7 @@ describe('storage helpers', () => {
             userDataPath: 'C:\\Users\\tester\\AppData\\Roaming\\TFT Tool'
         });
 
-        assert.equal(
-            resolveDataFallbackPath(paths, 'pbe'),
-            path.join(paths.storageRoot, 'data_fallback_pbe.json')
-        );
+        assert.equal(resolveDataFallbackPath(paths, 'pbe'), path.join(paths.storageRoot, 'data_fallback_pbe.json'));
         assert.equal(
             resolveDataFallbackPath(paths, 'latest'),
             path.join(paths.storageRoot, 'data_fallback_latest.json')

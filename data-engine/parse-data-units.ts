@@ -20,8 +20,8 @@ function resolveChampionLinkedTraits({
     const hasExcludedLinkedTraits = allLinkedTraits.some(({ resolvedName }) =>
         isExcludedTraitName(resolvedName, setOverrides)
     );
-    const includedLinkedTraits = allLinkedTraits.filter(({ resolvedName }) =>
-        !isExcludedTraitName(resolvedName, setOverrides)
+    const includedLinkedTraits = allLinkedTraits.filter(
+        ({ resolvedName }) => !isExcludedTraitName(resolvedName, setOverrides)
     );
 
     return {
@@ -83,28 +83,24 @@ function resolvePreferredChampionIcon({
 }) {
     const preferredMetadataIcon = championReferenceIconUrl
         ? {
-            url: championReferenceIconUrl,
-            rank: rankChampionIconAsset(championReferenceIconUrl)
-        }
+              url: championReferenceIconUrl,
+              rank: rankChampionIconAsset(championReferenceIconUrl)
+          }
         : championIcon
-            ? {
+          ? {
                 url: championIcon.url,
                 rank: championIcon.rank ?? rankChampionIconAsset(championIcon.url)
             }
-            : null;
+          : null;
 
-    const rawIconBeatsMetadata = rawShopIcon && (
-        shouldPreferRawAsset(rawShopIcon.url, preferredMetadataIcon?.url, latestSet) ||
-        (
-            assetMatchesSet(rawShopIcon.url, latestSet) &&
-            assetMatchesSet(preferredMetadataIcon?.url, latestSet) &&
-            rawShopIcon.rank > (preferredMetadataIcon?.rank ?? -1)
-        )
-    );
+    const rawIconBeatsMetadata =
+        rawShopIcon &&
+        (shouldPreferRawAsset(rawShopIcon.url, preferredMetadataIcon?.url, latestSet) ||
+            (assetMatchesSet(rawShopIcon.url, latestSet) &&
+                assetMatchesSet(preferredMetadataIcon?.url, latestSet) &&
+                rawShopIcon.rank > (preferredMetadataIcon?.rank ?? -1)));
 
-    return rawIconBeatsMetadata
-        ? rawShopIcon.url
-        : (preferredMetadataIcon?.url || rawShopIcon?.url || null);
+    return rawIconBeatsMetadata ? rawShopIcon.url : preferredMetadataIcon?.url || rawShopIcon?.url || null;
 }
 
 module.exports = {

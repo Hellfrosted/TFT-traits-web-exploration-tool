@@ -22,19 +22,12 @@ function buildRemainingUnitPotential(availableIndices, unitInfo) {
     };
 }
 
-function buildRemainingTraitPotential({
-    useMustIncludePruning,
-    mustIncludeTraitIndices,
-    availableIndices,
-    unitInfo
-}) {
+function buildRemainingTraitPotential({ useMustIncludePruning, mustIncludeTraitIndices, availableIndices, unitInfo }) {
     if (!useMustIncludePruning) {
         return [];
     }
 
-    const remainingTraitPotentialFrom = mustIncludeTraitIndices.map(
-        () => new Uint8Array(availableIndices.length + 1)
-    );
+    const remainingTraitPotentialFrom = mustIncludeTraitIndices.map(() => new Uint8Array(availableIndices.length + 1));
 
     for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
         const requiredTraitIndex = mustIncludeTraitIndices[traitPos];
@@ -88,12 +81,12 @@ function shouldPruneSearchBranch({
     if (
         requireCarry &&
         !meetsCarryRequirement(carryFourPlusCount) &&
-        (carryFourPlusCount + remainingCarryFourPlusFrom[startIdx] < 1)
+        carryFourPlusCount + remainingCarryFourPlusFrom[startIdx] < 1
     ) {
         return true;
     }
 
-    if ((currentMinSlots + currentSlotFlex + remainingMaxSlotsFrom[startIdx]) < boardSize) {
+    if (currentMinSlots + currentSlotFlex + remainingMaxSlotsFrom[startIdx] < boardSize) {
         return true;
     }
 
@@ -101,7 +94,7 @@ function shouldPruneSearchBranch({
         for (let traitPos = 0; traitPos < mustIncludeTraitIndices.length; traitPos++) {
             const traitIndexValue = mustIncludeTraitIndices[traitPos];
             const target = mustIncludeTraitTargets[traitPos];
-            if ((currentTraitCounts[traitIndexValue] + remainingTraitPotentialFrom[traitPos][startIdx]) < target) {
+            if (currentTraitCounts[traitIndexValue] + remainingTraitPotentialFrom[traitPos][startIdx] < target) {
                 return true;
             }
         }

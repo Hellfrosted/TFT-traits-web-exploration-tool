@@ -76,7 +76,11 @@ function createSearchCacheService({
         return {
             key,
             params: payload.params,
-            resultCount: Array.isArray(payload.results) ? payload.results.length : (Number.isFinite(payload.resultCount) ? payload.resultCount : 0),
+            resultCount: Array.isArray(payload.results)
+                ? payload.results.length
+                : Number.isFinite(payload.resultCount)
+                  ? payload.resultCount
+                  : 0,
             timestamp: Number.isFinite(payload.timestamp) ? payload.timestamp : null,
             dataFingerprint: typeof payload.dataFingerprint === 'string' ? payload.dataFingerprint : null,
             searchVersion: Number.isFinite(payload.searchVersion) ? payload.searchVersion : searchCacheVersion
@@ -188,10 +192,7 @@ function createSearchCacheService({
     }
 
     function getPreparedSearchContextKey(dataFingerprint, params) {
-        return createHashedCacheKey(
-            dataFingerprint,
-            buildPreparedSearchContextCacheParams(params)
-        );
+        return createHashedCacheKey(dataFingerprint, buildPreparedSearchContextCacheParams(params));
     }
 
     function clearSearchMemoryCaches() {
@@ -284,13 +285,16 @@ function createSearchCacheService({
                 timestamp
             });
             const cacheIndex = await ensureCacheIndexEntries();
-            cacheIndex.set(key, createCacheIndexEntry(key, {
-                searchVersion: searchCacheVersion,
-                dataFingerprint,
-                params,
-                results,
-                timestamp
-            }));
+            cacheIndex.set(
+                key,
+                createCacheIndexEntry(key, {
+                    searchVersion: searchCacheVersion,
+                    dataFingerprint,
+                    params,
+                    results,
+                    timestamp
+                })
+            );
             await persistCacheIndexEntries();
         } catch (error) {
             console.error('Failed to write cache:', error.message);
@@ -332,7 +336,10 @@ function createSearchCacheService({
                 try {
                     canonicalParams = canonicalizeByFingerprint(dataFingerprint, parsed.params);
                 } catch (error) {
-                    console.warn(`Failed to canonicalize params for cache file ${file.file}:`, error.message || String(error));
+                    console.warn(
+                        `Failed to canonicalize params for cache file ${file.file}:`,
+                        error.message || String(error)
+                    );
                     canonicalParams = parsed.params;
                 }
             }
@@ -408,7 +415,9 @@ function createSearchCacheService({
                     try {
                         const quarantinedPath = await cacheStore.quarantineDataFallback(source);
                         if (quarantinedPath) {
-                            console.warn(`Quarantined malformed data fallback snapshot for ${source}: ${quarantinedPath}`);
+                            console.warn(
+                                `Quarantined malformed data fallback snapshot for ${source}: ${quarantinedPath}`
+                            );
                         }
                     } catch (quarantineError) {
                         console.warn(
@@ -426,20 +435,22 @@ function createSearchCacheService({
         try {
             clearSearchMemoryCaches();
             const files = await cacheStore.listCacheFiles();
-            await Promise.all(files.map(async (file) => {
-                try {
-                    const parsed = await cacheStore.readJsonFile(file.filePath);
-                    const hasCurrentVersion = (parsed?.searchVersion ?? 1) === searchCacheVersion;
-                    const hasActiveFingerprint = !activeDataFingerprint
-                        || parsed?.dataFingerprint === activeDataFingerprint;
+            await Promise.all(
+                files.map(async (file) => {
+                    try {
+                        const parsed = await cacheStore.readJsonFile(file.filePath);
+                        const hasCurrentVersion = (parsed?.searchVersion ?? 1) === searchCacheVersion;
+                        const hasActiveFingerprint =
+                            !activeDataFingerprint || parsed?.dataFingerprint === activeDataFingerprint;
 
-                    if (!hasCurrentVersion || !hasActiveFingerprint) {
-                        await fsp.unlink(file.filePath);
+                        if (!hasCurrentVersion || !hasActiveFingerprint) {
+                            await fsp.unlink(file.filePath);
+                        }
+                    } catch {
+                        await fsp.unlink(file.filePath).catch(() => {});
                     }
-                } catch {
-                    await fsp.unlink(file.filePath).catch(() => {});
-                }
-            }));
+                })
+            );
             await rebuildCacheIndex();
         } catch (error) {
             console.warn('Failed to prune cache:', error.message);
@@ -447,9 +458,7 @@ function createSearchCacheService({
     }
 
     async function listCacheEntries(activeDataFingerprint = null, options: LooseRecord = {}) {
-        const limit = Number.isFinite(options?.limit) && options.limit > 0
-            ? Math.trunc(options.limit)
-            : null;
+        const limit = Number.isFinite(options?.limit) && options.limit > 0 ? Math.trunc(options.limit) : null;
         const cacheIndex = await ensureCacheIndexEntries();
         const entries = [...cacheIndex.values()]
             .filter((entry) => entry.searchVersion === searchCacheVersion)
@@ -486,10 +495,7 @@ function createSearchCacheService({
         }
         return {
             deleted: deletedCacheEntries.deleted + deletedFallbackSnapshots.deleted,
-            failures: [
-                ...deletedCacheEntries.failures,
-                ...deletedFallbackSnapshots.failures
-            ]
+            failures: [...deletedCacheEntries.failures, ...deletedFallbackSnapshots.failures]
         };
     }
 

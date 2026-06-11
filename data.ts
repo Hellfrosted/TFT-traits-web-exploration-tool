@@ -46,13 +46,6 @@ const parseMethods = require('./data-engine/parse.js');
 
 class DataEngine {}
 
-Object.assign(
-    DataEngine,
-    sourceMethods,
-    fetchMethods,
-    assetMethods,
-    overrideMethods,
-    parseMethods
-);
+Object.assign(DataEngine, sourceMethods, fetchMethods, assetMethods, overrideMethods, parseMethods);
 
 module.exports = DataEngine;

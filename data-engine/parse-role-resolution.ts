@@ -1,12 +1,5 @@
 module.exports = {
-    _resolveRoleName({
-        cleanName,
-        rawName,
-        roleId,
-        hashDictionary,
-        championReference,
-        setOverrides
-    }) {
+    _resolveRoleName({ cleanName, rawName, roleId, hashDictionary, championReference, setOverrides }) {
         const roleOverrides = setOverrides.roleOverrides || {};
         const roleOverride = roleOverrides[cleanName] || roleOverrides[rawName] || null;
         if (roleOverride) return roleOverride;
@@ -25,11 +18,13 @@ module.exports = {
             return baseRole;
         }
 
-        const variantRoles = [...new Set(
-            (variants || [])
-                .map((variant) => variant?.role)
-                .filter((roleName) => roleName && roleName !== 'Unknown')
-        )];
+        const variantRoles = [
+            ...new Set(
+                (variants || [])
+                    .map((variant) => variant?.role)
+                    .filter((roleName) => roleName && roleName !== 'Unknown')
+            )
+        ];
 
         if (variantRoles.length !== 1) {
             return baseRole;

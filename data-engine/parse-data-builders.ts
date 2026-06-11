@@ -1,14 +1,10 @@
-const {
-    shouldIncludeChampionRecord
-} = require('./parse-data-state.js');
+const { shouldIncludeChampionRecord } = require('./parse-data-state.js');
 const {
     resolveChampionLinkedTraits,
     collectResolvedUnitTaxonomy,
     resolvePreferredChampionIcon
 } = require('./parse-data-units.js');
-const {
-    buildUnitOverrideComposition
-} = require('./parse-data-unit-overrides.js');
+const { buildUnitOverrideComposition } = require('./parse-data-unit-overrides.js');
 
 function buildParseDataHooks(dataEngine: LooseRecord) {
     return {
@@ -51,11 +47,7 @@ function buildParseDataHooks(dataEngine: LooseRecord) {
     };
 }
 
-function buildParsedUnits({
-    rawJSON,
-    parseContext,
-    hooks
-}: LooseRecord) {
+function buildParsedUnits({ rawJSON, parseContext, hooks }: LooseRecord) {
     const units = [];
     const traits = new Set();
     const roles = new Set();
@@ -74,19 +66,21 @@ function buildParsedUnits({
     } = parseContext;
 
     for (const [key, val] of Object.entries(rawJSON as LooseRecord)) {
-        if (!shouldIncludeChampionRecord({
-            key,
-            value: val,
-            rawJSON,
-            rawShopDataLookup,
-            latestSet,
-            setChampionIdentitySet,
-            setOverrides,
-            isChampionRecord: hooks.isChampionRecord,
-            isExcludedUnit: hooks.isExcludedUnit,
-            normalizeChampionIdentity: hooks.normalizeChampionIdentity,
-            detectRawUnitSetNumber: hooks.detectRawUnitSetNumber
-        })) {
+        if (
+            !shouldIncludeChampionRecord({
+                key,
+                value: val,
+                rawJSON,
+                rawShopDataLookup,
+                latestSet,
+                setChampionIdentitySet,
+                setOverrides,
+                isChampionRecord: hooks.isChampionRecord,
+                isExcludedUnit: hooks.isExcludedUnit,
+                normalizeChampionIdentity: hooks.normalizeChampionIdentity,
+                detectRawUnitSetNumber: hooks.detectRawUnitSetNumber
+            })
+        ) {
             continue;
         }
 
@@ -94,12 +88,7 @@ function buildParsedUnits({
         const tier = val.tier || 1;
         const cleanName = rawName.replace(/^TFT\d+_/, '');
         const displayName = hooks.toDisplayName(cleanName) || cleanName;
-        const championReference = hooks.findChampionReference(
-            championReferenceMap,
-            rawName,
-            cleanName,
-            displayName
-        );
+        const championReference = hooks.findChampionReference(championReferenceMap, rawName, cleanName, displayName);
         const roleName = hooks.resolveRoleName({
             cleanName,
             rawName,

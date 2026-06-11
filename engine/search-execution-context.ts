@@ -17,12 +17,8 @@ const {
     buildUnitSearchInfo,
     buildInitialSearchState
 } = require('./search-setup.js');
-const {
-    createTopBoardTracker
-} = require('./search-results.js');
-const {
-    countPreparedSearchSpaceCandidates
-} = require('./search-space-counter.js');
+const { createTopBoardTracker } = require('./search-results.js');
+const { countPreparedSearchSpaceCandidates } = require('./search-space-counter.js');
 const {
     buildAvailableIndices,
     buildUnitIndexById,
@@ -57,25 +53,14 @@ function buildSearchExecutionContext({
         includeUnique,
         maxResults
     } = normalizedParams;
-    const {
-        validUnits,
-        mustHaveMask,
-        remainingSlots,
-        hasVariableSlotCosts
-    } = preparedSearchContext;
+    const { validUnits, mustHaveMask, remainingSlots, hasVariableSlotCosts } = preparedSearchContext;
     const allTraitNames = dataCache.traits;
     const traitBreakpoints = dataCache.traitBreakpoints || {};
     const traitIndex = buildTraitIndex(allTraitNames);
     const availableIndices = buildAvailableIndices(validUnits, mustHaveMask);
     const unitIndexById = buildUnitIndexById(validUnits);
-    const {
-        tankRoleSet,
-        carryRoleSet,
-        requireTank,
-        requireCarry,
-        meetsTankRequirement,
-        meetsCarryRequirement
-    } = buildRoleRequirementState(tankRoles, carryRoles);
+    const { tankRoleSet, carryRoleSet, requireTank, requireCarry, meetsTankRequirement, meetsCarryRequirement } =
+        buildRoleRequirementState(tankRoles, carryRoles);
 
     const numTraits = allTraitNames.length;
     const mustIncludeTraitIndices = buildMustIncludeTraitIndices(mustIncludeTraits, traitIndex);
@@ -122,28 +107,25 @@ function buildSearchExecutionContext({
     });
 
     const maxBoards = maxResults || limits.DEFAULT_MAX_RESULTS;
-    const {
-        hasVariantUnits,
-        hasConditionalProfiles,
-        hasConditionalEffects
-    } = detectSearchFeatures(unitInfo);
+    const { hasVariantUnits, hasConditionalProfiles, hasConditionalEffects } = detectSearchFeatures(unitInfo);
 
     const topBoardTracker = createTopBoardTracker({
         maxBoards,
-        createBoardResult: ({ unitIds, evaluation, totalCost }) => createBoardResult({
-            unitIds,
-            evaluation,
-            totalCost,
-            scoreBoard
-        })
+        createBoardResult: ({ unitIds, evaluation, totalCost }) =>
+            createBoardResult({
+                unitIds,
+                evaluation,
+                totalCost,
+                scoreBoard
+            })
     });
 
     const totalCombinations = hasVariableSlotCosts
         ? countPreparedSearchSpaceCandidates({
-            ...preparedSearchContext,
-            variantLocks,
-            getUnitSlotCostRange: dependencies.getUnitSlotCostRange
-        })
+              ...preparedSearchContext,
+              variantLocks,
+              getUnitSlotCostRange: dependencies.getUnitSlotCostRange
+          })
         : dependencies.combinations(availableIndices.length, remainingSlots);
     const progressTracker = createProgressTracker({
         onProgress,
@@ -152,23 +134,20 @@ function buildSearchExecutionContext({
     });
 
     const currentTraitCounts = new Uint8Array(initialTraitCounts);
-    const {
-        remainingTankThreePlusFrom,
-        remainingTankFourPlusFrom,
-        remainingCarryFourPlusFrom,
-        remainingMaxSlotsFrom
-    } = buildRemainingUnitPotential(availableIndices, unitInfo);
+    const { remainingTankThreePlusFrom, remainingTankFourPlusFrom, remainingCarryFourPlusFrom, remainingMaxSlotsFrom } =
+        buildRemainingUnitPotential(availableIndices, unitInfo);
 
     const mustIncludeTraitTargets = buildMustIncludeTraitTargets(
         mustIncludeTraitIndices,
         allTraitNames,
         traitBreakpoints
     );
-    const useMustIncludePruning = mustIncludeTraitIndices.length > 0
-        && !hasVariantUnits
-        && !hasConditionalProfiles
-        && !hasConditionalEffects
-        && !hasVariableSlotCosts;
+    const useMustIncludePruning =
+        mustIncludeTraitIndices.length > 0 &&
+        !hasVariantUnits &&
+        !hasConditionalProfiles &&
+        !hasConditionalEffects &&
+        !hasVariableSlotCosts;
     const remainingTraitPotentialFrom = buildRemainingTraitPotential({
         useMustIncludePruning,
         mustIncludeTraitIndices,
@@ -195,10 +174,9 @@ function buildSearchExecutionContext({
         traitCountsToRecord: dependencies.traitCountsToRecord
     });
 
-    const canRunSearch = (
+    const canRunSearch =
         remainingSlots <= limits.MAX_REMAINING_SLOTS &&
-        (!Number.isFinite(totalCombinations) || totalCombinations <= limits.COMBINATION_LIMIT)
-    );
+        (!Number.isFinite(totalCombinations) || totalCombinations <= limits.COMBINATION_LIMIT);
 
     return {
         totalCombinations,

@@ -1,9 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const {
-    resolveElectronLaunch,
-    toWindowsPath
-} = require('../tools/electron-launch.js');
+const { resolveElectronLaunch, toWindowsPath } = require('../tools/electron-launch.js');
 
 describe('Electron launch helpers', () => {
     it('converts WSL electron launches into cmd.exe invocations', () => {
@@ -30,16 +27,11 @@ describe('Electron launch helpers', () => {
     });
 
     it('leaves non-WSL launches unchanged', () => {
-        const launch = resolveElectronLaunch(
-            '/tmp/electron',
-            '/tmp/app',
-            ['--dev'],
-            {
-                platform: 'linux',
-                release: '6.8.0',
-                wslDistroName: undefined
-            }
-        );
+        const launch = resolveElectronLaunch('/tmp/electron', '/tmp/app', ['--dev'], {
+            platform: 'linux',
+            release: '6.8.0',
+            wslDistroName: undefined
+        });
 
         assert.deepEqual(launch, {
             command: '/tmp/electron',

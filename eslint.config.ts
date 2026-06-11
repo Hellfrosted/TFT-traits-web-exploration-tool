@@ -3,12 +3,7 @@ const tseslint = require('typescript-eslint');
 
 module.exports = [
     {
-        ignores: [
-            'build/**',
-            'dist/**',
-            'node_modules/**',
-            'renderer-dist/**'
-        ]
+        ignores: ['build/**', 'dist/**', 'node_modules/**', 'renderer-dist/**']
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,
@@ -52,7 +47,7 @@ module.exports = [
             '@typescript-eslint/no-explicit-any': 'off',
             'no-console': 'off',
             'prefer-const': 'warn',
-            'eqeqeq': ['error', 'always'],
+            eqeqeq: ['error', 'always'],
             'no-var': 'error'
         }
     }

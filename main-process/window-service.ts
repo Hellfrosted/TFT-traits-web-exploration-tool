@@ -20,9 +20,7 @@ function createWindowService({
     const requiredBridgeMethods = Array.isArray(rendererContract?.requiredBridgeMethods)
         ? rendererContract.requiredBridgeMethods
         : [];
-    const requiredShellIds = Array.isArray(rendererContract?.requiredShellIds)
-        ? rendererContract.requiredShellIds
-        : [];
+    const requiredShellIds = Array.isArray(rendererContract?.requiredShellIds) ? rendererContract.requiredShellIds : [];
 
     function clearTimer(handle) {
         if (handle) {
@@ -69,7 +67,8 @@ function createWindowService({
         }
 
         try {
-            const result = await mainWindow.webContents.executeJavaScript(`(() => {
+            const result = await mainWindow.webContents.executeJavaScript(
+                `(() => {
                 const requiredMethods = ${JSON.stringify(requiredBridgeMethods)};
                 const requiredIds = ${JSON.stringify(requiredShellIds)};
                 const deadline = Date.now() + ${rendererInspectionTimeoutMs};
@@ -125,7 +124,9 @@ function createWindowService({
                     deadlineTimer = setTimeout(inspect, Math.max(0, deadline - Date.now()));
                     inspect();
                 });
-            })()`, true);
+            })()`,
+                true
+            );
 
             if (!result?.hasElectronAPI) {
                 finishSmokeTest(1, 'window.electronAPI was not exposed.');

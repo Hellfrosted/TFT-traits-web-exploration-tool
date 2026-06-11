@@ -34,11 +34,13 @@ module.exports = {
 
     _normalizeBreakpoints(effects) {
         if (!Array.isArray(effects)) return [];
-        return [...new Set(
-            effects
-                .map((effect) => Number(effect?.minUnits))
-                .filter((minUnits) => Number.isFinite(minUnits) && minUnits > 0)
-        )].sort((a, b) => a - b);
+        return [
+            ...new Set(
+                effects
+                    .map((effect) => Number(effect?.minUnits))
+                    .filter((minUnits) => Number.isFinite(minUnits) && minUnits > 0)
+            )
+        ].sort((a, b) => a - b);
     },
 
     _extractDirectoryFilenames(directoryHtml) {
@@ -84,11 +86,7 @@ module.exports = {
             return [];
         }
 
-        const patterns = [
-            /TFT(\d+)_/gi,
-            /TFT[_-]?Set(\d+)/gi,
-            /Trait[_-]?Icon[_-]?(\d+)[_-]/gi
-        ];
+        const patterns = [/TFT(\d+)_/gi, /TFT[_-]?Set(\d+)/gi, /Trait[_-]?Icon[_-]?(\d+)[_-]/gi];
         const setNumbers = new Set();
 
         patterns.forEach((pattern) => {
@@ -135,8 +133,10 @@ module.exports = {
             return false;
         }
 
-        return this._assetMatchesSet(rawAssetPathOrUrl, setNumber) &&
-            !this._assetMatchesSet(currentAssetPathOrUrl, setNumber);
+        return (
+            this._assetMatchesSet(rawAssetPathOrUrl, setNumber) &&
+            !this._assetMatchesSet(currentAssetPathOrUrl, setNumber)
+        );
     },
 
     _createChampionAssetCandidates(rawName, cleanName, displayName) {
@@ -222,11 +222,7 @@ module.exports = {
             if (!lower.endsWith('.png')) return;
             if (setPrefix && !lower.startsWith(setPrefix)) return;
 
-            const rank = lower.includes('_teamplanner_splash.png')
-                ? 2
-                : lower.includes('_mobile_small.png')
-                    ? 1
-                    : 0;
+            const rank = lower.includes('_teamplanner_splash.png') ? 2 : lower.includes('_mobile_small.png') ? 1 : 0;
             if (rank === 0) return;
 
             const slug = lower
@@ -299,7 +295,7 @@ module.exports = {
         ];
 
         return preferredFields.reduce((score, fieldName, index) => {
-            return score + (shopData?.[fieldName] ? (preferredFields.length - index) : 0);
+            return score + (shopData?.[fieldName] ? preferredFields.length - index : 0);
         }, 0);
     },
 
@@ -350,36 +346,40 @@ module.exports = {
             return [];
         }
 
-        return setData.champions.filter((champion) => {
-            const rawName = champion.characterName || champion.apiName || '';
-            if (!rawName || this._isExcludedUnit(rawName, setOverrides)) {
-                return false;
-            }
+        return setData.champions
+            .filter((champion) => {
+                const rawName = champion.characterName || champion.apiName || '';
+                if (!rawName || this._isExcludedUnit(rawName, setOverrides)) {
+                    return false;
+                }
 
-            return Array.isArray(champion.traits) && champion.traits.length > 0;
-        }).map((champion) => {
-            const cleanName = this._normalizeUnitAlias(champion.characterName || champion.apiName || champion.name);
-            const displayName = champion.name || this._toDisplayName(cleanName) || cleanName;
-            const iconUrl = this._assetPathToRawUrl(champion.squareIcon || champion.icon, source);
+                return Array.isArray(champion.traits) && champion.traits.length > 0;
+            })
+            .map((champion) => {
+                const cleanName = this._normalizeUnitAlias(champion.characterName || champion.apiName || champion.name);
+                const displayName = champion.name || this._toDisplayName(cleanName) || cleanName;
+                const iconUrl = this._assetPathToRawUrl(champion.squareIcon || champion.icon, source);
 
-            return {
-                cleanName,
-                displayName,
-                role: champion.role || null,
-                iconUrl,
-                identities: [...new Set(
-                    [champion.characterName, champion.apiName]
-                        .filter(Boolean)
-                        .map((value) => this._normalizeChampionIdentity(value))
-                        .filter(Boolean)
-                )],
-                candidates: this._createChampionAssetCandidates(
-                    champion.characterName || champion.apiName,
+                return {
                     cleanName,
-                    displayName
-                )
-            };
-        });
+                    displayName,
+                    role: champion.role || null,
+                    iconUrl,
+                    identities: [
+                        ...new Set(
+                            [champion.characterName, champion.apiName]
+                                .filter(Boolean)
+                                .map((value) => this._normalizeChampionIdentity(value))
+                                .filter(Boolean)
+                        )
+                    ],
+                    candidates: this._createChampionAssetCandidates(
+                        champion.characterName || champion.apiName,
+                        cleanName,
+                        displayName
+                    )
+                };
+            });
     },
 
     _buildChampionIdentitySet(setChampionRecords) {
@@ -460,7 +460,14 @@ module.exports = {
         return null;
     },
 
-    _findRawShopData(rawChampionRecord, rawJSON, rawShopDataLookup = null, rawName = '', cleanName = '', displayName = '') {
+    _findRawShopData(
+        rawChampionRecord,
+        rawJSON,
+        rawShopDataLookup = null,
+        rawName = '',
+        cleanName = '',
+        displayName = ''
+    ) {
         const directKey = rawChampionRecord?.mShopData;
         const directShopData = directKey ? rawJSON?.[directKey] : null;
         if (this._looksLikeShopData(directShopData)) {
@@ -481,7 +488,15 @@ module.exports = {
         return null;
     },
 
-    _resolveRawChampionIcon(rawChampionRecord, rawJSON, rawShopDataLookup = null, rawName = '', cleanName = '', displayName = '', source = DEFAULT_DATA_SOURCE) {
+    _resolveRawChampionIcon(
+        rawChampionRecord,
+        rawJSON,
+        rawShopDataLookup = null,
+        rawName = '',
+        cleanName = '',
+        displayName = '',
+        source = DEFAULT_DATA_SOURCE
+    ) {
         const shopData = this._findRawShopData(
             rawChampionRecord,
             rawJSON,
@@ -505,19 +520,19 @@ module.exports = {
         const traitIcons = {};
         const traitEntries = Array.isArray(setData?.traits)
             ? setData.traits.map((trait) => ({
-                displayName: trait.displayName || trait.name || trait.apiName || trait.traitId,
-                apiName: trait.apiName,
-                icon: trait.icon,
-                aliases: [trait.apiName, trait.name, trait.displayName, trait.traitId].filter(Boolean)
-            }))
+                  displayName: trait.displayName || trait.name || trait.apiName || trait.traitId,
+                  apiName: trait.apiName,
+                  icon: trait.icon,
+                  aliases: [trait.apiName, trait.name, trait.displayName, trait.traitId].filter(Boolean)
+              }))
             : Array.isArray(rawTraitMetadata?.traitRecords)
-                ? rawTraitMetadata.traitRecords.map((trait) => ({
+              ? rawTraitMetadata.traitRecords.map((trait) => ({
                     displayName: trait.alias || trait.key,
                     apiName: trait.alias || trait.key,
                     icon: trait.iconPath || null,
                     aliases: [trait.alias, trait.key].filter(Boolean)
                 }))
-                : [];
+              : [];
 
         if (traitEntries.length === 0) {
             return traitIcons;
@@ -557,10 +572,11 @@ module.exports = {
             });
 
             const match = fileEntries.find((entry) => {
-                return [...candidates].some((candidate) =>
-                    entry.baseName === candidate ||
-                    entry.baseName.startsWith(`${candidate}.`) ||
-                    entry.baseName.includes(candidate)
+                return [...candidates].some(
+                    (candidate) =>
+                        entry.baseName === candidate ||
+                        entry.baseName.startsWith(`${candidate}.`) ||
+                        entry.baseName.includes(candidate)
                 );
             });
 

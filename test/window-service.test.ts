@@ -4,10 +4,7 @@ const assert = require('node:assert/strict');
 const { createWindowService } = require('../main-process/window-service.js');
 const { RENDERER_CONTRACT } = require('../bridge-contract.js');
 
-function createWindowServiceUnderTest({
-    executeJavaScriptImpl,
-    smokeTimeoutMs = 20000
-}: LooseRecord = {}) {
+function createWindowServiceUnderTest({ executeJavaScriptImpl, smokeTimeoutMs = 20000 }: LooseRecord = {}) {
     const EXIT_TIMEOUT_MS = 500;
     const app = {
         exitCalls: [],
@@ -34,12 +31,14 @@ function createWindowServiceUnderTest({
     const listeners = {};
     let windowOpenHandler = null;
     const webContents = {
-        executeJavaScript: executeJavaScriptImpl || (async () => ({
-            hasElectronAPI: true,
-            missingMethods: [],
-            missingIds: [],
-            preloadFailureText: false
-        })),
+        executeJavaScript:
+            executeJavaScriptImpl ||
+            (async () => ({
+                hasElectronAPI: true,
+                missingMethods: [],
+                missingIds: [],
+                preloadFailureText: false
+            })),
         on(eventName, handler) {
             listeners[eventName] = handler;
         },

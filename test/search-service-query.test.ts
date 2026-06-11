@@ -72,18 +72,24 @@ describe('search service query helpers', () => {
         const estimate = await query.getSearchEstimate({ boardSize: 7 });
 
         assert.deepEqual(estimate, { count: 3, remainingSlots: 7 });
-        assert.deepEqual(cacheKeyCalls, [{
-            dataFingerprint: 'fp-1',
-            params: { boardSize: 7, canonical: true }
-        }]);
-        assert.deepEqual(preparedCalls, [{
-            dataCache: { dataFingerprint: 'fp-1', units: ['A', 'B'] },
-            params: { boardSize: 7, canonical: true }
-        }]);
-        assert.deepEqual(setEstimateCalls, [{
-            key: 'estimate-key',
-            estimate: { count: 3, remainingSlots: 7 }
-        }]);
+        assert.deepEqual(cacheKeyCalls, [
+            {
+                dataFingerprint: 'fp-1',
+                params: { boardSize: 7, canonical: true }
+            }
+        ]);
+        assert.deepEqual(preparedCalls, [
+            {
+                dataCache: { dataFingerprint: 'fp-1', units: ['A', 'B'] },
+                params: { boardSize: 7, canonical: true }
+            }
+        ]);
+        assert.deepEqual(setEstimateCalls, [
+            {
+                key: 'estimate-key',
+                estimate: { count: 3, remainingSlots: 7 }
+            }
+        ]);
     });
 
     it('reuses cached estimates when only result-limiting params change', async () => {

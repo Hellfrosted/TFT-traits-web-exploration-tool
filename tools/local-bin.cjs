@@ -5,11 +5,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-function isWslRuntime(runtime = {
-    platform: process.platform,
-    release: os.release(),
-    wslDistroName: process.env.WSL_DISTRO_NAME
-}) {
+function isWslRuntime(
+    runtime = {
+        platform: process.platform,
+        release: os.release(),
+        wslDistroName: process.env.WSL_DISTRO_NAME
+    }
+) {
     if (runtime.platform !== 'linux') {
         return false;
     }
@@ -40,11 +42,16 @@ function toWindowsPath(pathValue) {
     return `${driveLetter.toUpperCase()}:\\${rest.replaceAll('/', '\\')}`;
 }
 
-function resolveLocalBinCommand(binName, binArgs, runtime = {
-    platform: process.platform,
-    release: os.release(),
-    wslDistroName: process.env.WSL_DISTRO_NAME
-}, cwd = process.cwd()) {
+function resolveLocalBinCommand(
+    binName,
+    binArgs,
+    runtime = {
+        platform: process.platform,
+        release: os.release(),
+        wslDistroName: process.env.WSL_DISTRO_NAME
+    },
+    cwd = process.cwd()
+) {
     if (isWslRuntime(runtime)) {
         const windowsShim = path.join(cwd, 'node_modules', '.bin', `${binName}.CMD`);
         if (!fs.existsSync(windowsShim)) {

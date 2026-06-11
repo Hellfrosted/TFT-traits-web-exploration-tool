@@ -3,25 +3,29 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const {
-    isWslRuntime,
-    resolveLocalBinCommand,
-    toWindowsPath
-} = require(path.join(process.cwd(), 'tools/local-bin.cjs'));
+const { isWslRuntime, resolveLocalBinCommand, toWindowsPath } = require(
+    path.join(process.cwd(), 'tools/local-bin.cjs')
+);
 
 describe('local tool runner helpers', () => {
     it('detects WSL runtimes', () => {
-        assert.equal(isWslRuntime({
-            platform: 'linux',
-            release: '6.6.87.2-microsoft-standard-WSL2',
-            wslDistroName: 'Ubuntu'
-        }), true);
+        assert.equal(
+            isWslRuntime({
+                platform: 'linux',
+                release: '6.6.87.2-microsoft-standard-WSL2',
+                wslDistroName: 'Ubuntu'
+            }),
+            true
+        );
 
-        assert.equal(isWslRuntime({
-            platform: 'linux',
-            release: '6.8.0',
-            wslDistroName: undefined
-        }), false);
+        assert.equal(
+            isWslRuntime({
+                platform: 'linux',
+                release: '6.8.0',
+                wslDistroName: undefined
+            }),
+            false
+        );
     });
 
     it('rewrites mounted Windows paths', () => {
@@ -50,10 +54,7 @@ describe('local tool runner helpers', () => {
 
         assert.deepEqual(commandSpec, {
             command: 'cmd.exe',
-            args: [
-                '/c',
-                `cd /d ${toWindowsPath(tempDir)} && call node_modules\\.bin\\biome.CMD lint .`
-            ]
+            args: ['/c', `cd /d ${toWindowsPath(tempDir)} && call node_modules\\.bin\\biome.CMD lint .`]
         });
     });
 

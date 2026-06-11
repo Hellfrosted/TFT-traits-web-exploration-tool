@@ -1,9 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-    buildParsedUnits
-} = require('../data-engine/parse-data-builders.js');
+const { buildParsedUnits } = require('../data-engine/parse-data-builders.js');
 
 describe('parse-data builders', () => {
     it('builds parsed units, taxonomy, and matched references from champion records', () => {
@@ -12,9 +10,7 @@ describe('parse-data builders', () => {
                 mCharacterName: 'TFT17_Aurora',
                 tier: 4,
                 CharacterRole: 'TankRole',
-                mLinkedTraits: [
-                    { TraitData: '{TraitA}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitA}' }]
             },
             ignored: {
                 mCharacterName: 'NotAChampion'
@@ -51,9 +47,7 @@ describe('parse-data builders', () => {
             getUnitOverride: () => ({
                 slotCost: 2,
                 traitContributions: { BonusTrait: 1 },
-                conditionalEffects: [
-                    { traitContributions: { EffectTrait: 1 } }
-                ],
+                conditionalEffects: [{ traitContributions: { EffectTrait: 1 } }],
                 conditionalProfiles: [
                     {
                         traits: ['ProfileTrait'],
@@ -73,7 +67,8 @@ describe('parse-data builders', () => {
             buildDetectedVariantOverrides: () => {
                 throw new Error('should not auto-detect variants when overrides already define them');
             },
-            mergeUnitOverrides: (unitOverride, autoDetectedVariantOverride) => unitOverride || autoDetectedVariantOverride,
+            mergeUnitOverrides: (unitOverride, autoDetectedVariantOverride) =>
+                unitOverride || autoDetectedVariantOverride,
             applyUnitTraitOverrides: (traitNames) => [...new Set(traitNames)],
             buildTraitContributionMap: (traitNames, unitOverride) => {
                 const traitContributions = {};
@@ -120,9 +115,7 @@ describe('parse-data builders', () => {
                 Invoker: 1,
                 BonusTrait: 1
             },
-            conditionalEffects: [
-                { traitContributions: { EffectTrait: 1 } }
-            ],
+            conditionalEffects: [{ traitContributions: { EffectTrait: 1 } }],
             conditionalProfiles: [
                 {
                     traits: ['ProfileTrait'],

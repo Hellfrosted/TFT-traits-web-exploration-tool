@@ -6,14 +6,16 @@ module.exports = {
 
         const requiredUnits = Array.isArray(conditions.requiredUnits) ? conditions.requiredUnits : [];
         const forbiddenUnits = Array.isArray(conditions.forbiddenUnits) ? conditions.forbiddenUnits : [];
-        const requiredActiveTraits = Array.isArray(conditions.requiredActiveTraits) ? conditions.requiredActiveTraits : [];
-        const forbiddenActiveTraits = Array.isArray(conditions.forbiddenActiveTraits) ? conditions.forbiddenActiveTraits : [];
-        const minTraitCounts = conditions.minTraitCounts && typeof conditions.minTraitCounts === 'object'
-            ? conditions.minTraitCounts
-            : {};
-        const maxTraitCounts = conditions.maxTraitCounts && typeof conditions.maxTraitCounts === 'object'
-            ? conditions.maxTraitCounts
-            : {};
+        const requiredActiveTraits = Array.isArray(conditions.requiredActiveTraits)
+            ? conditions.requiredActiveTraits
+            : [];
+        const forbiddenActiveTraits = Array.isArray(conditions.forbiddenActiveTraits)
+            ? conditions.forbiddenActiveTraits
+            : [];
+        const minTraitCounts =
+            conditions.minTraitCounts && typeof conditions.minTraitCounts === 'object' ? conditions.minTraitCounts : {};
+        const maxTraitCounts =
+            conditions.maxTraitCounts && typeof conditions.maxTraitCounts === 'object' ? conditions.maxTraitCounts : {};
 
         return {
             requiredUnitIndices: requiredUnits.map((unitId) => unitIndexById[unitId] ?? -1),
@@ -130,33 +132,47 @@ module.exports = {
             return false;
         }
 
-        const requiredActiveTraits = Array.isArray(conditions.requiredActiveTraits) ? conditions.requiredActiveTraits : [];
-        if (requiredActiveTraits.some((traitName) => {
-            const breakpoints = traitBreakpoints[traitName] || [1];
-            return (traitCounts[traitName] || 0) < breakpoints[0];
-        })) {
+        const requiredActiveTraits = Array.isArray(conditions.requiredActiveTraits)
+            ? conditions.requiredActiveTraits
+            : [];
+        if (
+            requiredActiveTraits.some((traitName) => {
+                const breakpoints = traitBreakpoints[traitName] || [1];
+                return (traitCounts[traitName] || 0) < breakpoints[0];
+            })
+        ) {
             return false;
         }
 
-        const forbiddenActiveTraits = Array.isArray(conditions.forbiddenActiveTraits) ? conditions.forbiddenActiveTraits : [];
-        if (forbiddenActiveTraits.some((traitName) => {
-            const breakpoints = traitBreakpoints[traitName] || [1];
-            return (traitCounts[traitName] || 0) >= breakpoints[0];
-        })) {
+        const forbiddenActiveTraits = Array.isArray(conditions.forbiddenActiveTraits)
+            ? conditions.forbiddenActiveTraits
+            : [];
+        if (
+            forbiddenActiveTraits.some((traitName) => {
+                const breakpoints = traitBreakpoints[traitName] || [1];
+                return (traitCounts[traitName] || 0) >= breakpoints[0];
+            })
+        ) {
             return false;
         }
 
-        const minTraitCounts = conditions.minTraitCounts && typeof conditions.minTraitCounts === 'object'
-            ? conditions.minTraitCounts
-            : {};
-        if (Object.entries(minTraitCounts).some(([traitName, minCount]) => (traitCounts[traitName] || 0) < Number(minCount || 0))) {
+        const minTraitCounts =
+            conditions.minTraitCounts && typeof conditions.minTraitCounts === 'object' ? conditions.minTraitCounts : {};
+        if (
+            Object.entries(minTraitCounts).some(
+                ([traitName, minCount]) => (traitCounts[traitName] || 0) < Number(minCount || 0)
+            )
+        ) {
             return false;
         }
 
-        const maxTraitCounts = conditions.maxTraitCounts && typeof conditions.maxTraitCounts === 'object'
-            ? conditions.maxTraitCounts
-            : {};
-        if (Object.entries(maxTraitCounts).some(([traitName, maxCount]) => (traitCounts[traitName] || 0) > Number(maxCount))) {
+        const maxTraitCounts =
+            conditions.maxTraitCounts && typeof conditions.maxTraitCounts === 'object' ? conditions.maxTraitCounts : {};
+        if (
+            Object.entries(maxTraitCounts).some(
+                ([traitName, maxCount]) => (traitCounts[traitName] || 0) > Number(maxCount)
+            )
+        ) {
             return false;
         }
 

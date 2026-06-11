@@ -24,82 +24,104 @@ describe('react renderer helpers', () => {
             { units: ['C'], synergyScore: 5, totalCost: 15 }
         ];
 
-        assert.deepEqual(sortBoards(boards, 'mostTraits').map((board) => board.units[0]), ['C', 'B', 'A']);
-        assert.deepEqual(sortBoards(boards, 'lowestCost').map((board) => board.units[0]), ['B', 'A', 'C']);
-        assert.deepEqual(sortBoards(boards, 'highestCost').map((board) => board.units[0]), ['C', 'A', 'B']);
-        assert.deepEqual(sortBoards(boards, 'bestValue').map((board) => board.units[0]), ['B', 'C', 'A']);
+        assert.deepEqual(
+            sortBoards(boards, 'mostTraits').map((board) => board.units[0]),
+            ['C', 'B', 'A']
+        );
+        assert.deepEqual(
+            sortBoards(boards, 'lowestCost').map((board) => board.units[0]),
+            ['B', 'A', 'C']
+        );
+        assert.deepEqual(
+            sortBoards(boards, 'highestCost').map((board) => board.units[0]),
+            ['C', 'A', 'B']
+        );
+        assert.deepEqual(
+            sortBoards(boards, 'bestValue').map((board) => board.units[0]),
+            ['B', 'C', 'A']
+        );
     });
 
     it('builds active data maps and trait summaries for result rendering', async () => {
-        const {
-            buildTraitSummary,
-            createActiveData,
-            getAssetCoverageLabel
-        } = await loadHelpers();
-        const activeData = createActiveData({
-            units: [
-                { id: 'Aatrox', displayName: 'Aatrox' },
-                { id: 'Jax', displayName: 'Jax' }
-            ],
-            traits: ['Bruiser', 'Duelist', 'Ace'],
-            roles: ['Tank', 'Carry'],
-            traitBreakpoints: {
-                Bruiser: [2, 4],
-                Duelist: [2, 4],
-                Ace: [1]
+        const { buildTraitSummary, createActiveData, getAssetCoverageLabel } = await loadHelpers();
+        const activeData = createActiveData(
+            {
+                units: [
+                    { id: 'Aatrox', displayName: 'Aatrox' },
+                    { id: 'Jax', displayName: 'Jax' }
+                ],
+                traits: ['Bruiser', 'Duelist', 'Ace'],
+                roles: ['Tank', 'Carry'],
+                traitBreakpoints: {
+                    Bruiser: [2, 4],
+                    Duelist: [2, 4],
+                    Ace: [1]
+                },
+                traitIcons: {
+                    Bruiser: 'bruiser.png'
+                },
+                assetValidation: {
+                    valid: 2,
+                    total: 3
+                },
+                dataSource: 'latest',
+                dataFingerprint: 'fingerprint'
             },
-            traitIcons: {
-                Bruiser: 'bruiser.png'
-            },
-            assetValidation: {
-                valid: 2,
-                total: 3
-            },
-            dataSource: 'latest',
-            dataFingerprint: 'fingerprint'
-        }, 'pbe');
+            'pbe'
+        );
 
-        const summaryWithoutUnique = buildTraitSummary({
-            traitCounts: {
-                Bruiser: 2,
-                Duelist: 1,
-                Ace: 1
+        const summaryWithoutUnique = buildTraitSummary(
+            {
+                traitCounts: {
+                    Bruiser: 2,
+                    Duelist: 1,
+                    Ace: 1
+                }
+            },
+            activeData,
+            {
+                includeUnique: false,
+                extraEmblems: ['Duelist']
             }
-        }, activeData, {
-            includeUnique: false,
-            extraEmblems: ['Duelist']
-        });
-        const summaryWithUnique = buildTraitSummary({
-            traitCounts: {
-                Ace: 1
+        );
+        const summaryWithUnique = buildTraitSummary(
+            {
+                traitCounts: {
+                    Ace: 1
+                }
+            },
+            activeData,
+            {
+                includeUnique: true,
+                extraEmblems: []
             }
-        }, activeData, {
-            includeUnique: true,
-            extraEmblems: []
-        });
+        );
 
         assert.equal(activeData.unitMap.get('Jax').displayName, 'Jax');
         assert.equal(activeData.dataSource, 'latest');
         assert.equal(getAssetCoverageLabel(activeData.assetValidation), '2/3');
-        assert.deepEqual(summaryWithoutUnique.map((trait) => trait.label), [
-            'Bruiser 2/2',
-            'Duelist 2/2'
-        ]);
-        assert.deepEqual(summaryWithUnique.map((trait) => trait.label), ['Ace 1/1']);
+        assert.deepEqual(
+            summaryWithoutUnique.map((trait) => trait.label),
+            ['Bruiser 2/2', 'Duelist 2/2']
+        );
+        assert.deepEqual(
+            summaryWithUnique.map((trait) => trait.label),
+            ['Ace 1/1']
+        );
     });
 
     it('collects trait labels from base units and variants', async () => {
         const { collectUnitTraitLabels } = await loadHelpers();
 
-        assert.deepEqual(collectUnitTraitLabels({
-            traits: ['Bruiser'],
-            traitContributions: {
-                Vanguard: 1
-            },
-            variants: [
-                { traits: ['Duelist'] },
-                { traitContributions: { Ace: 1 } }
-            ]
-        }), ['Ace', 'Duelist', 'Vanguard']);
+        assert.deepEqual(
+            collectUnitTraitLabels({
+                traits: ['Bruiser'],
+                traitContributions: {
+                    Vanguard: 1
+                },
+                variants: [{ traits: ['Duelist'] }, { traitContributions: { Ace: 1 } }]
+            }),
+            ['Ace', 'Duelist', 'Vanguard']
+        );
     });
 });

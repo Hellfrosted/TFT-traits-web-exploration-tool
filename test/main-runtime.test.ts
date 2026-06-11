@@ -147,29 +147,31 @@ function createRuntimeUnderTest(options: LooseRecord = {}) {
             resolveDataFallbackPath: () => 'storage-root\\data.json'
         },
         setTimeoutFn: options.setTimeoutFn,
-        createSearchCacheService: options.createSearchCacheService || (() => ({
-            ensureCacheDir: () => {
-                ensureCacheDirCalls += 1;
-            },
-            migrateCanonicalParams: async () => {
-                serviceCalls.migrateCanonicalParams += 1;
-            },
-            listCacheEntries: async (_activeDataFingerprint, requestOptions = {}) => {
-                serviceCalls.listCacheEntries += 1;
-                serviceCalls.listCacheOptions.push(requestOptions);
-                return [];
-            },
-            deleteCacheEntry: async () => {
-                serviceCalls.deleteCacheEntry += 1;
-            },
-            clearAllCache: async () => {
-                serviceCalls.clearAllCache += 1;
-                return {
-                    deleted: 0,
-                    failures: []
-                };
-            }
-        })),
+        createSearchCacheService:
+            options.createSearchCacheService ||
+            (() => ({
+                ensureCacheDir: () => {
+                    ensureCacheDirCalls += 1;
+                },
+                migrateCanonicalParams: async () => {
+                    serviceCalls.migrateCanonicalParams += 1;
+                },
+                listCacheEntries: async (_activeDataFingerprint, requestOptions = {}) => {
+                    serviceCalls.listCacheEntries += 1;
+                    serviceCalls.listCacheOptions.push(requestOptions);
+                    return [];
+                },
+                deleteCacheEntry: async () => {
+                    serviceCalls.deleteCacheEntry += 1;
+                },
+                clearAllCache: async () => {
+                    serviceCalls.clearAllCache += 1;
+                    return {
+                        deleted: 0,
+                        failures: []
+                    };
+                }
+            })),
         createDataService: () => ({
             fetchData: async () => {
                 serviceCalls.fetchData += 1;
@@ -229,9 +231,9 @@ function createRuntimeUnderTest(options: LooseRecord = {}) {
             senderFrame: Object.prototype.hasOwnProperty.call(overrides, 'senderFrame')
                 ? overrides.senderFrame
                 : {
-                    isMainFrame: true,
-                    url: senderUrl
-                }
+                      isMainFrame: true,
+                      url: senderUrl
+                  }
         };
     }
 
@@ -263,14 +265,8 @@ describe('main runtime', () => {
     });
 
     it('registers and tears down process, app, and IPC handlers explicitly', async () => {
-        const {
-            runtime,
-            fakeApp,
-            fakeIpcMain,
-            fakeProcess,
-            getCounts,
-            getWindowServiceOptions
-        } = createRuntimeUnderTest();
+        const { runtime, fakeApp, fakeIpcMain, fakeProcess, getCounts, getWindowServiceOptions } =
+            createRuntimeUnderTest();
 
         const started = runtime.start();
         await started.readyPromise;
@@ -372,10 +368,13 @@ describe('main runtime', () => {
             }
         };
 
-        const result = await handler({
-            sender,
-            senderFrame: undefined
-        }, { boardSize: 9 });
+        const result = await handler(
+            {
+                sender,
+                senderFrame: undefined
+            },
+            { boardSize: 9 }
+        );
 
         assert.deepEqual(result, { count: 0, remainingSlots: 0 });
         assert.equal(serviceCalls.getSearchEstimate, 1);
@@ -390,10 +389,7 @@ describe('main runtime', () => {
             getURL: () => 'file:///index.html'
         };
 
-        await assert.rejects(
-            handler(createInvokeEvent({ sender: foreignSender }), 'pbe'),
-            /Unauthorized IPC sender\./
-        );
+        await assert.rejects(handler(createInvokeEvent({ sender: foreignSender }), 'pbe'), /Unauthorized IPC sender\./);
 
         assert.equal(serviceCalls.fetchData, 0);
     });
@@ -405,12 +401,15 @@ describe('main runtime', () => {
         const handler = fakeIpcMain.handlers.get('search-boards');
 
         await assert.rejects(
-            handler(createInvokeEvent({
-                senderFrame: {
-                    isMainFrame: false,
-                    url: 'file:///index.html'
-                }
-            }), { boardSize: 9 }),
+            handler(
+                createInvokeEvent({
+                    senderFrame: {
+                        isMainFrame: false,
+                        url: 'file:///index.html'
+                    }
+                }),
+                { boardSize: 9 }
+            ),
             /Unauthorized IPC sender\./
         );
 
@@ -424,12 +423,14 @@ describe('main runtime', () => {
         const handler = fakeIpcMain.handlers.get('list-cache');
 
         await assert.rejects(
-            handler(createInvokeEvent({
-                senderFrame: {
-                    isMainFrame: true,
-                    url: 'https://example.com'
-                }
-            })),
+            handler(
+                createInvokeEvent({
+                    senderFrame: {
+                        isMainFrame: true,
+                        url: 'https://example.com'
+                    }
+                })
+            ),
             /Unauthorized IPC sender\./
         );
 
@@ -443,12 +444,15 @@ describe('main runtime', () => {
         const handler = fakeIpcMain.handlers.get('normalize-search-params');
 
         await assert.rejects(
-            handler(createInvokeEvent({
-                senderFrame: {
-                    isMainFrame: false,
-                    url: 'file:///index.html'
-                }
-            }), { boardSize: 9 }),
+            handler(
+                createInvokeEvent({
+                    senderFrame: {
+                        isMainFrame: false,
+                        url: 'file:///index.html'
+                    }
+                }),
+                { boardSize: 9 }
+            ),
             /Unauthorized IPC sender\./
         );
 

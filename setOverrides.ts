@@ -20,17 +20,20 @@ function mergeUnique(...lists) {
 }
 
 function getSetOverrides({ setNumber = null }: LooseRecord = {}) {
-    const setOverrides = setNumber ? (SET_OVERRIDES[String(setNumber)] || {}) : {};
+    const setOverrides = setNumber ? SET_OVERRIDES[String(setNumber)] || {} : {};
     const unitOverrides = {
         ...GLOBAL_OVERRIDES.unitOverrides,
         ...(setOverrides.unitOverrides || {})
     };
-    const unitOverrideNotes = Object.entries(unitOverrides as LooseRecord).reduce((notes: LooseRecord, [unitId, override]) => {
-        if (override?.note) {
-            notes[unitId] = override.note;
-        }
-        return notes;
-    }, {});
+    const unitOverrideNotes = Object.entries(unitOverrides as LooseRecord).reduce(
+        (notes: LooseRecord, [unitId, override]) => {
+            if (override?.note) {
+                notes[unitId] = override.note;
+            }
+            return notes;
+        },
+        {}
+    );
     const unitOverrideUnknownRoleUnits = Object.entries(unitOverrides as LooseRecord)
         .filter(([, override]) => override?.allowUnknownRole)
         .map(([unitId]) => unitId);
@@ -44,14 +47,8 @@ function getSetOverrides({ setNumber = null }: LooseRecord = {}) {
             GLOBAL_OVERRIDES.excludedUnitSuffixes,
             setOverrides.excludedUnitSuffixes || []
         ),
-        excludedUnitExact: mergeUnique(
-            GLOBAL_OVERRIDES.excludedUnitExact,
-            setOverrides.excludedUnitExact || []
-        ),
-        excludedTraitNames: mergeUnique(
-            GLOBAL_OVERRIDES.excludedTraitNames,
-            setOverrides.excludedTraitNames || []
-        ),
+        excludedUnitExact: mergeUnique(GLOBAL_OVERRIDES.excludedUnitExact, setOverrides.excludedUnitExact || []),
+        excludedTraitNames: mergeUnique(GLOBAL_OVERRIDES.excludedTraitNames, setOverrides.excludedTraitNames || []),
         roleOverrides: {
             ...GLOBAL_OVERRIDES.roleOverrides,
             ...(setOverrides.roleOverrides || {})

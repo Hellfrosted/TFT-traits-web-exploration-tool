@@ -28,7 +28,8 @@ describe('parser fixtures', () => {
                     apiName: 'TFT17_Kaisa',
                     characterName: 'TFT17_Kaisa',
                     name: "Kai'Sa",
-                    squareIcon: 'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
+                    squareIcon:
+                        'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
                     traits: ['Challenger']
                 }
             ],
@@ -44,7 +45,10 @@ describe('parser fixtures', () => {
         const parsed = DataEngine.parseData(rawJSON, cdragonJSON);
 
         assert.equal(parsed.setNumber, '17');
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['KaiSa']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['KaiSa']
+        );
         assert.deepEqual(parsed.units[0].traits, ['Challenger']);
         assert.deepEqual(parsed.roles, ['Carry']);
         assert.deepEqual(parsed.traitBreakpoints.Challenger, [2, 4]);

@@ -9,15 +9,9 @@ function buildRoleRequirementState(tankRoles = [], carryRoles = []) {
         carryRoleSet,
         requireTank,
         requireCarry,
-        meetsTankRequirement: (tankThreePlusCount, tankFourPlusCount) => (
-            !requireTank ||
-            tankFourPlusCount >= 1 ||
-            tankThreePlusCount >= 2
-        ),
-        meetsCarryRequirement: (carryFourPlusCount) => (
-            !requireCarry ||
-            carryFourPlusCount >= 1
-        )
+        meetsTankRequirement: (tankThreePlusCount, tankFourPlusCount) =>
+            !requireTank || tankFourPlusCount >= 1 || tankThreePlusCount >= 2,
+        meetsCarryRequirement: (carryFourPlusCount) => !requireCarry || carryFourPlusCount >= 1
     };
 }
 
@@ -87,14 +81,24 @@ function buildUnitSearchInfo({
                     traits: variant.traits || [],
                     fullTraitContributionEntries: buildTraitContributionEntries(variant, traitIndex, hashMap),
                     traitContributionEntries: buildTraitContributionEntries(variant, traitIndex, hashMap),
-                    compiledConditions: compileConditions(variant.conditions, traitIndex, unitIndexById, traitBreakpoints),
+                    compiledConditions: compileConditions(
+                        variant.conditions,
+                        traitIndex,
+                        unitIndexById,
+                        traitBreakpoints
+                    ),
                     conditionalProfileEntries: buildConditionalProfileEntries(
                         variant.conditionalProfiles,
                         traitIndex,
                         hashMap
                     ).map((profile) => ({
                         ...profile,
-                        compiledConditions: compileConditions(profile.conditions, traitIndex, unitIndexById, traitBreakpoints)
+                        compiledConditions: compileConditions(
+                            profile.conditions,
+                            traitIndex,
+                            unitIndexById,
+                            traitBreakpoints
+                        )
                     })),
                     conditionalEffectEntries: buildConditionalEffectEntries(
                         variant.conditionalEffects,
@@ -102,7 +106,12 @@ function buildUnitSearchInfo({
                         hashMap
                     ).map((effect) => ({
                         ...effect,
-                        compiledConditions: compileConditions(effect.conditions, traitIndex, unitIndexById, traitBreakpoints)
+                        compiledConditions: compileConditions(
+                            effect.conditions,
+                            traitIndex,
+                            unitIndexById,
+                            traitBreakpoints
+                        )
                     }))
                 }));
 
@@ -140,25 +149,19 @@ function buildUnitSearchInfo({
             conditionalProfileEntries,
             conditionalEffectEntries,
             variantProfiles,
-            hasComplexEvaluation: (
+            hasComplexEvaluation:
                 conditionalProfileEntries.length > 0 ||
                 conditionalEffectEntries.length > 0 ||
                 variantProfiles.length > 0
-            ) ? 1 : 0,
+                    ? 1
+                    : 0,
             sortRank: unitSortRank[unit.id] ?? 0,
             id: unit.id
         };
     });
 }
 
-function buildInitialSearchState({
-    validUnits,
-    unitInfo,
-    mustHaveMask,
-    extraEmblems,
-    traitIndex,
-    numTraits
-}) {
+function buildInitialSearchState({ validUnits, unitInfo, mustHaveMask, extraEmblems, traitIndex, numTraits }) {
     let mustHaveInitialTankThreePlusCount = 0;
     let mustHaveInitialTankFourPlusCount = 0;
     let mustHaveInitialCarryFourPlusCount = 0;

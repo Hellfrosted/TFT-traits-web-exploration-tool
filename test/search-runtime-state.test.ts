@@ -36,10 +36,12 @@ describe('search runtime state helpers', () => {
                 conditionalEffectEntries: []
             },
             {
-                variantProfiles: [{
-                    conditionalProfileEntries: [],
-                    conditionalEffectEntries: [{ trait: 'Arcane' }]
-                }],
+                variantProfiles: [
+                    {
+                        conditionalProfileEntries: [],
+                        conditionalEffectEntries: [{ trait: 'Arcane' }]
+                    }
+                ],
                 conditionalProfileEntries: [{ addTraits: ['Shadow'] }],
                 conditionalEffectEntries: []
             }

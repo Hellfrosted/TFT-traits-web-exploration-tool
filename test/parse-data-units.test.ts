@@ -10,11 +10,7 @@ const {
 describe('parse-data unit helpers', () => {
     it('resolves linked trait aliases while filtering excluded traits', () => {
         const linkedTraits = resolveChampionLinkedTraits({
-            linkedTraits: [
-                { TraitData: '{TraitA}' },
-                { TraitData: '{TraitB}' },
-                { TraitData: null }
-            ],
+            linkedTraits: [{ TraitData: '{TraitA}' }, { TraitData: '{TraitB}' }, { TraitData: null }],
             hashDictionary: {
                 '{TraitA}': 'TraitAliasA',
                 '{TraitB}': 'TraitAliasB'
@@ -32,9 +28,7 @@ describe('parse-data unit helpers', () => {
                 { traitId: '{TraitA}', resolvedName: 'Trait A' },
                 { traitId: '{TraitB}', resolvedName: 'Trait B' }
             ],
-            includedLinkedTraits: [
-                { traitId: '{TraitA}', resolvedName: 'Trait A' }
-            ],
+            includedLinkedTraits: [{ traitId: '{TraitA}', resolvedName: 'Trait A' }],
             linkedTraitNames: ['Trait A'],
             hasExcludedLinkedTraits: true
         });
@@ -48,9 +42,7 @@ describe('parse-data unit helpers', () => {
             traits,
             roles,
             effectiveTraitNames: ['BaseTrait'],
-            conditionalEffects: [
-                { traitContributions: { ConditionalTrait: 1 } }
-            ],
+            conditionalEffects: [{ traitContributions: { ConditionalTrait: 1 } }],
             conditionalProfiles: [
                 {
                     traits: ['ProfileTrait'],
@@ -112,27 +104,33 @@ describe('parse-data unit helpers', () => {
     });
 
     it('falls back to metadata or raw icons when one side is missing', () => {
-        assert.equal(resolvePreferredChampionIcon({
-            rawShopIcon: null,
-            championIcon: null,
-            championReferenceIconUrl: 'https://assets.example/TFT17_Foo_Metadata.png',
-            latestSet: 17,
-            shouldPreferRawAsset: () => false,
-            assetMatchesSet: () => false,
-            rankChampionIconAsset: () => 3
-        }), 'https://assets.example/TFT17_Foo_Metadata.png');
+        assert.equal(
+            resolvePreferredChampionIcon({
+                rawShopIcon: null,
+                championIcon: null,
+                championReferenceIconUrl: 'https://assets.example/TFT17_Foo_Metadata.png',
+                latestSet: 17,
+                shouldPreferRawAsset: () => false,
+                assetMatchesSet: () => false,
+                rankChampionIconAsset: () => 3
+            }),
+            'https://assets.example/TFT17_Foo_Metadata.png'
+        );
 
-        assert.equal(resolvePreferredChampionIcon({
-            rawShopIcon: {
-                url: 'https://assets.example/TFT17_Foo_Square.png',
-                rank: 4
-            },
-            championIcon: null,
-            championReferenceIconUrl: null,
-            latestSet: 17,
-            shouldPreferRawAsset: () => false,
-            assetMatchesSet: () => false,
-            rankChampionIconAsset: () => -1
-        }), 'https://assets.example/TFT17_Foo_Square.png');
+        assert.equal(
+            resolvePreferredChampionIcon({
+                rawShopIcon: {
+                    url: 'https://assets.example/TFT17_Foo_Square.png',
+                    rank: 4
+                },
+                championIcon: null,
+                championReferenceIconUrl: null,
+                latestSet: 17,
+                shouldPreferRawAsset: () => false,
+                assetMatchesSet: () => false,
+                rankChampionIconAsset: () => -1
+            }),
+            'https://assets.example/TFT17_Foo_Square.png'
+        );
     });
 });

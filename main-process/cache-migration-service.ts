@@ -96,10 +96,10 @@ function createCacheMigrationService({
 
     async function migrateFingerprintWithStrictNormalization(dataFingerprint) {
         if (
-            typeof cacheService.migrateCanonicalParams !== 'function'
-            || typeof dataFingerprint !== 'string'
-            || !dataFingerprint
-            || strictlyMigratedFingerprints.has(dataFingerprint)
+            typeof cacheService.migrateCanonicalParams !== 'function' ||
+            typeof dataFingerprint !== 'string' ||
+            !dataFingerprint ||
+            strictlyMigratedFingerprints.has(dataFingerprint)
         ) {
             return;
         }
@@ -131,7 +131,10 @@ function createCacheMigrationService({
                 strictFingerprints: [...strictlyMigratedFingerprints].sort()
             });
         } catch (error) {
-            console.warn(`Failed to migrate cached params for fingerprint ${dataFingerprint}:`, error.message || String(error));
+            console.warn(
+                `Failed to migrate cached params for fingerprint ${dataFingerprint}:`,
+                error.message || String(error)
+            );
         }
     }
 

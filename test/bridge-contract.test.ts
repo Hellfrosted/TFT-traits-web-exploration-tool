@@ -8,10 +8,7 @@ const bridgeContract = require('../bridge-contract.js');
 const constants = require('../constants.js');
 
 function loadPreloadBridge() {
-    const source = fs.readFileSync(
-        path.join(__dirname, '..', 'preload.js'),
-        'utf8'
-    );
+    const source = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
     let exposedApi = null;
     const invokeCalls = [];
     const sandbox = {
@@ -76,10 +73,7 @@ describe('shared bridge contract', () => {
         assert.deepEqual(toPlainData(preloadBridge.limits), bridgeContract.LIMITS);
         assert.deepEqual(toPlainData(preloadBridge.rendererContract), bridgeContract.RENDERER_CONTRACT);
         assert.equal(typeof preloadBridge.normalizeSearchParams, 'function');
-        assert.equal(
-            bridgeContract.RENDERER_CONTRACT.requiredBridgeMethods.includes('normalizeSearchParams'),
-            true
-        );
+        assert.equal(bridgeContract.RENDERER_CONTRACT.requiredBridgeMethods.includes('normalizeSearchParams'), true);
 
         preloadBridge.normalizeSearchParams({ boardSize: 9 });
         assert.equal(invokeCalls.length, 1);

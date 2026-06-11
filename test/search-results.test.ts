@@ -1,10 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-    createTopBoardTracker,
-    finalizeTopBoards
-} = require('../engine/search-results.js');
+const { createTopBoardTracker, finalizeTopBoards } = require('../engine/search-results.js');
 
 describe('search results helpers', () => {
     it('tracks only the strongest boards up to the configured max', () => {
@@ -37,10 +34,7 @@ describe('search results helpers', () => {
             totalCost: 1
         });
 
-        assert.deepEqual(
-            tracker.topBoards.map((board) => board.units[0]).sort(),
-            ['B', 'C']
-        );
+        assert.deepEqual(tracker.topBoards.map((board) => board.units[0]).sort(), ['B', 'C']);
     });
 
     it('finalizes boards by dropping scores and sorting deterministically', () => {

@@ -84,33 +84,36 @@ describe('search param normalization', () => {
     });
 
     it('drops unknown values when normalizing against active data', () => {
-        const normalized = normalizeSearchParamsForData({
-            boardSize: 9,
-            maxResults: 500,
-            mustInclude: ['KnownUnit', 'UnknownUnit'],
-            mustExclude: ['UnknownUnit'],
-            mustIncludeTraits: ['KnownTrait', 'UnknownTrait'],
-            mustExcludeTraits: ['UnknownTrait'],
-            tankRoles: ['Tank', 'UnknownRole'],
-            carryRoles: ['Carry', 'UnknownRole'],
-            extraEmblems: ['KnownTrait', 'UnknownTrait'],
-            variantLocks: {
-                KnownUnit: 'mode-a',
-                UnknownUnit: 'mode-z'
+        const normalized = normalizeSearchParamsForData(
+            {
+                boardSize: 9,
+                maxResults: 500,
+                mustInclude: ['KnownUnit', 'UnknownUnit'],
+                mustExclude: ['UnknownUnit'],
+                mustIncludeTraits: ['KnownTrait', 'UnknownTrait'],
+                mustExcludeTraits: ['UnknownTrait'],
+                tankRoles: ['Tank', 'UnknownRole'],
+                carryRoles: ['Carry', 'UnknownRole'],
+                extraEmblems: ['KnownTrait', 'UnknownTrait'],
+                variantLocks: {
+                    KnownUnit: 'mode-a',
+                    UnknownUnit: 'mode-z'
+                },
+                onlyActive: true,
+                tierRank: true,
+                includeUnique: false
             },
-            onlyActive: true,
-            tierRank: true,
-            includeUnique: false
-        }, {
-            units: [
-                {
-                    id: 'KnownUnit',
-                    variants: [{ id: 'mode-a' }]
-                }
-            ],
-            traits: ['KnownTrait'],
-            roles: ['Tank', 'Carry']
-        });
+            {
+                units: [
+                    {
+                        id: 'KnownUnit',
+                        variants: [{ id: 'mode-a' }]
+                    }
+                ],
+                traits: ['KnownTrait'],
+                roles: ['Tank', 'Carry']
+            }
+        );
 
         assert.deepEqual(normalized.mustInclude, ['KnownUnit']);
         assert.deepEqual(normalized.mustExclude, []);

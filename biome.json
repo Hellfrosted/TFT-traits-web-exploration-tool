@@ -11,6 +11,7 @@
       "**",
       "!build",
       "!dist",
+      "!.omo",
       "!node_modules",
       "!renderer-dist",
       "!tools/node"
@@ -20,12 +21,12 @@
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 4,
-    "lineEnding": "crlf",
+    "lineEnding": "lf",
     "lineWidth": 120
   },
   "javascript": {
     "formatter": {
-      "lineEnding": "crlf",
+      "lineEnding": "lf",
       "quoteStyle": "single",
       "semicolons": "always",
       "trailingCommas": "none"
@@ -34,7 +35,7 @@
   "json": {
     "formatter": {
       "expand": "always",
-      "lineEnding": "crlf",
+      "lineEnding": "lf",
       "indentWidth": 2
     }
   },

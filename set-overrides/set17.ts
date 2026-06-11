@@ -25,9 +25,7 @@ function createMechaFormSelectionGroup() {
 
 function createMechaOverride() {
     return {
-        selectionGroups: [
-            createMechaFormSelectionGroup()
-        ]
+        selectionGroups: [createMechaFormSelectionGroup()]
     };
 }
 

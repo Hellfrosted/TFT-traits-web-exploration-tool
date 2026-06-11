@@ -80,10 +80,12 @@ describe('search dfs runner', () => {
         });
 
         assert.equal(progressMarks, 1);
-        assert.deepEqual(visitedBoards, [{
-            occupiedSlots: 2,
-            unitIndices: [0, 1]
-        }]);
+        assert.deepEqual(visitedBoards, [
+            {
+                occupiedSlots: 2,
+                unitIndices: [0, 1]
+            }
+        ]);
     });
 
     it('stops immediately when the prune helper rejects the branch', () => {
@@ -104,15 +106,17 @@ describe('search dfs runner', () => {
         runSearchDfs({
             boardSize: 1,
             availableIndices: [0],
-            unitInfo: [{
-                minSlotCost: 1,
-                qualifyingTankThreePlus: 0,
-                qualifyingTankFourPlus: 0,
-                qualifyingCarryFourPlus: 0,
-                cost: 1,
-                hasComplexEvaluation: 0,
-                slotFlex: 0
-            }],
+            unitInfo: [
+                {
+                    minSlotCost: 1,
+                    qualifyingTankThreePlus: 0,
+                    qualifyingTankFourPlus: 0,
+                    qualifyingCarryFourPlus: 0,
+                    cost: 1,
+                    hasComplexEvaluation: 0,
+                    slotFlex: 0
+                }
+            ],
             currentTraitCounts: new Uint8Array(0),
             activeUnitFlags: new Uint8Array(1),
             progressTracker: {

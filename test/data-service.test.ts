@@ -37,9 +37,10 @@ describe('main-process data service', () => {
         const dataService = createDataService({
             dataEngine: {
                 normalizeDataSource: (source) => source,
-                fetchAndParse: async ({ source }) => await new Promise((resolve) => {
-                    pendingFetches.push({ source, resolve });
-                })
+                fetchAndParse: async ({ source }) =>
+                    await new Promise((resolve) => {
+                        pendingFetches.push({ source, resolve });
+                    })
             },
             cacheService: {
                 readDataFallback: async () => null,
@@ -54,18 +55,22 @@ describe('main-process data service', () => {
         const olderFetchPromise = dataService.fetchData('pbe');
         const newerFetchPromise = dataService.fetchData('latest');
 
-        pendingFetches[1].resolve(createParsedData({
-            source: 'latest',
-            fingerprint: 'newer-fingerprint',
-            unitId: 'NewerUnit'
-        }));
+        pendingFetches[1].resolve(
+            createParsedData({
+                source: 'latest',
+                fingerprint: 'newer-fingerprint',
+                unitId: 'NewerUnit'
+            })
+        );
         const newerResponse = await newerFetchPromise;
 
-        pendingFetches[0].resolve(createParsedData({
-            source: 'pbe',
-            fingerprint: 'older-fingerprint',
-            unitId: 'OlderUnit'
-        }));
+        pendingFetches[0].resolve(
+            createParsedData({
+                source: 'pbe',
+                fingerprint: 'older-fingerprint',
+                unitId: 'OlderUnit'
+            })
+        );
         const olderResponse = await olderFetchPromise;
 
         assert.equal(newerResponse.dataFingerprint, 'newer-fingerprint');
@@ -96,11 +101,13 @@ describe('main-process data service', () => {
             defaultDataSource: 'pbe'
         });
 
-        dataService.setDataCache(createParsedData({
-            source: 'pbe',
-            fingerprint: 'baseline-fingerprint',
-            unitId: 'BaselineUnit'
-        }));
+        dataService.setDataCache(
+            createParsedData({
+                source: 'pbe',
+                fingerprint: 'baseline-fingerprint',
+                unitId: 'BaselineUnit'
+            })
+        );
 
         const olderFetchPromise = dataService.fetchData('pbe');
         const newerFetchPromise = dataService.fetchData('latest');
@@ -108,11 +115,13 @@ describe('main-process data service', () => {
         pendingFetches[1].reject(new Error('Network timeout'));
         await assert.rejects(newerFetchPromise, /Network timeout/);
 
-        pendingFetches[0].resolve(createParsedData({
-            source: 'pbe',
-            fingerprint: 'older-fingerprint',
-            unitId: 'OlderUnit'
-        }));
+        pendingFetches[0].resolve(
+            createParsedData({
+                source: 'pbe',
+                fingerprint: 'older-fingerprint',
+                unitId: 'OlderUnit'
+            })
+        );
         const olderResponse = await olderFetchPromise;
 
         assert.equal(olderResponse.dataFingerprint, 'older-fingerprint');
@@ -148,12 +157,16 @@ describe('main-process data service', () => {
 
         // Newer fetch (index 1) completes first and writes its fallback.
         await pendingFetches[1].writeFallback({ dataFingerprint: 'newer-fingerprint' });
-        pendingFetches[1].resolve(createParsedData({ source: 'pbe', fingerprint: 'newer-fingerprint', unitId: 'NewerUnit' }));
+        pendingFetches[1].resolve(
+            createParsedData({ source: 'pbe', fingerprint: 'newer-fingerprint', unitId: 'NewerUnit' })
+        );
         await newerFetchPromise;
 
         // Older fetch (index 0) finishes late and attempts to write its fallback.
         await pendingFetches[0].writeFallback({ dataFingerprint: 'older-fingerprint' });
-        pendingFetches[0].resolve(createParsedData({ source: 'pbe', fingerprint: 'older-fingerprint', unitId: 'OlderUnit' }));
+        pendingFetches[0].resolve(
+            createParsedData({ source: 'pbe', fingerprint: 'older-fingerprint', unitId: 'OlderUnit' })
+        );
         await olderFetchPromise;
 
         // Only the newer fetch's fallback write should have reached cacheService.
@@ -187,11 +200,15 @@ describe('main-process data service', () => {
         const latestFetchPromise = dataService.fetchData('latest');
 
         await pendingFetches[1].writeFallback({ dataFingerprint: 'latest-fingerprint' });
-        pendingFetches[1].resolve(createParsedData({ source: 'latest', fingerprint: 'latest-fingerprint', unitId: 'LatestUnit' }));
+        pendingFetches[1].resolve(
+            createParsedData({ source: 'latest', fingerprint: 'latest-fingerprint', unitId: 'LatestUnit' })
+        );
         await latestFetchPromise;
 
         await pendingFetches[0].writeFallback({ dataFingerprint: 'pbe-fingerprint' });
-        pendingFetches[0].resolve(createParsedData({ source: 'pbe', fingerprint: 'pbe-fingerprint', unitId: 'PbeUnit' }));
+        pendingFetches[0].resolve(
+            createParsedData({ source: 'pbe', fingerprint: 'pbe-fingerprint', unitId: 'PbeUnit' })
+        );
         await pbeFetchPromise;
 
         assert.deepEqual(writeFallbackCalls, [
@@ -211,11 +228,12 @@ describe('main-process data service', () => {
             const dataService = createDataService({
                 dataEngine: {
                     normalizeDataSource: (source) => source,
-                    fetchAndParse: async ({ source }) => createParsedData({
-                        source,
-                        fingerprint: 'fresh-fingerprint',
-                        unitId: 'FreshUnit'
-                    })
+                    fetchAndParse: async ({ source }) =>
+                        createParsedData({
+                            source,
+                            fingerprint: 'fresh-fingerprint',
+                            unitId: 'FreshUnit'
+                        })
                 },
                 cacheService: {
                     readDataFallback: async () => null,

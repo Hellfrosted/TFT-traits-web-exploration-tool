@@ -4,11 +4,6 @@ const searchExecutionMethods = require('./engine/search-execution.js');
 
 class Engine {}
 
-Object.assign(
-    Engine,
-    traitMethods,
-    conditionMethods,
-    searchExecutionMethods
-);
+Object.assign(Engine, traitMethods, conditionMethods, searchExecutionMethods);
 
 module.exports = Engine;

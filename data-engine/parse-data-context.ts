@@ -1,8 +1,5 @@
 const { getSetOverrides } = require('../setOverrides.js');
-const {
-    buildSetTraitIndexes,
-    mergeRawTraitMetadata
-} = require('./parse-data-state.js');
+const { buildSetTraitIndexes, mergeRawTraitMetadata } = require('./parse-data-state.js');
 
 function buildHashDictionary(rawJSON: LooseRecord) {
     const hashDictionary = {};
@@ -36,14 +33,7 @@ function buildRawMetadataIndex(rawJSON: LooseRecord, source, hooks: LooseRecord)
     };
 }
 
-function resolveSetParseContext({
-    rawJSON,
-    cdragonJSON,
-    parseOptions,
-    rawShopDataLookup,
-    source,
-    hooks
-}) {
+function resolveSetParseContext({ rawJSON, cdragonJSON, parseOptions, rawShopDataLookup, source, hooks }) {
     const latestSet = hooks.detectLatestSet(cdragonJSON) || hooks.detectLatestSetFromRaw(rawJSON);
     const setOverrides = parseOptions.setOverrides || getSetOverrides({ setNumber: latestSet });
     const setData = hooks.getLatestSetData(cdragonJSON);
@@ -103,7 +93,13 @@ function prepareAssetLookupContext({
     };
 }
 
-function buildParseDataContext(rawJSON, cdragonJSON, assetSources: LooseRecord = {}, parseOptions: LooseRecord = {}, hooks: LooseRecord = {}) {
+function buildParseDataContext(
+    rawJSON,
+    cdragonJSON,
+    assetSources: LooseRecord = {},
+    parseOptions: LooseRecord = {},
+    hooks: LooseRecord = {}
+) {
     const source = hooks.normalizeDataSource(parseOptions.source);
     const rawMetadataIndex = buildRawMetadataIndex(rawJSON, source, hooks);
     const setContext = resolveSetParseContext({
@@ -158,9 +154,7 @@ function buildParsedDataResult({
     createDataFingerprint
 }) {
     const sortedTraits = Array.from(traits).sort();
-    const missingChampionIcons = units
-        .filter((unit) => !unit.iconUrl)
-        .map((unit) => unit.displayName);
+    const missingChampionIcons = units.filter((unit) => !unit.iconUrl).map((unit) => unit.displayName);
 
     const parsedData = {
         units,

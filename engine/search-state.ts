@@ -18,13 +18,7 @@ function buildMustIncludeTraitTargets(mustIncludeTraitIndices = [], allTraitName
 
 function calculateSynergyScore(
     counts,
-    {
-        allTraitNames = [],
-        traitBreakpoints = {},
-        onlyActive = true,
-        tierRank = true,
-        includeUnique = false
-    } = {}
+    { allTraitNames = [], traitBreakpoints = {}, onlyActive = true, tierRank = true, includeUnique = false } = {}
 ) {
     let score = 0;
     for (let index = 0; index < allTraitNames.length; index++) {
@@ -51,7 +45,7 @@ function calculateSynergyScore(
         if (tierRank) {
             score += levelsPassed;
         } else {
-            score += (levelsPassed > 0 ? 1 : (onlyActive ? 0 : 1));
+            score += levelsPassed > 0 ? 1 : onlyActive ? 0 : 1;
         }
     }
 

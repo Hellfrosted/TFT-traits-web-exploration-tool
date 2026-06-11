@@ -13,37 +13,32 @@ function createIpcRouter({
 }: LooseRecord = {}) {
     function assertTrustedSender(event, channel) {
         const mainWindow = getMainWindow();
-        const hasLiveMainWindow = !!mainWindow
-            && (typeof mainWindow.isDestroyed !== 'function' || !mainWindow.isDestroyed());
+        const hasLiveMainWindow =
+            !!mainWindow && (typeof mainWindow.isDestroyed !== 'function' || !mainWindow.isDestroyed());
         const sender = event?.sender;
         const senderFrame = event?.senderFrame || sender?.mainFrame || null;
         const expectedWebContents = mainWindow?.webContents;
-        const senderMatchesMainWindow = !!sender
-            && !!expectedWebContents
-            && (
-                sender === expectedWebContents
-                || (
-                    Number.isInteger(sender.id)
-                    && Number.isInteger(expectedWebContents.id)
-                    && sender.id === expectedWebContents.id
-                )
-            );
+        const senderMatchesMainWindow =
+            !!sender &&
+            !!expectedWebContents &&
+            (sender === expectedWebContents ||
+                (Number.isInteger(sender.id) &&
+                    Number.isInteger(expectedWebContents.id) &&
+                    sender.id === expectedWebContents.id));
         const isMainFrame = senderFrame?.isMainFrame !== false;
-        const senderUrl = typeof senderFrame?.url === 'string' && senderFrame.url
-            ? senderFrame.url
-            : sender?.getURL?.();
+        const senderUrl =
+            typeof senderFrame?.url === 'string' && senderFrame.url ? senderFrame.url : sender?.getURL?.();
 
         const isFileRenderer = typeof senderUrl === 'string' && senderUrl.startsWith('file://');
-        const isTrustedDevRenderer = rendererDevServerUrl
-            && typeof senderUrl === 'string'
-            && senderUrl.startsWith(rendererDevServerUrl);
+        const isTrustedDevRenderer =
+            rendererDevServerUrl && typeof senderUrl === 'string' && senderUrl.startsWith(rendererDevServerUrl);
 
         if (
-            !hasLiveMainWindow
-            || !senderMatchesMainWindow
-            || !isMainFrame
-            || typeof senderUrl !== 'string'
-            || (!isFileRenderer && !isTrustedDevRenderer)
+            !hasLiveMainWindow ||
+            !senderMatchesMainWindow ||
+            !isMainFrame ||
+            typeof senderUrl !== 'string' ||
+            (!isFileRenderer && !isTrustedDevRenderer)
         ) {
             console.warn(`Rejected unauthorized IPC sender for ${channel}.`);
             throw new Error('Unauthorized IPC sender.');

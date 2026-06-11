@@ -26,10 +26,7 @@ describe('search dfs state helpers', () => {
 
     it('builds suffix trait potential only when must-include pruning is enabled', () => {
         const availableIndices = [0, 1];
-        const unitInfo = [
-            { traitContributionByIndex: { 2: 1 } },
-            { traitContributionByIndex: { 2: 2 } }
-        ];
+        const unitInfo = [{ traitContributionByIndex: { 2: 1 } }, { traitContributionByIndex: { 2: 2 } }];
 
         const enabled = buildRemainingTraitPotential({
             useMustIncludePruning: true,

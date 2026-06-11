@@ -2,10 +2,7 @@ const crypto = require('node:crypto');
 const { performance } = require('node:perf_hooks');
 
 const Engine = require('../engine.js');
-const {
-    buildSearchBenchmarkData,
-    searchBenchmarkParams
-} = require('./search-benchmark-scenario.js');
+const { buildSearchBenchmarkData, searchBenchmarkParams } = require('./search-benchmark-scenario.js');
 
 function summarizeTimes(times) {
     const sorted = [...times].sort((left, right) => left - right);
@@ -19,10 +16,7 @@ function summarizeTimes(times) {
 }
 
 function digestResults(results) {
-    return crypto
-        .createHash('sha256')
-        .update(JSON.stringify(results))
-        .digest('hex');
+    return crypto.createHash('sha256').update(JSON.stringify(results)).digest('hex');
 }
 
 function runSearchBenchmark({ warmups = 2, runs = 5 } = {}) {

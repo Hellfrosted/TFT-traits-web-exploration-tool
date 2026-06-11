@@ -1,10 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-    evaluateBoardSelection,
-    createBoardResult
-} = require('../engine/search-evaluator.js');
+const { evaluateBoardSelection, createBoardResult } = require('../engine/search-evaluator.js');
 
 describe('search evaluator helpers', () => {
     it('creates board results with score metadata and variant assignments', () => {
@@ -42,34 +39,36 @@ describe('search evaluator helpers', () => {
             baseTraitCounts: Uint8Array.from([1, 0]),
             minOccupiedSlots: 1,
             boardSize: 2,
-            unitInfo: [{
-                id: 'Switcher',
-                baseTraitContributionEntries: [{ index: 0, count: 1 }],
-                conditionalProfileEntries: [],
-                conditionalEffectEntries: [],
-                variantProfiles: [
-                    {
-                        id: 'alpha',
-                        label: 'Alpha Mode',
-                        slotDelta: 1,
-                        compiledConditions: null,
-                        traitContributionEntries: [{ index: 1, count: 1 }],
-                        fullTraitContributionEntries: [{ index: 1, count: 1 }],
-                        conditionalProfileEntries: [],
-                        conditionalEffectEntries: []
-                    },
-                    {
-                        id: 'beta',
-                        label: 'Beta Mode',
-                        slotDelta: 1,
-                        compiledConditions: null,
-                        traitContributionEntries: [{ index: 1, count: 2 }],
-                        fullTraitContributionEntries: [{ index: 1, count: 2 }],
-                        conditionalProfileEntries: [],
-                        conditionalEffectEntries: []
-                    }
-                ]
-            }],
+            unitInfo: [
+                {
+                    id: 'Switcher',
+                    baseTraitContributionEntries: [{ index: 0, count: 1 }],
+                    conditionalProfileEntries: [],
+                    conditionalEffectEntries: [],
+                    variantProfiles: [
+                        {
+                            id: 'alpha',
+                            label: 'Alpha Mode',
+                            slotDelta: 1,
+                            compiledConditions: null,
+                            traitContributionEntries: [{ index: 1, count: 1 }],
+                            fullTraitContributionEntries: [{ index: 1, count: 1 }],
+                            conditionalProfileEntries: [],
+                            conditionalEffectEntries: []
+                        },
+                        {
+                            id: 'beta',
+                            label: 'Beta Mode',
+                            slotDelta: 1,
+                            compiledConditions: null,
+                            traitContributionEntries: [{ index: 1, count: 2 }],
+                            fullTraitContributionEntries: [{ index: 1, count: 2 }],
+                            conditionalProfileEntries: [],
+                            conditionalEffectEntries: []
+                        }
+                    ]
+                }
+            ],
             activeUnitFlags: Uint8Array.from([1]),
             mustIncludeTraitIndices: [1],
             mustIncludeTraitTargets: [2],
@@ -77,9 +76,8 @@ describe('search evaluator helpers', () => {
             calculateSynergyScore: (counts) => counts[1],
             isCompiledConditionSatisfied: () => true,
             findFirstSatisfiedProfile: () => null,
-            traitCountsToRecord: (counts, names) => Object.fromEntries(
-                names.map((name, index) => [name, counts[index]]).filter(([, count]) => count > 0)
-            )
+            traitCountsToRecord: (counts, names) =>
+                Object.fromEntries(names.map((name, index) => [name, counts[index]]).filter(([, count]) => count > 0))
         });
 
         assert.deepEqual(evaluation, {

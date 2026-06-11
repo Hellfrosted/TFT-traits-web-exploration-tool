@@ -91,9 +91,7 @@ describe('Engine.search', () => {
 
         assert.ok(results.length > 0);
         results.forEach((result) => {
-            const units = result.units.map((unitId) =>
-                roleThresholdDataCache.units.find((unit) => unit.id === unitId)
-            );
+            const units = result.units.map((unitId) => roleThresholdDataCache.units.find((unit) => unit.id === unitId));
             const tanks = units.filter((unit) => unit.role === 'Tank');
             const carries = units.filter((unit) => unit.role === 'Carry');
             const tankThreePlusCount = tanks.filter((unit) => unit.cost >= 3).length;
@@ -598,7 +596,16 @@ describe('Engine.search', () => {
             ...baseParams,
             boardSize: 9,
             maxResults: 5,
-            mustInclude: ['Galio', 'VoyagerTwo', 'VoyagerThree', 'ConduitTwo', 'ConduitThree', 'BrawlerTwo', 'Lux', 'Braum'],
+            mustInclude: [
+                'Galio',
+                'VoyagerTwo',
+                'VoyagerThree',
+                'ConduitTwo',
+                'ConduitThree',
+                'BrawlerTwo',
+                'Lux',
+                'Braum'
+            ],
             tankRoles: [],
             carryRoles: [],
             includeUnique: true

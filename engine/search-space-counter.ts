@@ -40,10 +40,7 @@ function countPreparedSearchSpaceCandidates({
 
                 const nextMinSlots = Math.min(overflowMinBucket, minSlots + slotRange.min);
                 const nextMaxSlots = Math.min(maxBucket, maxSlots + slotRange.max);
-                next[nextMinSlots][nextMaxSlots] = Math.min(
-                    cap,
-                    next[nextMinSlots][nextMaxSlots] + count
-                );
+                next[nextMinSlots][nextMaxSlots] = Math.min(cap, next[nextMinSlots][nextMaxSlots] + count);
             }
         }
 

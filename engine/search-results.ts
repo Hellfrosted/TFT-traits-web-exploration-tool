@@ -72,10 +72,7 @@ function createWorstBoardHeap(topBoards) {
     };
 }
 
-function createTopBoardTracker({
-    maxBoards,
-    createBoardResult
-}) {
+function createTopBoardTracker({ maxBoards, createBoardResult }) {
     const topBoards = [];
     const worstBoardHeap = createWorstBoardHeap(topBoards);
 
@@ -116,10 +113,11 @@ function finalizeTopBoards(topBoards = []) {
         delete board._score;
     }
 
-    topBoards.sort((left, right) =>
-        right.synergyScore - left.synergyScore ||
-        right.totalCost - left.totalCost ||
-        left.units.join(',').localeCompare(right.units.join(','))
+    topBoards.sort(
+        (left, right) =>
+            right.synergyScore - left.synergyScore ||
+            right.totalCost - left.totalCost ||
+            left.units.join(',').localeCompare(right.units.join(','))
     );
 
     return topBoards;

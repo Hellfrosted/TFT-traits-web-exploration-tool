@@ -35,21 +35,27 @@ describe('search state helpers', () => {
             Unique: [1]
         };
 
-        assert.equal(calculateSynergyScore(counts, {
-            allTraitNames,
-            traitBreakpoints,
-            onlyActive: true,
-            tierRank: true,
-            includeUnique: false
-        }), 2);
+        assert.equal(
+            calculateSynergyScore(counts, {
+                allTraitNames,
+                traitBreakpoints,
+                onlyActive: true,
+                tierRank: true,
+                includeUnique: false
+            }),
+            2
+        );
 
-        assert.equal(calculateSynergyScore(counts, {
-            allTraitNames,
-            traitBreakpoints,
-            onlyActive: false,
-            tierRank: false,
-            includeUnique: true
-        }), 3);
+        assert.equal(
+            calculateSynergyScore(counts, {
+                allTraitNames,
+                traitBreakpoints,
+                onlyActive: false,
+                tierRank: false,
+                includeUnique: true
+            }),
+            3
+        );
     });
 
     it('scores boards and formats oversized-search errors', () => {

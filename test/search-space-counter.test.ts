@@ -7,17 +7,23 @@ const { mechaSlotDataCache } = require('./fixtures/engine-fixtures.js');
 
 describe('search space counter helpers', () => {
     it('returns zero when the prepared context cannot produce a valid board', () => {
-        assert.equal(countPreparedSearchSpaceCandidates({
-            remainingSlots: -1,
-            hasAllRequiredUnits: true,
-            getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
-        }), 0);
+        assert.equal(
+            countPreparedSearchSpaceCandidates({
+                remainingSlots: -1,
+                hasAllRequiredUnits: true,
+                getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
+            }),
+            0
+        );
 
-        assert.equal(countPreparedSearchSpaceCandidates({
-            remainingSlots: 2,
-            hasAllRequiredUnits: false,
-            getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
-        }), 0);
+        assert.equal(
+            countPreparedSearchSpaceCandidates({
+                remainingSlots: 2,
+                hasAllRequiredUnits: false,
+                getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
+            }),
+            0
+        );
     });
 
     it('counts prepared slot-varying search spaces with required-unit flex', () => {
@@ -29,10 +35,13 @@ describe('search space counter helpers', () => {
             variantLocks: {}
         });
 
-        assert.equal(countPreparedSearchSpaceCandidates({
-            ...preparedContext,
-            getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
-        }), 8);
+        assert.equal(
+            countPreparedSearchSpaceCandidates({
+                ...preparedContext,
+                getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
+            }),
+            8
+        );
     });
 
     it('respects variant locks when counting prepared search spaces', () => {
@@ -46,12 +55,15 @@ describe('search space counter helpers', () => {
             }
         });
 
-        assert.equal(countPreparedSearchSpaceCandidates({
-            ...preparedContext,
-            variantLocks: {
-                Galio: 'two-slot'
-            },
-            getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
-        }), 43);
+        assert.equal(
+            countPreparedSearchSpaceCandidates({
+                ...preparedContext,
+                variantLocks: {
+                    Galio: 'two-slot'
+                },
+                getUnitSlotCostRange: Engine.getUnitSlotCostRange.bind(Engine)
+            }),
+            43
+        );
     });
 });

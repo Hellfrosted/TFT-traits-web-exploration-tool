@@ -42,9 +42,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeStringValue(value: unknown) {
-    const candidate = isRecord(value)
-        ? value.value ?? value.id ?? value.name ?? value.label ?? ''
-        : value;
+    const candidate = isRecord(value) ? (value.value ?? value.id ?? value.name ?? value.label ?? '') : value;
 
     return String(candidate ?? '').trim();
 }
@@ -72,13 +70,15 @@ export function normalizeStringMap(values: unknown) {
     }
 
     const normalized = {};
-    Object.keys(values).sort().forEach((rawKey) => {
-        const key = String(rawKey ?? '').trim();
-        const value = normalizeStringValue(values[rawKey]);
-        if (!key || !value) return;
+    Object.keys(values)
+        .sort()
+        .forEach((rawKey) => {
+            const key = String(rawKey ?? '').trim();
+            const value = normalizeStringValue(values[rawKey]);
+            if (!key || !value) return;
 
-        normalized[key] = value;
-    });
+            normalized[key] = value;
+        });
 
     return normalized;
 }
@@ -190,7 +190,10 @@ function getNormalizationMetadata(dataCache: ActiveSearchData) {
     return metadata;
 }
 
-export function normalizeSearchParamsForData(params: SearchParamsInput = {}, dataCache: ActiveSearchData | null = null) {
+export function normalizeSearchParamsForData(
+    params: SearchParamsInput = {},
+    dataCache: ActiveSearchData | null = null
+) {
     const normalized = normalizeSearchParams(params);
     if (!dataCache || typeof dataCache !== 'object') {
         return normalized;
@@ -229,20 +232,33 @@ export function deriveDefaultCarryRoles(roles: unknown) {
     return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
 }
 
-export function withDefaultRoleFilters(params: SearchParamsInput = {}, dataCache: ActiveSearchData | null = null, limits: SearchQueryLimits = {}) {
+export function withDefaultRoleFilters(
+    params: SearchParamsInput = {},
+    dataCache: ActiveSearchData | null = null,
+    limits: SearchQueryLimits = {}
+) {
     const roles = dataCache?.roles || [];
-    return normalizeSearchParams({
-        ...params,
-        tankRoles: normalizeStringList(params.tankRoles).length ? params.tankRoles : deriveDefaultTankRoles(roles),
-        carryRoles: normalizeStringList(params.carryRoles).length ? params.carryRoles : deriveDefaultCarryRoles(roles)
-    }, limits);
+    return normalizeSearchParams(
+        {
+            ...params,
+            tankRoles: normalizeStringList(params.tankRoles).length ? params.tankRoles : deriveDefaultTankRoles(roles),
+            carryRoles: normalizeStringList(params.carryRoles).length
+                ? params.carryRoles
+                : deriveDefaultCarryRoles(roles)
+        },
+        limits
+    );
 }
 
 export function createDefaultSearchQuery(dataCache: ActiveSearchData | null = null, limits: SearchQueryLimits = {}) {
-    return withDefaultRoleFilters({
-        ...DEFAULT_QUERY,
-        maxResults: limits.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults
-    }, dataCache, limits);
+    return withDefaultRoleFilters(
+        {
+            ...DEFAULT_QUERY,
+            maxResults: limits.DEFAULT_MAX_RESULTS || DEFAULT_QUERY.maxResults
+        },
+        dataCache,
+        limits
+    );
 }
 
 export function buildSerializableSearchParams(params: SearchParamsInput = {}) {
@@ -257,10 +273,9 @@ export function buildSerializableSearchParams(params: SearchParamsInput = {}) {
         tankRoles: [...normalized.tankRoles].sort(),
         carryRoles: [...normalized.carryRoles].sort(),
         extraEmblems: [...normalized.extraEmblems].sort(),
-        variantLocks: Object.keys(normalized.variantLocks).sort().map((unitId) => [
-            unitId,
-            normalized.variantLocks[unitId]
-        ]),
+        variantLocks: Object.keys(normalized.variantLocks)
+            .sort()
+            .map((unitId) => [unitId, normalized.variantLocks[unitId]]),
         onlyActive: normalized.onlyActive,
         tierRank: normalized.tierRank,
         includeUnique: normalized.includeUnique

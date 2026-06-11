@@ -93,14 +93,16 @@ describe('DataEngine.parseData', () => {
                             apiName: 'TFT17_Kaisa',
                             characterName: 'TFT17_Kaisa',
                             name: "Kai'Sa",
-                            squareIcon: 'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
                             traits: ['Challenger']
                         },
                         {
                             apiName: 'TFT17_MissingUnit',
                             characterName: 'TFT17_MissingUnit',
                             name: 'Missing Unit',
-                            squareIcon: 'ASSETS/Characters/TFT17_MissingUnit/Skins/Base/Images/TFT17_MissingUnit_splash_tile_1.TFT_Set17.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT17_MissingUnit/Skins/Base/Images/TFT17_MissingUnit_splash_tile_1.TFT_Set17.tex',
                             traits: ['Challenger']
                         }
                     ],
@@ -150,14 +152,16 @@ describe('DataEngine.parseData', () => {
                             apiName: 'TFT17_Kaisa',
                             characterName: 'TFT17_Kaisa',
                             name: "Kai'Sa",
-                            squareIcon: 'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
                             traits: ['Challenger']
                         },
                         {
                             apiName: 'TFT17_MissingUnit',
                             characterName: 'TFT17_MissingUnit',
                             name: 'Missing Unit',
-                            squareIcon: 'ASSETS/Characters/TFT17_MissingUnit/Skins/Base/Images/TFT17_MissingUnit_splash_tile_1.TFT_Set17.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT17_MissingUnit/Skins/Base/Images/TFT17_MissingUnit_splash_tile_1.TFT_Set17.tex',
                             traits: ['Challenger']
                         }
                     ],
@@ -228,7 +232,8 @@ describe('DataEngine.parseData', () => {
                             apiName: 'TFT17_Kaisa',
                             characterName: 'TFT17_Kaisa',
                             name: "Kai'Sa",
-                            squareIcon: 'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT17_Kaisa/Skins/Base/Images/TFT17_Kaisa_splash_tile_69.TFT_Set17.tex',
                             traits: ['Challenger']
                         }
                     ],
@@ -276,13 +281,7 @@ describe('DataEngine.parseData', () => {
                     traits: [
                         {
                             apiName: 'Bruiser',
-                            effects: [
-                                { minUnits: 4 },
-                                { minUnits: 2 },
-                                { minUnits: 4 },
-                                { minUnits: 0 },
-                                {}
-                            ]
+                            effects: [{ minUnits: 4 }, { minUnits: 2 }, { minUnits: 4 }, { minUnits: 0 }, {}]
                         }
                     ]
                 }
@@ -347,7 +346,10 @@ describe('DataEngine.parseData', () => {
         const parsed = DataEngine.parseData(rawJSON, null);
 
         assert.equal(parsed.setNumber, '17');
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Karma']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Karma']
+        );
     });
 
     it('scopes parsed units using raw asset signals when champion names carry stale set prefixes', () => {
@@ -396,7 +398,10 @@ describe('DataEngine.parseData', () => {
         const parsed = DataEngine.parseData(rawJSON, null);
 
         assert.equal(parsed.setNumber, '18');
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Karma']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Karma']
+        );
     });
 
     it('scopes parsed units to the detected set when older-set raw records share the same champion alias', () => {
@@ -466,7 +471,10 @@ describe('DataEngine.parseData', () => {
 
         const parsed = DataEngine.parseData(rawJSON, cdragonJSON);
 
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['KaiSa']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['KaiSa']
+        );
         assert.deepEqual(parsed.traits, ['Stargazer']);
     });
 
@@ -534,7 +542,8 @@ describe('DataEngine.parseData', () => {
             '{ShopKarma}': {
                 mName: 'TFT17_Karma',
                 TeamPlannerPortraitPath: 'ASSETS/Characters/TFT17_Karma/HUD/TFT17_Karma_Square.TFT_Set17.tex',
-                SquareSplashPath: 'ASSETS/Characters/TFT17_Karma/Skins/Base/Images/TFT17_Karma_splash_tile_11.TFT_Set17.tex',
+                SquareSplashPath:
+                    'ASSETS/Characters/TFT17_Karma/Skins/Base/Images/TFT17_Karma_splash_tile_11.TFT_Set17.tex',
                 __type: 'TftShopData'
             },
             'Characters/TFT17_Karma': {
@@ -615,7 +624,8 @@ describe('DataEngine.parseData', () => {
                             apiName: 'TFT17_Karma',
                             characterName: 'TFT17_Karma',
                             name: 'Karma',
-                            squareIcon: 'ASSETS/Characters/TFT16_Karma/Skins/Base/Images/TFT16_Karma_splash_tile_11.TFT_Set16.tex',
+                            squareIcon:
+                                'ASSETS/Characters/TFT16_Karma/Skins/Base/Images/TFT16_Karma_splash_tile_11.TFT_Set16.tex',
                             traits: ['Invoker']
                         }
                     ],
@@ -657,13 +667,16 @@ describe('DataEngine.parseData', () => {
         };
 
         const parsedA = DataEngine.parseData(rawJSON, null);
-        const parsedB = DataEngine.parseData({
-            ...rawJSON,
-            'Characters/Set12Champion': {
-                ...rawJSON['Characters/Set12Champion'],
-                tier: 3
-            }
-        }, null);
+        const parsedB = DataEngine.parseData(
+            {
+                ...rawJSON,
+                'Characters/Set12Champion': {
+                    ...rawJSON['Characters/Set12Champion'],
+                    tier: 3
+                }
+            },
+            null
+        );
 
         assert.notEqual(parsedA.dataFingerprint, parsedB.dataFingerprint);
     });
@@ -690,7 +703,10 @@ describe('DataEngine.parseData', () => {
 
         const parsed = DataEngine.parseData(rawJSON, null);
 
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Ahri']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Ahri']
+        );
     });
 
     it('skips enemy-only variants that would otherwise duplicate the champion label', () => {
@@ -714,8 +730,14 @@ describe('DataEngine.parseData', () => {
         };
 
         const parsed = DataEngine.parseData(rawJSON, null);
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Aatrox']);
-        assert.deepEqual(parsed.units.map((unit) => unit.displayName), ['Aatrox']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Aatrox']
+        );
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.displayName),
+            ['Aatrox']
+        );
     });
 
     it('skips internal clone, summon, and prop variants from the board pool', () => {
@@ -760,7 +782,10 @@ describe('DataEngine.parseData', () => {
         };
 
         const parsed = DataEngine.parseData(rawJSON, null);
-        assert.deepEqual(parsed.units.map((unit) => unit.id), ['Leona']);
+        assert.deepEqual(
+            parsed.units.map((unit) => unit.id),
+            ['Leona']
+        );
     });
 
     it('drops placeholder choice traits so they do not inflate scoring', () => {
@@ -774,10 +799,7 @@ describe('DataEngine.parseData', () => {
                 mCharacterName: 'TFT17_MissFortune',
                 unitTagsString: 'Champion',
                 tier: 3,
-                mLinkedTraits: [
-                    { TraitData: '{TraitReal}' },
-                    { TraitData: '{TraitPlaceholder}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitReal}' }, { TraitData: '{TraitPlaceholder}' }]
             },
             'Characters/TFT17_MissFortune_TraitClone': {
                 mCharacterName: 'TFT17_MissFortune_TraitClone',
@@ -836,20 +858,14 @@ describe('DataEngine.parseData', () => {
                 unitTagsString: 'Champion',
                 tier: 3,
                 CharacterRole: '{RoleTank}',
-                mLinkedTraits: [
-                    { TraitData: '{TraitFixed}' },
-                    { TraitData: '{TraitPlaceholder}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitFixed}' }, { TraitData: '{TraitPlaceholder}' }]
             },
             'Characters/TFT17_Switcher_TraitClone': {
                 mCharacterName: 'TFT17_Switcher_TraitClone',
                 unitTagsString: 'Champion',
                 tier: 3,
                 CharacterRole: '{RoleCarry}',
-                mLinkedTraits: [
-                    { TraitData: '{TraitConduit}' },
-                    { TraitData: '{TraitReplicator}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitConduit}' }, { TraitData: '{TraitReplicator}' }]
             }
         };
 
@@ -907,20 +923,14 @@ describe('DataEngine.parseData', () => {
                 mCharacterName: 'TFT17_Switcher',
                 unitTagsString: 'Champion',
                 tier: 3,
-                mLinkedTraits: [
-                    { TraitData: '{TraitFixed}' },
-                    { TraitData: '{TraitPlaceholder}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitFixed}' }, { TraitData: '{TraitPlaceholder}' }]
             },
             'Characters/TFT17_Switcher_TraitClone': {
                 mCharacterName: 'TFT17_Switcher_TraitClone',
                 unitTagsString: 'Champion',
                 tier: 3,
                 CharacterRole: '{RoleCarry}',
-                mLinkedTraits: [
-                    { TraitData: '{TraitConduit}' },
-                    { TraitData: '{TraitReplicator}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitConduit}' }, { TraitData: '{TraitReplicator}' }]
             }
         };
 
@@ -972,22 +982,27 @@ describe('DataEngine.parseData', () => {
             }
         };
 
-        const parsed = DataEngine.parseData(rawJSON, null, {}, {
-            setOverrides: createCustomSetOverrides({
-                Switcher: {
-                    conditionalEffects: [
-                        {
-                            conditions: {
-                                requiredActiveTraits: ['Guardian']
-                            },
-                            traitContributions: {
-                                Arcane: 1
+        const parsed = DataEngine.parseData(
+            rawJSON,
+            null,
+            {},
+            {
+                setOverrides: createCustomSetOverrides({
+                    Switcher: {
+                        conditionalEffects: [
+                            {
+                                conditions: {
+                                    requiredActiveTraits: ['Guardian']
+                                },
+                                traitContributions: {
+                                    Arcane: 1
+                                }
                             }
-                        }
-                    ]
-                }
-            })
-        });
+                        ]
+                    }
+                })
+            }
+        );
 
         assert.deepEqual(parsed.units[0].conditionalEffects, [
             {
@@ -1012,28 +1027,30 @@ describe('DataEngine.parseData', () => {
                 unitTagsString: 'Champion',
                 tier: 3,
                 CharacterRole: '{RoleCarry}',
-                mLinkedTraits: [
-                    { TraitData: '{TraitCore}' },
-                    { TraitData: '{TraitShadow}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitCore}' }, { TraitData: '{TraitShadow}' }]
             }
         };
 
-        const parsed = DataEngine.parseData(rawJSON, null, {}, {
-            setOverrides: createCustomSetOverrides({
-                Switcher: {
-                    conditionalProfiles: [
-                        {
-                            conditions: {
-                                requiredActiveTraits: ['Guardian']
-                            },
-                            addTraits: ['Arcane'],
-                            removeTraits: ['Shadow']
-                        }
-                    ]
-                }
-            })
-        });
+        const parsed = DataEngine.parseData(
+            rawJSON,
+            null,
+            {},
+            {
+                setOverrides: createCustomSetOverrides({
+                    Switcher: {
+                        conditionalProfiles: [
+                            {
+                                conditions: {
+                                    requiredActiveTraits: ['Guardian']
+                                },
+                                addTraits: ['Arcane'],
+                                removeTraits: ['Shadow']
+                            }
+                        ]
+                    }
+                })
+            }
+        );
 
         assert.deepEqual(parsed.units[0].conditionalProfiles, [
             {
@@ -1063,34 +1080,39 @@ describe('DataEngine.parseData', () => {
             }
         };
 
-        const parsed = DataEngine.parseData(rawJSON, null, {}, {
-            setOverrides: createCustomSetOverrides({
-                Switcher: {
-                    selectionGroups: [
-                        {
-                            id: 'mode',
-                            options: [
-                                {
-                                    id: 'arcane',
-                                    label: 'Arcane Mode',
-                                    addTraits: ['Arcane'],
-                                    conditionalEffects: [
-                                        {
-                                            conditions: {
-                                                requiredUnits: ['Warden']
-                                            },
-                                            traitContributions: {
-                                                Arcane: 1
+        const parsed = DataEngine.parseData(
+            rawJSON,
+            null,
+            {},
+            {
+                setOverrides: createCustomSetOverrides({
+                    Switcher: {
+                        selectionGroups: [
+                            {
+                                id: 'mode',
+                                options: [
+                                    {
+                                        id: 'arcane',
+                                        label: 'Arcane Mode',
+                                        addTraits: ['Arcane'],
+                                        conditionalEffects: [
+                                            {
+                                                conditions: {
+                                                    requiredUnits: ['Warden']
+                                                },
+                                                traitContributions: {
+                                                    Arcane: 1
+                                                }
                                             }
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            })
-        });
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                })
+            }
+        );
 
         assert.deepEqual(parsed.units[0].variants, [
             {
@@ -1127,39 +1149,41 @@ describe('DataEngine.parseData', () => {
                 unitTagsString: 'Champion',
                 tier: 3,
                 CharacterRole: '{RoleCarry}',
-                mLinkedTraits: [
-                    { TraitData: '{TraitCore}' },
-                    { TraitData: '{TraitShadow}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitCore}' }, { TraitData: '{TraitShadow}' }]
             }
         };
 
-        const parsed = DataEngine.parseData(rawJSON, null, {}, {
-            setOverrides: createCustomSetOverrides({
-                Switcher: {
-                    selectionGroups: [
-                        {
-                            id: 'mode',
-                            options: [
-                                {
-                                    id: 'arcane',
-                                    label: 'Arcane Mode',
-                                    addTraits: ['Arcane'],
-                                    conditionalProfiles: [
-                                        {
-                                            conditions: {
-                                                requiredUnits: ['Warden']
-                                            },
-                                            removeTraits: ['Shadow']
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            })
-        });
+        const parsed = DataEngine.parseData(
+            rawJSON,
+            null,
+            {},
+            {
+                setOverrides: createCustomSetOverrides({
+                    Switcher: {
+                        selectionGroups: [
+                            {
+                                id: 'mode',
+                                options: [
+                                    {
+                                        id: 'arcane',
+                                        label: 'Arcane Mode',
+                                        addTraits: ['Arcane'],
+                                        conditionalProfiles: [
+                                            {
+                                                conditions: {
+                                                    requiredUnits: ['Warden']
+                                                },
+                                                removeTraits: ['Shadow']
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                })
+            }
+        );
 
         assert.deepEqual(parsed.units[0].variants, [
             {
@@ -1200,10 +1224,7 @@ describe('DataEngine.parseData', () => {
                 mCharacterName: 'TFT17_MissFortune',
                 unitTagsString: 'Champion',
                 tier: 3,
-                mLinkedTraits: [
-                    { TraitData: '{TraitReal}' },
-                    { TraitData: '{TraitPlaceholder}' }
-                ]
+                mLinkedTraits: [{ TraitData: '{TraitReal}' }, { TraitData: '{TraitPlaceholder}' }]
             },
             'Characters/TFT17_MissFortune_TraitClone': {
                 mCharacterName: 'TFT17_MissFortune_TraitClone',

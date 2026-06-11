@@ -19,21 +19,21 @@ function buildUnitIndexById(validUnits = []) {
 }
 
 function buildMustIncludeTraitIndices(mustIncludeTraits = [], traitIndex = {}) {
-    return mustIncludeTraits
-        .map((traitName) => traitIndex[traitName])
-        .filter((index) => index !== undefined);
+    return mustIncludeTraits.map((traitName) => traitIndex[traitName]).filter((index) => index !== undefined);
 }
 
 function detectSearchFeatures(unitInfo = []) {
     return {
         hasVariantUnits: unitInfo.some((info) => info.variantProfiles.length > 0),
-        hasConditionalProfiles: unitInfo.some((info) =>
-            info.conditionalProfileEntries.length > 0
-            || info.variantProfiles.some((variant) => variant.conditionalProfileEntries.length > 0)
+        hasConditionalProfiles: unitInfo.some(
+            (info) =>
+                info.conditionalProfileEntries.length > 0 ||
+                info.variantProfiles.some((variant) => variant.conditionalProfileEntries.length > 0)
         ),
-        hasConditionalEffects: unitInfo.some((info) =>
-            info.conditionalEffectEntries.length > 0
-            || info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
+        hasConditionalEffects: unitInfo.some(
+            (info) =>
+                info.conditionalEffectEntries.length > 0 ||
+                info.variantProfiles.some((variant) => variant.conditionalEffectEntries.length > 0)
         )
     };
 }

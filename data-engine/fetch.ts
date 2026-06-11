@@ -24,13 +24,13 @@ function getHeaderValue(headers, name) {
 
 function parseContentLength(headers) {
     const contentLength = Number.parseInt(getHeaderValue(headers, 'content-length'), 10);
-    return Number.isFinite(contentLength) && contentLength >= 0
-        ? contentLength
-        : null;
+    return Number.isFinite(contentLength) && contentLength >= 0 ? contentLength : null;
 }
 
 function createResponseTooLargeError(responseType, actualBytes, limitBytes) {
-    const error = new Error(`Response too large for ${responseType}: ${actualBytes} bytes exceeds limit of ${limitBytes} bytes.`);
+    const error = new Error(
+        `Response too large for ${responseType}: ${actualBytes} bytes exceeds limit of ${limitBytes} bytes.`
+    );
     const typedError = error as Error & LooseRecord;
     typedError.code = RESPONSE_TOO_LARGE_CODE;
     typedError.responseType = responseType;
@@ -75,9 +75,7 @@ async function readResponseTextWithinLimit(res, responseType, limitBytes, contro
                     break;
                 }
 
-                const chunk = value instanceof Uint8Array
-                    ? value
-                    : new Uint8Array(value || []);
+                const chunk = value instanceof Uint8Array ? value : new Uint8Array(value || []);
 
                 totalBytes += chunk.byteLength;
                 if (totalBytes > limitBytes) {
@@ -124,10 +122,7 @@ module.exports = {
 
         if (!rawData) {
             try {
-                const [rawChar, rawTraits] = await Promise.all([
-                    fetchJson(urls.characters),
-                    fetchJson(urls.cdragon)
-                ]);
+                const [rawChar, rawTraits] = await Promise.all([fetchJson(urls.characters), fetchJson(urls.cdragon)]);
 
                 const [rawTraitIconsHtml, rawChampionSplashesHtml] = await Promise.all([
                     fetchText(urls.traitIcons).catch((error) => {
@@ -162,9 +157,7 @@ module.exports = {
                     rawData = cachedSnapshot;
                     usedCachedSnapshot = true;
                 } else {
-                    const staleSnapshotMessage = cachedSnapshot
-                        ? ' Cached offline snapshot is stale.'
-                        : '';
+                    const staleSnapshotMessage = cachedSnapshot ? ' Cached offline snapshot is stale.' : '';
                     throw new Error(
                         `Network error and no fresh offline data available:${staleSnapshotMessage} ${fetchErr.message}`.trim(),
                         { cause: fetchErr }
@@ -177,10 +170,15 @@ module.exports = {
             throw new Error('Invalid character data: expected a JSON object');
         }
 
-        const parsed = this.parseData(rawData.rawChar, rawData.rawTraits, {
-            rawTraitIconsHtml: rawData.rawTraitIconsHtml,
-            rawChampionSplashesHtml: rawData.rawChampionSplashesHtml
-        }, { source });
+        const parsed = this.parseData(
+            rawData.rawChar,
+            rawData.rawTraits,
+            {
+                rawTraitIconsHtml: rawData.rawTraitIconsHtml,
+                rawChampionSplashesHtml: rawData.rawChampionSplashesHtml
+            },
+            { source }
+        );
 
         return {
             ...parsed,
@@ -220,7 +218,12 @@ module.exports = {
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 }
-                const responseText = await readResponseTextWithinLimit(res, responseType, responseByteLimit, controller);
+                const responseText = await readResponseTextWithinLimit(
+                    res,
+                    responseType,
+                    responseByteLimit,
+                    controller
+                );
                 if (responseType === 'text') {
                     return responseText;
                 }

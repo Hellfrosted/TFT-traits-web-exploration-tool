@@ -45,12 +45,8 @@ async function validateSource(source) {
     const leakedUnits = parsedIds.filter((id) => !canonicalIds.has(id)).sort();
     const missingUnits = [...canonicalIds].filter((id) => !parsedIdSet.has(id)).sort();
     const allowedUnknownRoleUnits = new Set(setOverrides.allowedUnknownRoleUnits || []);
-    const unknownRoleUnits = parsed.units
-        .filter((unit) => unit.role === 'Unknown')
-        .map((unit) => unit.id);
-    const unexpectedUnknownRoleUnits = unknownRoleUnits
-        .filter((id) => !allowedUnknownRoleUnits.has(id))
-        .sort();
+    const unknownRoleUnits = parsed.units.filter((unit) => unit.role === 'Unknown').map((unit) => unit.id);
+    const unexpectedUnknownRoleUnits = unknownRoleUnits.filter((id) => !allowedUnknownRoleUnits.has(id)).sort();
     const warnings = [];
     const failures = [];
 
@@ -70,9 +66,7 @@ async function validateSource(source) {
         failures.push(`Canonical set units missing from parsed output: ${missingUnits.join(', ')}`);
     }
     if (parsed.assetValidation?.missingChampionIcons?.length > 0) {
-        warnings.push(
-            `Missing champion icons: ${parsed.assetValidation.missingChampionIcons.slice(0, 10).join(', ')}`
-        );
+        warnings.push(`Missing champion icons: ${parsed.assetValidation.missingChampionIcons.slice(0, 10).join(', ')}`);
     }
     if (unexpectedUnknownRoleUnits.length > 0) {
         warnings.push(`Unexpected Unknown-role units: ${unexpectedUnknownRoleUnits.join(', ')}`);
@@ -95,9 +89,7 @@ async function validateSource(source) {
 
 async function main() {
     const requestedSources = process.argv.slice(2);
-    const sources = requestedSources.length > 0
-        ? requestedSources
-        : [DATA_SOURCES.PBE, DATA_SOURCES.LIVE];
+    const sources = requestedSources.length > 0 ? requestedSources : [DATA_SOURCES.PBE, DATA_SOURCES.LIVE];
     let hasFailures = false;
 
     for (const source of sources) {

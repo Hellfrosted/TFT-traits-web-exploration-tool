@@ -2,16 +2,8 @@ const { calculateSynergyScore: defaultCalculateSynergyScore } = require('./searc
 const { evaluateBoardSelection: defaultEvaluateBoardSelection } = require('./search-evaluator.js');
 
 function createSearchScoreCalculator(
-    {
-        allTraitNames = [],
-        traitBreakpoints = {},
-        onlyActive = true,
-        tierRank = true,
-        includeUnique = false
-    } = {},
-    {
-        calculateSynergyScore = defaultCalculateSynergyScore
-    } = {}
+    { allTraitNames = [], traitBreakpoints = {}, onlyActive = true, tierRank = true, includeUnique = false } = {},
+    { calculateSynergyScore = defaultCalculateSynergyScore } = {}
 ) {
     if (calculateSynergyScore === defaultCalculateSynergyScore) {
         const scoreIndexes = [];
@@ -92,19 +84,20 @@ function createSearchScoreCalculator(
                     continue;
                 }
 
-                score += tierRank ? levelsPassed : (levelsPassed > 0 ? 1 : (onlyActive ? 0 : 1));
+                score += tierRank ? levelsPassed : levelsPassed > 0 ? 1 : onlyActive ? 0 : 1;
             }
             return score;
         };
     }
 
-    return (counts) => calculateSynergyScore(counts, {
-        allTraitNames,
-        traitBreakpoints,
-        onlyActive,
-        tierRank,
-        includeUnique
-    });
+    return (counts) =>
+        calculateSynergyScore(counts, {
+            allTraitNames,
+            traitBreakpoints,
+            onlyActive,
+            tierRank,
+            includeUnique
+        });
 }
 
 function createResolvedBoardSelectionEvaluator(
@@ -120,31 +113,25 @@ function createResolvedBoardSelectionEvaluator(
         findFirstSatisfiedProfile,
         traitCountsToRecord
     },
-    {
-        evaluateBoardSelection = defaultEvaluateBoardSelection
-    } = {}
+    { evaluateBoardSelection = defaultEvaluateBoardSelection } = {}
 ) {
-    return ({
-        selectedUnitIndices,
-        selectedVariantIndices,
-        baseTraitCounts,
-        minOccupiedSlots
-    }) => evaluateBoardSelection({
-        selectedUnitIndices,
-        selectedVariantIndices,
-        baseTraitCounts,
-        minOccupiedSlots,
-        boardSize,
-        unitInfo,
-        activeUnitFlags,
-        mustIncludeTraitIndices,
-        mustIncludeTraitTargets,
-        allTraitNames,
-        calculateSynergyScore,
-        isCompiledConditionSatisfied,
-        findFirstSatisfiedProfile,
-        traitCountsToRecord
-    });
+    return ({ selectedUnitIndices, selectedVariantIndices, baseTraitCounts, minOccupiedSlots }) =>
+        evaluateBoardSelection({
+            selectedUnitIndices,
+            selectedVariantIndices,
+            baseTraitCounts,
+            minOccupiedSlots,
+            boardSize,
+            unitInfo,
+            activeUnitFlags,
+            mustIncludeTraitIndices,
+            mustIncludeTraitTargets,
+            allTraitNames,
+            calculateSynergyScore,
+            isCompiledConditionSatisfied,
+            findFirstSatisfiedProfile,
+            traitCountsToRecord
+        });
 }
 
 function buildSearchCandidateEvaluationContext({

@@ -10,51 +10,59 @@ const {
 describe('search evaluation context helpers', () => {
     it('builds a reusable search score calculator with the supplied options', () => {
         const seenCalls = [];
-        const calculateBoardSynergyScore = createSearchScoreCalculator({
-            allTraitNames: ['Bruiser'],
-            traitBreakpoints: { Bruiser: [2] },
-            onlyActive: false,
-            tierRank: false,
-            includeUnique: true
-        }, {
-            calculateSynergyScore: (counts, options) => {
-                seenCalls.push({ counts, options });
-                return 7;
-            }
-        });
-
-        assert.equal(calculateBoardSynergyScore(Uint8Array.from([2])), 7);
-        assert.deepEqual(seenCalls, [{
-            counts: Uint8Array.from([2]),
-            options: {
+        const calculateBoardSynergyScore = createSearchScoreCalculator(
+            {
                 allTraitNames: ['Bruiser'],
                 traitBreakpoints: { Bruiser: [2] },
                 onlyActive: false,
                 tierRank: false,
                 includeUnique: true
+            },
+            {
+                calculateSynergyScore: (counts, options) => {
+                    seenCalls.push({ counts, options });
+                    return 7;
+                }
             }
-        }]);
+        );
+
+        assert.equal(calculateBoardSynergyScore(Uint8Array.from([2])), 7);
+        assert.deepEqual(seenCalls, [
+            {
+                counts: Uint8Array.from([2]),
+                options: {
+                    allTraitNames: ['Bruiser'],
+                    traitBreakpoints: { Bruiser: [2] },
+                    onlyActive: false,
+                    tierRank: false,
+                    includeUnique: true
+                }
+            }
+        ]);
     });
 
     it('builds a resolved-board evaluator with fixed search context', () => {
         let capturedArgs;
-        const evaluateResolvedBoardSelection = createResolvedBoardSelectionEvaluator({
-            boardSize: 9,
-            unitInfo: [{ id: 'A' }],
-            activeUnitFlags: Uint8Array.from([1]),
-            mustIncludeTraitIndices: [0],
-            mustIncludeTraitTargets: [2],
-            allTraitNames: ['Bruiser'],
-            calculateSynergyScore: () => 5,
-            isCompiledConditionSatisfied: () => true,
-            findFirstSatisfiedProfile: () => null,
-            traitCountsToRecord: () => ({ Bruiser: 2 })
-        }, {
-            evaluateBoardSelection: (args) => {
-                capturedArgs = args;
-                return { synergyScore: 5 };
+        const evaluateResolvedBoardSelection = createResolvedBoardSelectionEvaluator(
+            {
+                boardSize: 9,
+                unitInfo: [{ id: 'A' }],
+                activeUnitFlags: Uint8Array.from([1]),
+                mustIncludeTraitIndices: [0],
+                mustIncludeTraitTargets: [2],
+                allTraitNames: ['Bruiser'],
+                calculateSynergyScore: () => 5,
+                isCompiledConditionSatisfied: () => true,
+                findFirstSatisfiedProfile: () => null,
+                traitCountsToRecord: () => ({ Bruiser: 2 })
+            },
+            {
+                evaluateBoardSelection: (args) => {
+                    capturedArgs = args;
+                    return { synergyScore: 5 };
+                }
             }
-        });
+        );
 
         const result = evaluateResolvedBoardSelection({
             selectedUnitIndices: [0],
