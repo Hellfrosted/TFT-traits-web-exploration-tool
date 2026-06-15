@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-14T19:11:05-07:00",
+  "title": "Design System: TFT Board Exploration Tool",
+  "extensions": {
+    "colorMeta": {
+      "tactical-bg": {
+        "role": "neutral",
+        "displayName": "Tactical Background",
+        "canonical": "#101415",
+        "tonalRamp": [
+          "#080a0b",
+          "#101415",
+          "#181d1e",
+          "#242c2e",
+          "#364043",
+          "#586467",
+          "#88928f",
+          "#eef3f0"
+        ]
+      },
+      "tactical-panel": {
+        "role": "neutral",
+        "displayName": "Tactical Panel",
+        "canonical": "#181d1e",
+        "tonalRamp": [
+          "#0f1314",
+          "#121718",
+          "#181d1e",
+          "#1d2425",
+          "#242c2e",
+          "#2d3638",
+          "#3b474a",
+          "#b3bdb9"
+        ]
+      },
+      "command-green": {
+        "role": "primary",
+        "displayName": "Command Green",
+        "canonical": "#7ec488",
+        "tonalRamp": [
+          "#0b130d",
+          "#213127",
+          "#34513c",
+          "#679f71",
+          "#7ec488",
+          "#a5d8ac",
+          "#caefd1",
+          "#dcf5e1"
+        ]
+      },
+      "danger-coral": {
+        "role": "secondary",
+        "displayName": "Danger Coral",
+        "canonical": "#d1847b",
+        "tonalRamp": [
+          "#321513",
+          "#4b221f",
+          "#8d4b46",
+          "#98514b",
+          "#d1847b",
+          "#f7d9d9",
+          "#fff2f0",
+          "#fff8f7"
+        ]
+      },
+      "warning-gold": {
+        "role": "secondary",
+        "displayName": "Warning Gold",
+        "canonical": "#cab37c",
+        "tonalRamp": [
+          "#2e2610",
+          "#4b3e1f",
+          "#806c36",
+          "#a89057",
+          "#cab37c",
+          "#d8c58a",
+          "#eadba8",
+          "#f7efcf"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "App title only; never hero-scale product text."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Workspace and primary panel headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings, modal titles, and spotlight titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Controls, status, data cells, and general UI copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Dense labels, hints, metadata, and table headers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-ambient",
+        "value": "0 12px 28px rgba(0, 0, 0, 0.28)",
+        "purpose": "Main panels, dropdowns, tooltips, and modals."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "140ms ease",
+        "purpose": "Button background, border, and color transitions."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0ms under prefers-reduced-motion: reduce",
+        "purpose": "Disable non-essential transition and animation timing for reduced-motion users."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "shell-stack",
+        "value": "1120px"
+      },
+      {
+        "name": "toolbar-stack",
+        "value": "920px"
+      },
+      {
+        "name": "compact-stack",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary command button for Compute, Fetch Data, and confirmation actions.",
+      "html": "<button class=\"ds-btn-primary\">Compute</button>",
+      "css": ".ds-btn-primary { min-height: 44px; border: 1px solid var(--accent-border, #34513c); border-radius: var(--radius-md, 0.5rem); background: var(--accent-strong, #679f71); color: var(--button-text, #0b130d); padding: 0.65rem 0.85rem; font: 600 0.875rem/1.5 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); letter-spacing: 0.01em; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; } .ds-btn-primary:hover { background: var(--accent, #7ec488); } .ds-btn-primary:focus-visible { outline: 2px solid var(--focus-ring, rgba(126, 196, 136, 0.92)); outline-offset: 2px; } .ds-btn-primary:disabled { cursor: default; opacity: 0.6; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary utility action for reset, cache management, and low-priority commands.",
+      "html": "<button class=\"ds-btn-outline\">Reset Filters</button>",
+      "css": ".ds-btn-outline { min-height: 44px; border: 1px solid var(--border-strong, #3b474a); border-radius: var(--radius-md, 0.5rem); background: var(--panel-3, #242c2e); color: var(--text, #eef3f0); padding: 0.65rem 0.85rem; font: 600 0.875rem/1.5 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); letter-spacing: 0.01em; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; } .ds-btn-outline:hover { background: var(--surface-hover, #2a3234); } .ds-btn-outline:focus-visible { outline: 2px solid var(--focus-ring, rgba(126, 196, 136, 0.92)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field Control",
+      "kind": "input",
+      "refersTo": "field-control",
+      "description": "Dense numeric, select, and text-entry control style.",
+      "html": "<label class=\"ds-field\"><span>Board Size</span><input class=\"ds-input\" value=\"9\" /></label>",
+      "css": ".ds-field { display: grid; gap: 0.35rem; color: var(--text-muted, #b3bdb9); font: 600 0.81rem/1.4 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); } .ds-input { min-height: 44px; border: 1px solid var(--border-strong, #3b474a); border-radius: var(--radius-md, 0.5rem); background: var(--panel-4, #121718); color: var(--text, #eef3f0); padding: 0.65rem 0.75rem; font: 400 0.875rem/1.5 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); outline: none; } .ds-input:focus { border-color: var(--accent, #7ec488); box-shadow: 0 0 0 1px var(--focus-shadow, rgba(126, 196, 136, 0.22)); }"
+    },
+    {
+      "name": "Active Chip",
+      "kind": "chip",
+      "refersTo": "chip-active",
+      "description": "Selected query pill for units, traits, emblems, and active summaries.",
+      "html": "<span class=\"ds-chip-active\"><span class=\"ds-chip-icon\"></span>Stand United</span>",
+      "css": ".ds-chip-active { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--accent-border, #34513c); border-radius: var(--radius-sm, 0.375rem); background: var(--accent-muted, #213127); color: var(--chip-accent-text, #d9f0de); padding: 0.25rem 0.55rem; font: 400 0.82rem/1.35 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); } .ds-chip-icon { width: 18px; height: 18px; border-radius: 50%; background: var(--icon-bg, #0e1113); border: 1px solid var(--icon-border, rgba(255, 255, 255, 0.12)); }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Primary app container for the controls rail, workspace, and modal shell.",
+      "html": "<section class=\"ds-panel\"><h2>Board Results</h2><p>Run a query to inspect ranked boards.</p></section>",
+      "css": ".ds-panel { background: var(--panel, #181d1e); border: 1px solid var(--border, #2d3638); border-radius: var(--radius-lg, 0.625rem); box-shadow: var(--shadow-md, 0 12px 28px rgba(0, 0, 0, 0.28)); color: var(--text, #eef3f0); padding: 1rem; font-family: var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); } .ds-panel h2 { margin: 0 0 0.5rem; color: var(--text, #eef3f0); font: 600 1.15rem/1.2 var(--font-display, Bahnschrift, Franklin Gothic Medium, Aptos, sans-serif); } .ds-panel p { margin: 0; max-width: 40ch; color: var(--text-muted, #b3bdb9); font-size: 0.84rem; line-height: 1.45; }"
+    },
+    {
+      "name": "Results Row",
+      "kind": "custom",
+      "refersTo": "board-results-table",
+      "description": "Representative dense result row with rank, score, unit chips, and trait chips.",
+      "html": "<div class=\"ds-result-row\"><strong class=\"ds-rank\">#1</strong><span class=\"ds-score\">12 traits</span><span class=\"ds-chip-neutral\">Aatrox</span><span class=\"ds-chip-active\">Duelist</span></div>",
+      "css": ".ds-result-row { display: grid; grid-template-columns: 3rem 6rem minmax(8rem, 1fr) minmax(8rem, 1fr); gap: 0.75rem; align-items: center; min-height: 68px; padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--border, #2d3638); background: var(--panel-4, #121718); color: var(--text, #eef3f0); font: 400 0.84rem/1.45 var(--font-ui, Aptos, Calibri, Tahoma, sans-serif); } .ds-result-row:hover { background: var(--surface-row-hover, #1f2526); } .ds-rank { color: var(--accent, #7ec488); font-weight: 700; } .ds-score { color: var(--text-muted, #b3bdb9); } .ds-chip-neutral, .ds-chip-active { display: inline-flex; align-items: center; width: fit-content; border-radius: var(--radius-sm, 0.375rem); padding: 0.2rem 0.48rem; font-size: 0.8rem; line-height: 1.35; } .ds-chip-neutral { background: var(--panel-3, #242c2e); color: var(--text, #eef3f0); border: 1px solid var(--border, #2d3638); } .ds-chip-active { background: var(--accent-muted, #213127); color: var(--chip-active-text, #dcf5e1); border: 1px solid var(--accent-border, #34513c); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tactical Console",
+    "overview": "This system should feel like a compact local command surface for experienced Teamfight Tactics players: dark, stable, and fast to scan while a player is planning under time pressure. The interface is not a themed game skin. It borrows TFT flavor through Community Dragon unit and trait assets, then keeps the surrounding chrome operational.\n\nThe visual language is dense but orderly: a fixed control rail, a results workspace, compact typographic steps, shallow rounded corners, restrained borders, and one green command accent for primary actions and selected states. The system rejects marketing drama, decorative dashboards, and novelty animation. Every visual choice must help users see constraints, query state, and ranked boards faster.",
+    "keyCharacteristics": [
+      "Dark neutral tactical surfaces with low-chroma green command states.",
+      "Dense desktop-first controls with explicit labels, hints, and visible status.",
+      "Compact panels, tables, chips, and dropdowns that preserve scan speed.",
+      "Functional depth from borders, tonal layers, and one ambient shadow.",
+      "Game assets appear inside data objects, not as background decoration."
+    ],
+    "rules": [
+      {
+        "name": "The One Command Color Rule",
+        "body": "Green is functional, not decorative. If a green element is not an action, selected state, focus state, or ranked signal, remove the green.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dark Workspace Rule",
+        "body": "Do not introduce light cards, cream canvases, purple gradients, or poster-like hero sections. This is an in-game planning tool, not a marketing page.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dense-But-Legible Rule",
+        "body": "Keep type fixed in rems and avoid fluid clamp sizing. Responsive behavior changes structure, not the typography scale.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Display Labels Rule",
+        "body": "Display fonts belong to headings only. Labels, buttons, chips, and table data must stay in the UI/body stack.",
+        "section": "typography"
+      },
+      {
+        "name": "The Single Shadow Rule",
+        "body": "Use the ambient shadow only for surfaces that genuinely sit above the app: main panels, dropdowns, tooltips, and modals. Do not stack custom shadows on buttons or chips.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Border-First Rule",
+        "body": "Internal hierarchy is created with `1px` strokes and tonal surfaces before shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the search task primary: controls, query state, and results must remain legible at a glance.",
+      "Do preserve density with order: align labels, group constraints, and let compact spacing carry more information.",
+      "Do use Community Dragon assets inside unit and trait objects when they clarify data.",
+      "Do keep focus states visible with the 2px Command Green outline and 44px hit targets.",
+      "Do use skeletons, inline status, and explicit errors for loading or search failures instead of vague waiting text.",
+      "Do respect reduced motion. Motion should communicate state in 150ms-250ms, not choreograph the page."
+    ],
+    "donts": [
+      "Don't drift into a marketing landing page, a generic SaaS dashboard, a comp tier-list clone, or a broad TFT companion app.",
+      "Don't use decorative card grids, hero-metric layouts, gratuitous animation, or visual noise that slows scanning during live-game decision making.",
+      "Don't add purple gradients, glass cards, beige paper surfaces, oversized hero headings, or brand-campaign composition.",
+      "Don't use green as decoration. Green means command, focus, active, selected, or ranked.",
+      "Don't use border-left or border-right accents wider than 1px on cards, list items, alerts, or callouts.",
+      "Don't pair 1px borders with wide decorative shadows on buttons or chips. Use border and tone for internal components.",
+      "Don't invent custom affordances where standard controls work. Dense product UI earns trust through familiarity."
+    ]
+  }
+}
