@@ -1,4 +1,5 @@
 const path = require('path');
+const { writeJsonPayloadAtomically } = require('./atomic-json-writer.js');
 
 function createSearchCacheStore({
     storagePaths,
@@ -12,20 +13,6 @@ function createSearchCacheStore({
 
     function ensureCacheDir() {
         ensureStorageDirs(storagePaths);
-    }
-
-    async function writeCachePayload(filePath, payload) {
-        const tempPath = `${filePath}.${process.pid || 'cache'}.${Date.now()}.tmp`;
-        await fsp.writeFile(tempPath, payload, 'utf-8');
-        try {
-            await fsp.rename(tempPath, filePath);
-        } catch (renameError) {
-            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
-                throw renameError;
-            }
-            await fsp.unlink(filePath).catch(() => {});
-            await fsp.rename(tempPath, filePath);
-        }
     }
 
     async function deleteFileIfPresent(filePath) {
@@ -73,7 +60,12 @@ function createSearchCacheStore({
 
     async function writeCacheIndex(entries = []) {
         ensureCacheDir();
-        await writeCachePayload(cacheIndexPath, JSON.stringify(entries));
+        await writeJsonPayloadAtomically({
+            fsp,
+            filePath: cacheIndexPath,
+            payload: JSON.stringify(entries),
+            tempSuffix: `${process.pid || 'cache'}.${Date.now()}`
+        });
     }
 
     async function readCacheIndex() {
@@ -83,7 +75,12 @@ function createSearchCacheStore({
     async function writeCacheEntry(key, payload) {
         ensureCacheDir();
         const filePath = resolveCacheEntryPath(storagePaths, key);
-        await writeCachePayload(filePath, JSON.stringify(payload));
+        await writeJsonPayloadAtomically({
+            fsp,
+            filePath,
+            payload: JSON.stringify(payload),
+            tempSuffix: `${process.pid || 'cache'}.${Date.now()}`
+        });
     }
 
     async function readCacheEntry(key) {
@@ -125,7 +122,12 @@ function createSearchCacheStore({
     async function writeDataFallback(source, rawData) {
         ensureCacheDir();
         const filePath = resolveDataFallbackPath(storagePaths, source);
-        await writeCachePayload(filePath, JSON.stringify(rawData));
+        await writeJsonPayloadAtomically({
+            fsp,
+            filePath,
+            payload: JSON.stringify(rawData),
+            tempSuffix: `${process.pid || 'cache'}.${Date.now()}`
+        });
     }
 
     async function readDataFallback(source) {

@@ -1,4 +1,5 @@
 const path = require('path');
+const { writeJsonPayloadAtomically } = require('./atomic-json-writer.js');
 
 function createCacheMigrationService({
     cacheService,
@@ -14,20 +15,6 @@ function createCacheMigrationService({
     const strictlyMigratedFingerprints = new Set();
     let cacheMigrationState = null;
     let cacheMigrationStatePromise = null;
-
-    async function writeJsonFileAtomically(filePath, payload) {
-        const tempPath = `${filePath}.${processRef.pid || 'runtime'}.${Date.now()}.tmp`;
-        await fsp.writeFile(tempPath, payload, 'utf-8');
-        try {
-            await fsp.rename(tempPath, filePath);
-        } catch (renameError) {
-            if (!['EEXIST', 'EPERM'].includes(renameError?.code)) {
-                throw renameError;
-            }
-            await fsp.unlink(filePath).catch(() => {});
-            await fsp.rename(tempPath, filePath);
-        }
-    }
 
     function normalizeCacheMigrationState(rawState) {
         const strictFingerprints = Array.isArray(rawState?.strictFingerprints)
@@ -69,7 +56,12 @@ function createCacheMigrationService({
 
     async function saveCacheMigrationState(nextState) {
         cacheMigrationState = normalizeCacheMigrationState(nextState);
-        await writeJsonFileAtomically(cacheMigrationStatePath, JSON.stringify(cacheMigrationState));
+        await writeJsonPayloadAtomically({
+            fsp,
+            filePath: cacheMigrationStatePath,
+            payload: JSON.stringify(cacheMigrationState),
+            tempSuffix: `${processRef.pid || 'runtime'}.${Date.now()}`
+        });
     }
 
     async function migrateAllCachedParamsWithBaseNormalization() {
