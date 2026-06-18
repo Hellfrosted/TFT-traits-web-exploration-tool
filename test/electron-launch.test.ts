@@ -40,10 +40,7 @@ describe('Electron launch helpers', () => {
     });
 
     it('only rewrites mounted Windows paths', () => {
-        assert.equal(
-            toWindowsPath('/mnt/e/dev/TFT-traits-web-exploration-tool'),
-            'E:\\dev\\TFT-traits-web-exploration-tool'
-        );
+        assert.equal(toWindowsPath('/mnt/c/tmp/x'), 'C:\\tmp\\x');
         assert.equal(toWindowsPath('/tmp/app'), '/tmp/app');
     });
 });

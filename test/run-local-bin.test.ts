@@ -38,46 +38,54 @@ describe('local tool runner helpers', () => {
 
     it('routes WSL binaries through cmd.exe when Windows shims are installed', () => {
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-bin-'));
-        fs.mkdirSync(path.join(tempDir, 'node_modules', '.bin'), { recursive: true });
-        fs.writeFileSync(path.join(tempDir, 'node_modules', '.bin', 'biome.CMD'), '');
+        try {
+            fs.mkdirSync(path.join(tempDir, 'node_modules', '.bin'), { recursive: true });
+            fs.writeFileSync(path.join(tempDir, 'node_modules', '.bin', 'biome.CMD'), '');
 
-        const commandSpec = resolveLocalBinCommand(
-            'biome',
-            ['lint', '.'],
-            {
-                platform: 'linux',
-                release: '6.6.87.2-microsoft-standard-WSL2',
-                wslDistroName: 'Ubuntu'
-            },
-            tempDir
-        );
+            const commandSpec = resolveLocalBinCommand(
+                'biome',
+                ['lint', '.'],
+                {
+                    platform: 'linux',
+                    release: '6.6.87.2-microsoft-standard-WSL2',
+                    wslDistroName: 'Ubuntu'
+                },
+                tempDir
+            );
 
-        assert.deepEqual(commandSpec, {
-            command: 'cmd.exe',
-            args: ['/c', `cd /d ${toWindowsPath(tempDir)} && call node_modules\\.bin\\biome.CMD lint .`]
-        });
+            assert.deepEqual(commandSpec, {
+                command: 'cmd.exe',
+                args: ['/c', `cd /d ${toWindowsPath(tempDir)} && call node_modules\\.bin\\biome.CMD lint .`]
+            });
+        } finally {
+            fs.rmSync(tempDir, { force: true, recursive: true });
+        }
     });
 
     it('uses local unix bins in WSL when only unix shims are installed', () => {
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-bin-'));
-        fs.mkdirSync(path.join(tempDir, 'node_modules', '.bin'), { recursive: true });
-        fs.writeFileSync(path.join(tempDir, 'node_modules', '.bin', 'eslint'), '');
+        try {
+            fs.mkdirSync(path.join(tempDir, 'node_modules', '.bin'), { recursive: true });
+            fs.writeFileSync(path.join(tempDir, 'node_modules', '.bin', 'eslint'), '');
 
-        const commandSpec = resolveLocalBinCommand(
-            'eslint',
-            ['src'],
-            {
-                platform: 'linux',
-                release: '6.6.87.2-microsoft-standard-WSL2',
-                wslDistroName: 'Ubuntu'
-            },
-            tempDir
-        );
+            const commandSpec = resolveLocalBinCommand(
+                'eslint',
+                ['src'],
+                {
+                    platform: 'linux',
+                    release: '6.6.87.2-microsoft-standard-WSL2',
+                    wslDistroName: 'Ubuntu'
+                },
+                tempDir
+            );
 
-        assert.deepEqual(commandSpec, {
-            command: path.join(tempDir, 'node_modules', '.bin', 'eslint'),
-            args: ['src']
-        });
+            assert.deepEqual(commandSpec, {
+                command: path.join(tempDir, 'node_modules', '.bin', 'eslint'),
+                args: ['src']
+            });
+        } finally {
+            fs.rmSync(tempDir, { force: true, recursive: true });
+        }
     });
 
     it('uses local unix bins outside WSL', () => {

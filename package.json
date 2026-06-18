@@ -10,7 +10,7 @@
     "dev:renderer": "node tools/local-bin.cjs vite",
     "dev:electron": "pnpm ensure:electron && pnpm build:node && node build/tools/run-electron-dev.js",
     "build": "pnpm build:node && pnpm build:renderer",
-    "build:node": "tsc && node -e \"const fs=require('node:fs'); fs.cpSync('assets','build/assets',{recursive:true}); fs.mkdirSync('build/tools',{recursive:true}); fs.copyFileSync('favicon.svg','build/favicon.svg'); fs.copyFileSync('tools/local-bin.cjs','build/tools/local-bin.cjs');\"",
+    "build:node": "tsc && node -e \"const fs=require('node:fs'); fs.cpSync('assets','build/assets',{recursive:true}); fs.mkdirSync('build/tools',{recursive:true}); fs.copyFileSync('favicon.svg','build/favicon.svg'); fs.copyFileSync('tools/local-bin.cjs','build/tools/local-bin.cjs'); fs.copyFileSync('tools/wsl-runtime.cjs','build/tools/wsl-runtime.cjs');\"",
     "build:renderer": "node tools/local-bin.cjs vite build",
     "help": "pnpm run",
     "test": "pnpm build:node && node build/tools/run-node-tests.js",

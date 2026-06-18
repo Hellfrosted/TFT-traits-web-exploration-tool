@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { runSmokeProcess } = require('./smoke-process-runner.js');
 
 function findPackagedExecutable(distRoot) {
     const candidates = fs
@@ -23,40 +23,12 @@ function findPackagedExecutable(distRoot) {
 
 async function runExecutable(exePath) {
     const timeoutMs = 30_000;
-    await new Promise<void>((resolve, reject) => {
-        const child = spawn(exePath, ['--smoke-test'], {
-            cwd: path.dirname(exePath),
-            stdio: 'inherit',
-            env: {
-                ...process.env,
-                ELECTRON_RUN_AS_NODE: undefined
-            }
-        });
-
-        const timeoutId = setTimeout(() => {
-            child.kill();
-            reject(new Error(`Packaged smoke test timed out after ${timeoutMs}ms.`));
-        }, timeoutMs);
-
-        child.once('error', (error) => {
-            clearTimeout(timeoutId);
-            reject(error);
-        });
-
-        child.once('exit', (code, signal) => {
-            clearTimeout(timeoutId);
-            if (signal) {
-                reject(new Error(`Packaged smoke test terminated with signal ${signal}.`));
-                return;
-            }
-
-            if (code !== 0) {
-                reject(new Error(`Packaged smoke test exited with code ${code}.`));
-                return;
-            }
-
-            resolve();
-        });
+    await runSmokeProcess({
+        command: exePath,
+        args: ['--smoke-test'],
+        cwd: path.dirname(exePath),
+        timeoutMs,
+        label: 'Packaged smoke test'
     });
 }
 

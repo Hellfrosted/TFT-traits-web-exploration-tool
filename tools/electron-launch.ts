@@ -1,4 +1,5 @@
-const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
 
 type RuntimeInfo = {
     readonly platform: string;
@@ -11,32 +12,22 @@ type ElectronLaunch = {
     readonly args: readonly string[];
 };
 
-function getRuntimeInfo(): RuntimeInfo {
-    return {
-        platform: process.platform,
-        release: os.release(),
-        wslDistroName: process.env.WSL_DISTRO_NAME
-    };
-}
+type WslRuntimeHelpers = {
+    readonly getRuntimeInfo: () => RuntimeInfo;
+    readonly isWslRuntime: (runtimeInfo: RuntimeInfo) => boolean;
+    readonly toWindowsPath: (pathValue: string) => string;
+};
 
-function isWslRuntime(runtimeInfo: RuntimeInfo): boolean {
-    if (runtimeInfo.platform !== 'linux') {
-        return false;
+function resolveWslRuntimeHelperPath(): string {
+    const localHelperPath = path.join(__dirname, 'wsl-runtime.cjs');
+    if (fs.existsSync(localHelperPath)) {
+        return localHelperPath;
     }
 
-    const normalizedRelease = runtimeInfo.release.toLowerCase();
-    return normalizedRelease.includes('microsoft') || Boolean(runtimeInfo.wslDistroName);
+    return path.join(__dirname, '..', '..', 'tools', 'wsl-runtime.cjs');
 }
 
-function toWindowsPath(pathValue: string): string {
-    const match = /^\/mnt\/([a-z])\/(.*)$/i.exec(pathValue);
-    if (!match) {
-        return pathValue;
-    }
-
-    const [, driveLetter, rest] = match;
-    return `${driveLetter.toUpperCase()}:\\${rest.replaceAll('/', '\\')}`;
-}
+const { getRuntimeInfo, isWslRuntime, toWindowsPath }: WslRuntimeHelpers = require(resolveWslRuntimeHelperPath());
 
 function resolveElectronLaunch(
     electronBinary: string,

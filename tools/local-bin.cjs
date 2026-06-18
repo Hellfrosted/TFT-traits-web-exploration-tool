@@ -1,23 +1,19 @@
 #!/usr/bin/env node
 
-const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-function isWslRuntime(
-    runtime = {
-        platform: process.platform,
-        release: os.release(),
-        wslDistroName: process.env.WSL_DISTRO_NAME
-    }
-) {
-    if (runtime.platform !== 'linux') {
-        return false;
+function resolveWslRuntimeHelperPath() {
+    const localHelperPath = path.join(__dirname, 'wsl-runtime.cjs');
+    if (fs.existsSync(localHelperPath)) {
+        return localHelperPath;
     }
 
-    return runtime.release.toLowerCase().includes('microsoft') || Boolean(runtime.wslDistroName);
+    return path.join(__dirname, '..', '..', 'tools', 'wsl-runtime.cjs');
 }
+
+const { getRuntimeInfo, isWslRuntime, toWindowsPath } = require(resolveWslRuntimeHelperPath());
 
 function quoteForCmd(argument) {
     return `"${String(argument).replaceAll('"', '""')}"`;
@@ -32,24 +28,10 @@ function renderCmdArgument(argument) {
     return normalized;
 }
 
-function toWindowsPath(pathValue) {
-    const match = /^\/mnt\/([a-z])\/(.*)$/i.exec(pathValue);
-    if (!match) {
-        return pathValue;
-    }
-
-    const [, driveLetter, rest] = match;
-    return `${driveLetter.toUpperCase()}:\\${rest.replaceAll('/', '\\')}`;
-}
-
 function resolveLocalBinCommand(
     binName,
     binArgs,
-    runtime = {
-        platform: process.platform,
-        release: os.release(),
-        wslDistroName: process.env.WSL_DISTRO_NAME
-    },
+    runtime = getRuntimeInfo(),
     cwd = process.cwd()
 ) {
     if (isWslRuntime(runtime)) {
