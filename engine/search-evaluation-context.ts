@@ -1,6 +1,21 @@
 const { calculateSynergyScore: defaultCalculateSynergyScore } = require('./search-state.js');
 const { evaluateBoardSelection: defaultEvaluateBoardSelection } = require('./search-evaluator.js');
 
+function createScoreLoop(scoreIndexes, scoreBreakpoints, scoreTrait) {
+    return (counts) => {
+        let score = 0;
+        for (let entryIndex = 0; entryIndex < scoreIndexes.length; entryIndex++) {
+            const count = counts[scoreIndexes[entryIndex]];
+            if (count === 0) {
+                continue;
+            }
+
+            score += scoreTrait(count, scoreBreakpoints[entryIndex]);
+        }
+        return score;
+    };
+}
+
 function createSearchScoreCalculator(
     { allTraitNames = [], traitBreakpoints = {}, onlyActive = true, tierRank = true, includeUnique = false } = {},
     { calculateSynergyScore = defaultCalculateSynergyScore } = {}
@@ -19,75 +34,47 @@ function createSearchScoreCalculator(
         }
 
         if (tierRank && onlyActive) {
-            return (counts) => {
+            return createScoreLoop(scoreIndexes, scoreBreakpoints, (count, breakpoints) => {
                 let score = 0;
-                for (let entryIndex = 0; entryIndex < scoreIndexes.length; entryIndex++) {
-                    const count = counts[scoreIndexes[entryIndex]];
-                    if (count === 0) {
-                        continue;
-                    }
-
-                    const breakpoints = scoreBreakpoints[entryIndex];
-                    for (const breakpoint of breakpoints) {
-                        if (count >= breakpoint) {
-                            score += 1;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                return score;
-            };
-        }
-
-        if (onlyActive) {
-            return (counts) => {
-                let score = 0;
-                for (let entryIndex = 0; entryIndex < scoreIndexes.length; entryIndex++) {
-                    const count = counts[scoreIndexes[entryIndex]];
-                    if (count === 0) {
-                        continue;
-                    }
-
-                    const breakpoints = scoreBreakpoints[entryIndex];
-                    for (const breakpoint of breakpoints) {
-                        if (count >= breakpoint) {
-                            score += 1;
-                            break;
-                        }
-                        break;
-                    }
-                }
-                return score;
-            };
-        }
-
-        return (counts) => {
-            let score = 0;
-            for (let entryIndex = 0; entryIndex < scoreIndexes.length; entryIndex++) {
-                const count = counts[scoreIndexes[entryIndex]];
-                if (count === 0) {
-                    continue;
-                }
-
-                let levelsPassed = 0;
-                const breakpoints = scoreBreakpoints[entryIndex];
                 for (const breakpoint of breakpoints) {
                     if (count >= breakpoint) {
-                        levelsPassed += 1;
+                        score += 1;
                     } else {
                         break;
                     }
                 }
+                return score;
+            });
+        }
 
-                if (onlyActive && levelsPassed === 0) {
-                    continue;
+        if (onlyActive) {
+            return createScoreLoop(scoreIndexes, scoreBreakpoints, (count, breakpoints) => {
+                for (const breakpoint of breakpoints) {
+                    if (count >= breakpoint) {
+                        return 1;
+                    }
+                    break;
                 }
+                return 0;
+            });
+        }
 
-                score += tierRank ? levelsPassed : levelsPassed > 0 ? 1 : onlyActive ? 0 : 1;
+        return createScoreLoop(scoreIndexes, scoreBreakpoints, (count, breakpoints) => {
+            let levelsPassed = 0;
+            for (const breakpoint of breakpoints) {
+                if (count >= breakpoint) {
+                    levelsPassed += 1;
+                } else {
+                    break;
+                }
             }
-            return score;
-        };
+
+            if (onlyActive && levelsPassed === 0) {
+                return 0;
+            }
+
+            return tierRank ? levelsPassed : levelsPassed > 0 ? 1 : onlyActive ? 0 : 1;
+        });
     }
 
     return (counts) =>

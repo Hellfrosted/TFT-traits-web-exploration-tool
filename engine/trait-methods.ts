@@ -1,3 +1,16 @@
+function addProfileTraitNames(traitNames, profile) {
+    (profile?.traits || []).forEach((traitName) => {
+        if (traitName) {
+            traitNames.add(traitName);
+        }
+    });
+    Object.keys(profile?.traitContributions || {}).forEach((traitName) => {
+        if (traitName) {
+            traitNames.add(traitName);
+        }
+    });
+}
+
 module.exports = {
     buildTraitContributionEntries(unit, traitIndex, hashMap = {}) {
         const contributionMap = new Map();
@@ -92,16 +105,7 @@ module.exports = {
         const traitNames = new Set(this.getConditionalEffectTraitNames(unit?.conditionalEffects));
 
         (unit?.conditionalProfiles || []).forEach((profile) => {
-            (profile?.traits || []).forEach((traitName) => {
-                if (traitName) {
-                    traitNames.add(traitName);
-                }
-            });
-            Object.keys(profile?.traitContributions || {}).forEach((traitName) => {
-                if (traitName) {
-                    traitNames.add(traitName);
-                }
-            });
+            addProfileTraitNames(traitNames, profile);
         });
 
         (unit?.variants || []).forEach((variant) => {
@@ -109,16 +113,7 @@ module.exports = {
                 traitNames.add(traitName);
             });
             (variant?.conditionalProfiles || []).forEach((profile) => {
-                (profile?.traits || []).forEach((traitName) => {
-                    if (traitName) {
-                        traitNames.add(traitName);
-                    }
-                });
-                Object.keys(profile?.traitContributions || {}).forEach((traitName) => {
-                    if (traitName) {
-                        traitNames.add(traitName);
-                    }
-                });
+                addProfileTraitNames(traitNames, profile);
             });
         });
 
