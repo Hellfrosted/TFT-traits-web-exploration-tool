@@ -1,4 +1,4 @@
-const { normalizeSearchParams } = require('../searchParams.js');
+const { normalizeSearchParams } = require('../src/shared/board-search-query.js');
 const { finalizeTopBoards } = require('./search-results.js');
 const { countPreparedSearchSpaceCandidates } = require('./search-space-counter.js');
 const { runSearchDfs } = require('./search-dfs-runner.js');

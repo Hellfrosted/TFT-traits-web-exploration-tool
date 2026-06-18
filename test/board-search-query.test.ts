@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 
 const {
     createDefaultSearchQuery,
+    normalizeBoolean,
+    normalizeSearchParams,
     normalizeSearchParamsForData,
+    normalizeStringList,
+    normalizeStringMap,
     serializeSearchParams,
     summarizeSearchParams,
     withDefaultRoleFilters
@@ -41,18 +45,96 @@ describe('board search query contract', () => {
         assert.deepEqual(query.carryRoles, ['Custom Carry']);
     });
 
+    it('normalizes option objects into distinct string values', () => {
+        assert.deepEqual(
+            normalizeStringList([
+                { value: 'Challenger', label: 'Challenger' },
+                { id: 'Lux' },
+                { name: 'Mage' },
+                'Lux',
+                '  Challenger  ',
+                '',
+                null
+            ]),
+            ['Challenger', 'Lux', 'Mage']
+        );
+    });
+
+    it('clamps numeric inputs and sanitizes array params', () => {
+        const query = normalizeSearchParams({
+            boardSize: '0',
+            maxResults: '500000',
+            mustIncludeTraits: [{ value: 'Challenger' }, { value: 'Challenger' }],
+            extraEmblems: [{ label: 'Replicator' }],
+            tankRoles: ['Tank', 'Tank'],
+            carryRoles: [{ value: 'Carry' }],
+            variantLocks: {
+                MissFortune: 'conduit',
+                Vex: { value: 'shadow' },
+                '': 'bad'
+            },
+            onlyActive: 1,
+            tierRank: 0,
+            includeUnique: 'yes'
+        });
+
+        assert.equal(query.boardSize, 1);
+        assert.equal(query.maxResults, 1000);
+        assert.deepEqual(query.mustIncludeTraits, ['Challenger']);
+        assert.deepEqual(query.extraEmblems, ['Replicator']);
+        assert.deepEqual(query.tankRoles, ['Tank']);
+        assert.deepEqual(query.carryRoles, ['Carry']);
+        assert.deepEqual(query.variantLocks, {
+            MissFortune: 'conduit',
+            Vex: 'shadow'
+        });
+        assert.equal(query.onlyActive, true);
+        assert.equal(query.tierRank, false);
+        assert.equal(query.includeUnique, true);
+    });
+
+    it('normalizes string and numeric booleans predictably', () => {
+        assert.equal(normalizeBoolean('false'), false);
+        assert.equal(normalizeBoolean('0'), false);
+        assert.equal(normalizeBoolean('off'), false);
+        assert.equal(normalizeBoolean('yes'), true);
+        assert.equal(normalizeBoolean(0), false);
+        assert.equal(normalizeBoolean(1), true);
+    });
+
+    it('normalizes variant lock objects into stable string maps', () => {
+        assert.deepEqual(
+            normalizeStringMap({
+                MissFortune: { value: 'conduit' },
+                Vex: '  shadow  ',
+                ' ': 'ignored',
+                Annie: ''
+            }),
+            {
+                MissFortune: 'conduit',
+                Vex: 'shadow'
+            }
+        );
+    });
+
     it('normalizes against active data and drops auto variant locks', () => {
         const query = normalizeSearchParamsForData(
             {
                 mustInclude: ['KnownUnit', 'UnknownUnit'],
+                mustExclude: ['UnknownUnit'],
+                mustIncludeTraits: ['KnownTrait', 'UnknownTrait'],
                 mustExcludeTraits: ['KnownTrait', 'UnknownTrait'],
                 tankRoles: ['Tank', 'UnknownRole'],
+                carryRoles: ['Carry', 'UnknownRole'],
                 extraEmblems: ['KnownTrait', 'UnknownTrait'],
                 variantLocks: {
                     KnownUnit: 'mode-a',
                     AutoUnit: 'auto',
                     UnknownUnit: 'mode-z'
-                }
+                },
+                onlyActive: true,
+                tierRank: true,
+                includeUnique: false
             },
             {
                 units: [
@@ -60,13 +142,16 @@ describe('board search query contract', () => {
                     { id: 'AutoUnit', variants: [{ id: 'mode-b' }] }
                 ],
                 traits: ['KnownTrait'],
-                roles: ['Tank']
+                roles: ['Tank', 'Carry']
             }
         );
 
         assert.deepEqual(query.mustInclude, ['KnownUnit']);
+        assert.deepEqual(query.mustExclude, []);
+        assert.deepEqual(query.mustIncludeTraits, ['KnownTrait']);
         assert.deepEqual(query.mustExcludeTraits, ['KnownTrait']);
         assert.deepEqual(query.tankRoles, ['Tank']);
+        assert.deepEqual(query.carryRoles, ['Carry']);
         assert.deepEqual(query.extraEmblems, ['KnownTrait']);
         assert.deepEqual(query.variantLocks, { KnownUnit: 'mode-a' });
     });
@@ -100,6 +185,16 @@ describe('board search query contract', () => {
                     A: 'mode-1',
                     B: 'mode-2'
                 }
+            })
+        );
+        assert.equal(
+            serializeSearchParams({
+                ...query,
+                onlyActive: true
+            }),
+            serializeSearchParams({
+                ...query,
+                onlyActive: 'true'
             })
         );
     });

@@ -44,8 +44,6 @@ const parseMethods = require('./data-engine/parse.js');
  * @property {Object<string, string>} hashMap
  */
 
-class DataEngine {}
-
-Object.assign(DataEngine, sourceMethods, fetchMethods, assetMethods, overrideMethods, parseMethods);
+const DataEngine = Object.assign({}, sourceMethods, fetchMethods, assetMethods, overrideMethods, parseMethods);
 
 module.exports = DataEngine;

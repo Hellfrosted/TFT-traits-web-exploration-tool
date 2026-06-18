@@ -52,6 +52,5 @@ if (require.main === module) {
 }
 
 module.exports = {
-    digestResults,
-    runSearchBenchmark
+    digestResults
 };

@@ -1,4 +1,4 @@
-const { serializeSearchParams: defaultSerializeSearchParams } = require('../searchParams.js');
+const { serializeSearchParams: defaultSerializeSearchParams } = require('../src/shared/board-search-query.js');
 const { createSearchCacheStore } = require('./search-cache-store.js');
 
 function touchMemoryCacheEntry(cache, key, value) {

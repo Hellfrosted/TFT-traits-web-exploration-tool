@@ -11,7 +11,7 @@ function createMainRuntime(options: LooseRecord = {}) {
     const Worker = options.Worker || require('worker_threads').Worker;
     const dataEngine = options.dataEngine || require('../data.js');
     const engine = options.engine || require('../engine.js');
-    const searchParamUtils = options.searchParamUtils || require('../searchParams.js');
+    const searchParamUtils = options.searchParamUtils || require('../src/shared/board-search-query.js');
     const normalizeSearchParams = options.normalizeSearchParams || searchParamUtils.normalizeSearchParams;
     const normalizeSearchParamsForData =
         options.normalizeSearchParamsForData || searchParamUtils.normalizeSearchParamsForData || normalizeSearchParams;
@@ -221,6 +221,5 @@ function createMainRuntime(options: LooseRecord = {}) {
 }
 
 module.exports = {
-    SEARCH_CACHE_VERSION,
     createMainRuntime
 };

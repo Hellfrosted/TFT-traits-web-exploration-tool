@@ -12,7 +12,6 @@ const eslintTargets = [
     'global.d.ts',
     'main.ts',
     'preload.ts',
-    'searchParams.ts',
     'setOverrides.ts',
     'storage.ts',
     'vite.config.ts',

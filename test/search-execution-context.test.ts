@@ -2,7 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const Engine = require('../engine.js');
-const { normalizeSearchParams } = require('../searchParams.js');
+const { normalizeSearchParams } = require('../src/shared/board-search-query.js');
 const { createSearchExecutionDependencies } = require('../engine/search-execution-dependencies.js');
 const { buildSearchExecutionContext } = require('../engine/search-execution-context.js');
 const { mechaSlotDataCache, mockDataCache } = require('./fixtures/engine-fixtures.js');

@@ -222,11 +222,11 @@ export function normalizeSearchParamsForData(
     };
 }
 
-export function deriveDefaultTankRoles(roles: unknown) {
+function deriveDefaultTankRoles(roles: unknown) {
     return normalizeStringList(roles).filter((role) => /tank/i.test(role));
 }
 
-export function deriveDefaultCarryRoles(roles: unknown) {
+function deriveDefaultCarryRoles(roles: unknown) {
     const normalizedRoles = normalizeStringList(roles);
     const tankRoles = new Set(deriveDefaultTankRoles(normalizedRoles).map((role) => role.toLowerCase()));
     return normalizedRoles.filter((role) => role.toLowerCase() !== 'unknown' && !tankRoles.has(role.toLowerCase()));
@@ -261,7 +261,7 @@ export function createDefaultSearchQuery(dataCache: ActiveSearchData | null = nu
     );
 }
 
-export function buildSerializableSearchParams(params: SearchParamsInput = {}) {
+function buildSerializableSearchParams(params: SearchParamsInput = {}) {
     const normalized = normalizeSearchParams(params);
     return {
         boardSize: normalized.boardSize,

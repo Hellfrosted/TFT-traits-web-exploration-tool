@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const { createSearchCacheService } = require('../main-process/search-cache-service.js');
 const { getStoragePaths, ensureStorageDirs, resolveCacheEntryPath, resolveDataFallbackPath } = require('../storage.js');
 const { LIMITS } = require('../constants.js');
-const { normalizeSearchParams, normalizeSearchParamsForData } = require('../searchParams.js');
+const { normalizeSearchParams, normalizeSearchParamsForData } = require('../src/shared/board-search-query.js');
 
 function makeTempDir(prefix) {
     return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
