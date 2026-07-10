@@ -56,6 +56,24 @@ pnpm validate:data
 
 Run the two dev commands in separate terminals when you want Vite hot reload inside Electron.
 
+## Optional Git Hooks
+
+The tracked hooks are opt-in and are never installed automatically. Enable them
+for a checkout with:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The pre-push hook runs the main-branch verification gate. The post-commit hook
+only delegates to an executable, workstation-local `.git/hooks/post-commit`
+hook when one is present; use that local hook for companion-clone sync or other
+machine-specific automation. Disable the tracked hooks with:
+
+```sh
+git config --unset core.hooksPath
+```
+
 
 ## License
 

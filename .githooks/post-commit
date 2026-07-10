@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+# Run an optional workstation-local hook without bypassing tracked hooksPath.
+local_hook="$(git rev-parse --git-dir)/hooks/post-commit"
+
+if [ -x "$local_hook" ]; then
+    exec "$local_hook"
+fi
