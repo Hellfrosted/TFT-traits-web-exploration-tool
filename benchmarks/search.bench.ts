@@ -1,5 +1,4 @@
 const { Bench } = require('tinybench');
-const { withCodSpeed } = require('@codspeed/tinybench-plugin');
 
 const Engine = require('../engine.js');
 const { buildSearchBenchmarkData, searchBenchmarkParams } = require('../tools/search-benchmark-scenario.js');
@@ -11,7 +10,7 @@ const mediumDataCache = buildSearchBenchmarkData(14);
 const largeDataCache = buildSearchBenchmarkData(16);
 
 async function main() {
-    const bench = withCodSpeed(new Bench({ time: 100 }));
+    const bench = new Bench({ time: 100 });
 
     bench
         .add('search - 12 units, board 7, top 500', () => {

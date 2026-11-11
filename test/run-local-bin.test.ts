@@ -101,7 +101,7 @@ describe('local tool runner helpers', () => {
         );
 
         assert.deepEqual(commandSpec, {
-            command: '/tmp/project/node_modules/.bin/vite',
+            command: path.join('/tmp/project', 'node_modules', '.bin', 'vite'),
             args: ['build']
         });
     });

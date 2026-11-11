@@ -1,6 +1,5 @@
 # TFT Board Exploration Tool
 
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/Hellfrosted/TFT-traits-web-exploration-tool?utm_source=badge)
 
 Desktop app for exploring high-cap Teamfight Tactics boards from raw Community Dragon data.
 
